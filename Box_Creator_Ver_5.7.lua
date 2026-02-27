@@ -28,11 +28,11 @@
 
 -- require("mobdebug").start()
 
-g_version = "5.6"                                                    -- Changed by Gremlin
+g_version = "5.7"                                                    -- Changed by Gremlin
 g_title = "Box Creator"
 g_width = 1025
 g_height = 1000                                                      -- Changed by Sharkcutup
-g_html_file = "Box_Creator_Ver_5.6.html"                             -- Changed by Gremlin
+g_html_file = "Box_Creator_Ver_5.7.html"                             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
 local function _is_pos(x) return type(x)=="number" and x>0 end
