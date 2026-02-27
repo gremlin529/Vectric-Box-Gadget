@@ -19,11 +19,14 @@
 -- Added some error-trapping into the gadget too                                                        -- by Sharkcutup 11/4/2025
 -- Changed Warning Messaage when not enough Material for Parts.                                         -- by Sharkcutup 11/14/2025
 -- Changed up the User Interface a bit by colorizing and defining lines of images                       -- by Sharkcutup 11/23/2025
+-- Added a separate field for the width of the bottom tabs vs side tabs                                 -- by Gremlin 2/27/2026
 -------------------------------------------------------------------------------------------------------------------------------------------
 -- It is provided 'as-is' with changes made, without any express or implied warranty, and you make use of them entirely at your own risk.
 -- In no event will "Sharkcutup" be held liable for any damages arising from this gadgets use.
+-- In no event will "Gremlin" be held liable for any damages arising from this gadgets use.
 
 -------------------------- Sharkcutup is NOT The Origianl Owner/Writer of this Gadget 11/23/2025  -----------------------------------------
+---------------------------- Gremlin is NOT The Origianl Owner/Writer of this Gadget 2/272026  --------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------
 
 -- require("mobdebug").start()
@@ -306,6 +309,7 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 end
 
 -- Make the side faces
+-- Gremlin added bottomdovetail seperation from side which is just dovetail
 function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdovetail, with_tails, flat_lid, name)
 
 	local dovetail_markers = {}
@@ -323,6 +327,9 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdov
 	local inner_trc = inner_brc + inner_height*unit_y
 	local inner_tlc = inner_blc + inner_height*unit_y
 
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
+  -- in this case the _w is the width of the side and _h is the height so 
+  -- we use bottomdovetail across wthe width
 	local num_flaps_w = math.floor((0.5*inner_width) / bottomdovetail.min_width )
 	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 
@@ -386,6 +393,7 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdov
 end
 
 -- Make an end face
+-- Gremlin added bottomdovetail seperation from side which is just dovetail
 function MakeEndFace(width, height, thickness, start_point, dovetail, bottomdovetail, with_tails, flat_lid, name)
 
 	local tablist = {}
@@ -402,6 +410,9 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, bottomdove
 	local inner_trc = inner_brc + inner_height*unit_y
 	local inner_tlc = inner_blc + inner_height*unit_y
 
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
+  -- in this case the _w is the width of the side and _h is the height so 
+  -- we use bottomdovetail across wthe width
 	local num_flaps_w = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
 	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 
@@ -1529,6 +1540,7 @@ function main(script_path)
 
 	options.tool = tool
 
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
 	local dialog_displayed = DisplayDialog(script_path, options, dovetail, bottomdovetail)
 	if (not dialog_displayed) then 
 		return false
@@ -1544,6 +1556,9 @@ function main(script_path)
 	local faces = {}
 
 	if options.make_bottom then
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
+    -- the bottom face is only the bottom so we didn't need to add
+    -- a separate value to it, just pass it the bottom value
 		local bottom_face = MakeBottomFaceContour(options.width, 
 													options.depth, 
 													options.thickness, 
@@ -1556,6 +1571,7 @@ function main(script_path)
 
 	-- -- -- Make sides
 	if options.make_side1 then
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
 		local sideface1 = MakeSideFace(options.width,
 									  options.height, 
 									  options.thickness, 
@@ -1569,6 +1585,7 @@ function main(script_path)
 	end
 
 	if options.make_side2 then
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
 		local sideface2 = MakeSideFace(options.width,
 									  options.height, 
 									  options.thickness, 
@@ -1583,6 +1600,7 @@ function main(script_path)
 
 	-- -- -- Make ends
 	if options.make_end1 then
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
 		local endface1 = MakeEndFace(options.depth, 
 											   options.height, 
 											   options.thickness,
@@ -1596,6 +1614,7 @@ function main(script_path)
 	end
 
 	if options.make_end2 then
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
 		local endface2 = MakeEndFace(options.depth, 
 											   options.height, 
 											   options.thickness,
@@ -1661,6 +1680,7 @@ function main(script_path)
 
 end
 
+-- Gremlin added bottomdovetail seperation from side which is just dovetail 
 function DisplayDialog(script_path, options, dovetail, bottomdovetail)
 	local html_path = "file:" .. script_path .. "\\" .. g_html_file
 	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
@@ -1674,6 +1694,7 @@ function DisplayDialog(script_path, options, dovetail, bottomdovetail)
 	dialog:AddDoubleField("DepthField", options.depth)
 	dialog:AddDoubleField("HeightField", options.height)
 	dialog:AddDoubleField("TabWidthField", dovetail.min_width)
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
   dialog:AddDoubleField("BottomTabWidthField", bottomdovetail.min_width)
 	dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("EdgeField", options.edge_margin)
@@ -1723,6 +1744,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 	dialog:AddTextField("UnitsLabel", units_string)
 
   local validator = function(dialog)
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
     ReadOptions(dialog, options, dovetail, bottomdovetail)
     local double_thickness = options.thickness * 2
     if options.width <= double_thickness then
@@ -1762,6 +1784,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local inner_width = options.width - double_thickness
     local inner_depth = options.depth - double_thickness
     local inner_height = options.height - double_thickness
+    -- Gremlin added bottomdovetail seperation from side which is just dovetail
     local num_flaps_w = math.floor((0.5*inner_width) / bottomdovetail.min_width)
     local total_tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width)
     local num_flaps_d = math.floor((0.5*inner_depth) / bottomdovetail.min_width)
@@ -1795,6 +1818,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       
     if options.cut_dovetails then
       local min_space = dovetail.max_width - dovetail.min_width
+      -- Gremlin added bottomdovetail seperation from side which is just dovetail
       local bottom_min_space = bottomdovetail.max_width - bottomdovetail.min_width
 
       -- make sure dovetails don't overlap
@@ -1809,6 +1833,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
         return false
       end  
     else
+      -- Gremlin added bottomdovetail seperation from side which is just dovetail
       tab_space_w = math.min(tab_space_w, bottomdovetail.min_width)
       tab_space_d = math.min(tab_space_d, bottomdovetail.min_width)
       tab_space_h = math.min(tab_space_h, dovetail.min_width)
@@ -1837,8 +1862,9 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       end
     until validator(dialog)    
   end
-  
- ReadOptions(dialog, options, dovetail, bottomdovetail)
+
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
+  ReadOptions(dialog, options, dovetail, bottomdovetail)
 
 	return true
 
@@ -1888,6 +1914,7 @@ function OnLuaButton_WarnDovetail()
   return true
 end
 
+-- Gremlin added bottomdovetail seperation from side which is just dovetail
 function ReadOptions(dialog, options, dovetail, bottomdovetail)
   -- Read back data from the form
   options.width     = dialog:GetDoubleField("WidthField")
@@ -1895,6 +1922,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail)
   options.height    = dialog:GetDoubleField("HeightField")
   options.tabwidth  = dialog:GetDoubleField("TabWidthField")
   dovetail.min_width = options.tabwidth
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
   options.bottomtabwidth = dialog:GetDoubleField("BottomTabWidthField")
   bottomdovetail.min_width = options.bottomtabwidth
 
@@ -1915,6 +1943,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail)
 
   -- dovetail.angle = dialog:GetDoubleField("DovetailAngleField")
   dovetail.max_width = dovetail.min_width + (2 * options.thickness / math.tan(dovetail.angle))
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
   bottomdovetail.max_width = bottomdovetail.min_width + (2* options.thickness/ math.tan(bottomdovetail.angle))
 
   local tab_index = dialog:GetRadioIndex("TabTypeRadio")
@@ -2005,6 +2034,7 @@ function SaveDefaults(options, dovetail)
 
 end
 
+-- Gremlin added bottomdovetail seperation from side which is just dovetail
 function LoadDefaults(options, dovetail, bottomdovetail)
   local registry = Registry("BoxCreator_5.6")
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
@@ -2018,7 +2048,7 @@ function LoadDefaults(options, dovetail, bottomdovetail)
   options.allowance = registry:GetDouble("Allowance", options.allowance)     -- Added by Sharkcutup
   options.edge_margin = registry:GetDouble("EdgeMargin", options.edge_margin)      -- Added by Sherkcutup
   dovetail.min_width = options.tabwidth
-  bottomdovetail.min_width = options.bottomtabwidth
+  bottomdovetail.min_width = options.bottomtabwidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
   options.default_toolid = ToolDBId("BoxCreator_5.6", "")
