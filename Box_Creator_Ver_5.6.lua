@@ -28,11 +28,11 @@
 
 -- require("mobdebug").start()
 
-g_version = "5.6"                                                    -- Changed by Sharkcutup
+g_version = "5.6"                                                    -- Changed by Gremlin
 g_title = "Box Creator"
 g_width = 1025
 g_height = 1000                                                      -- Changed by Sharkcutup
-g_html_file = "Box_Creator_Ver_5.6.html"                             -- Changed by Shatkcutup
+g_html_file = "Box_Creator_Ver_5.6.html"                             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
 local function _is_pos(x) return type(x)=="number" and x>0 end
@@ -306,7 +306,7 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 end
 
 -- Make the side faces
-function MakeSideFace(width, height, thickness, start_point, dovetail, with_tails, flat_lid, name)
+function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdovetail, with_tails, flat_lid, name)
 
 	local dovetail_markers = {}
 	local tablist = {}
@@ -323,10 +323,10 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, with_tail
 	local inner_trc = inner_brc + inner_height*unit_y
 	local inner_tlc = inner_blc + inner_height*unit_y
 
-	local num_flaps_w = math.floor((0.5*inner_width) / dovetail.min_width )
+	local num_flaps_w = math.floor((0.5*inner_width) / bottomdovetail.min_width )
 	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 
-	local tab_space_w = (inner_width - num_flaps_w*dovetail.min_width)/ (num_flaps_w + 1)
+	local tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width)/ (num_flaps_w + 1)
 	local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)/ (num_flaps_h + 1)
 
 
@@ -338,9 +338,9 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, with_tail
 	LineToVector(contour, tab_space_w*unit_x)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, dovetail, unit_x, -unit_y, contour,  num_flaps_w, tab_space_w)
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_w, tab_space_w)
 	else
-		AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
 	end
 	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
@@ -365,7 +365,7 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, with_tail
   else 
     LineToVector(contour, -tab_space_w*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
+    AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
     contour:LineTo(inner_tlc)
     AddMiddleOfLastSpanToList(contour, tablist)
   end
@@ -386,7 +386,7 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, with_tail
 end
 
 -- Make an end face
-function MakeEndFace(width, height, thickness, start_point, dovetail, with_tails, flat_lid, name)
+function MakeEndFace(width, height, thickness, start_point, dovetail, bottomdovetail, with_tails, flat_lid, name)
 
 	local tablist = {}
 	local dovetail_markers = {}
@@ -402,10 +402,10 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, with_tails
 	local inner_trc = inner_brc + inner_height*unit_y
 	local inner_tlc = inner_blc + inner_height*unit_y
 
-	local num_flaps_w = math.floor((0.5*inner_width)/ dovetail.min_width)
+	local num_flaps_w = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
 	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 
-	local tab_space_w = (inner_width - num_flaps_w*dovetail.min_width) / (num_flaps_w + 1)
+	local tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width) / (num_flaps_w + 1)
 	local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width) / (num_flaps_h + 1)
 
 	local contour = Contour(0.0)
@@ -415,9 +415,9 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, with_tails
 	LineToVector(contour, (tab_space_w + thickness)*unit_x)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, dovetail, unit_x, -unit_y, contour, num_flaps_w, tab_space_w)
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_w, tab_space_w)
 	else
-		AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
 	end
 	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
@@ -439,7 +439,7 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, with_tails
 		-- trc -> tlc (top line so has flaps for lid)
 		LineToVector(contour, (tab_space_w + thickness) * (-unit_x))
 		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
 		-- AddMaleDoveTailsAlongLine(thickness, dovetail, -unit_x, unit_y, contour, num_flaps_w, tab_space_w)
 		contour:LineTo(inner_tlc)
 		AddMiddleOfLastSpanToList(contour, tablist)
@@ -1488,7 +1488,8 @@ function main(script_path)
 	options.depth = 14                        --- depth default                      
 	options.start_point = Point2D(0,0)
 	options.thickness = mtl_block.Thickness;
-	options.tabwidth = 0.3                    --- joint width default         
+	options.tabwidth = 0.3                    --- joint width default      
+  options.tabwidthbottom = 1.0              --- joint width for the bottom (as a separate value)   
 	options.cut_layer_name  = "CutOut"        --- layer name default          
 	options.allowance = 0.0                   --- allowance default 
   options.edge_margin = 0.75                 --- edge margin default
@@ -1508,11 +1509,19 @@ function main(script_path)
 -----------------------------------------------------------------------------------------------------------------------------------------
 
 	local dovetails = ContourGroup(true)
-	local dovetail = {}
+	
+  local dovetail = {}
 	dovetail.angle = math.rad(60)
 	dovetail.min_width = 1.5
 	dovetail.depth = options.thickness
-	LoadDefaults(options, dovetail)
+
+  -- added by Gremlin to allow for separate widths on bottom vs side tabs
+  local bottomdovetail = {}   
+  bottomdovetail.angle = math.rad(60)
+	bottomdovetail.min_width = 1.5
+	bottomdovetail.depth = options.thickness
+
+	LoadDefaults(options, dovetail, bottomdovetail)
 
 	local tool = Tool("0.25 Inch End Mill", Tool.END_MILL)
 	tool.ToolDia = 0.25
@@ -1520,7 +1529,7 @@ function main(script_path)
 
 	options.tool = tool
 
-	local dialog_displayed = DisplayDialog(script_path, options, dovetail)
+	local dialog_displayed = DisplayDialog(script_path, options, dovetail, bottomdovetail)
 	if (not dialog_displayed) then 
 		return false
 	end
@@ -1539,7 +1548,7 @@ function main(script_path)
 													options.depth, 
 													options.thickness, 
 													options.start_point, 
-													dovetail, 
+													bottomdovetail, 
 													options.cut_dovetails,  -- if true then create dovetails
 													"BottomFace" )
 		faces[#faces + 1] = bottom_face
@@ -1552,6 +1561,7 @@ function main(script_path)
 									  options.thickness, 
 									  options.start_point, 
 									  dovetail, 
+                    bottomdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
 									  "SideFace1")
@@ -1564,6 +1574,7 @@ function main(script_path)
 									  options.thickness, 
 									  options.start_point, 
 									  dovetail, 
+                    bottomdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
 									  "SideFace2")
@@ -1577,6 +1588,7 @@ function main(script_path)
 											   options.thickness,
 											   options.start_point, 
 											   dovetail,
+                         bottomdovetail,
 											   options.cut_dovetails, 
 											   options.flat_lid,
 											   "EndFace1")
@@ -1589,6 +1601,7 @@ function main(script_path)
 											   options.thickness,
 											   options.start_point, 
 											   dovetail,
+                         bottomdovetail,
 											   options.cut_dovetails, 
 											   options.flat_lid,
 											   "EndFace2")
@@ -1624,6 +1637,8 @@ function main(script_path)
 	local dogboned_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
 
 	-- -- AddCadContourToJob(job, cad_contour, "Box")
+  -- These extra vectors represent the actual output
+  -- so you can place extra details on them if you wish
 	AddCadListToJob(job, cdcontours, "Box")
 	AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
 
@@ -1646,7 +1661,7 @@ function main(script_path)
 
 end
 
-function DisplayDialog(script_path, options, dovetail)
+function DisplayDialog(script_path, options, dovetail, bottomdovetail)
 	local html_path = "file:" .. script_path .. "\\" .. g_html_file
 	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
   
@@ -1659,6 +1674,7 @@ function DisplayDialog(script_path, options, dovetail)
 	dialog:AddDoubleField("DepthField", options.depth)
 	dialog:AddDoubleField("HeightField", options.height)
 	dialog:AddDoubleField("TabWidthField", dovetail.min_width)
+  dialog:AddDoubleField("BottomTabWidthField", bottomdovetail.min_width)
 	dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("EdgeField", options.edge_margin)
   
@@ -1707,7 +1723,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 	dialog:AddTextField("UnitsLabel", units_string)
 
   local validator = function(dialog)
-    ReadOptions(dialog, options, dovetail)
+    ReadOptions(dialog, options, dovetail, bottomdovetail)
     local double_thickness = options.thickness * 2
     if options.width <= double_thickness then
       DisplayMessageBox(string.format("The box width %f is too small for material thickness %f", options.width, options.thickness))
@@ -1821,7 +1837,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     until validator(dialog)    
   end
   
- ReadOptions(dialog, options, dovetail)
+ ReadOptions(dialog, options, dovetail, bottomdovetail)
 
 	return true
 
@@ -1871,13 +1887,15 @@ function OnLuaButton_WarnDovetail()
   return true
 end
 
-function ReadOptions(dialog, options, dovetail)
+function ReadOptions(dialog, options, dovetail, bottomdovetail)
   -- Read back data from the form
   options.width     = dialog:GetDoubleField("WidthField")
   options.depth     = dialog:GetDoubleField("DepthField")
   options.height    = dialog:GetDoubleField("HeightField")
   options.tabwidth  = dialog:GetDoubleField("TabWidthField")
   dovetail.min_width = options.tabwidth
+  options.bottomtabwidth = dialog:GetDoubleField("BottomTabWidthField")
+  bottomdovetail.min_width = options.bottomtabwidth
 
   options.allowance   = dialog:GetDoubleField("AllowanceField")
   options.edge_margin = dialog:GetDoubleField("EdgeField")
@@ -1964,8 +1982,9 @@ function SaveDefaults(options, dovetail)
   registry:SetDouble("Height", options.height)
   registry:SetDouble("Depth", options.depth)
   registry:SetDouble("JointWidth", options.tabwidth)
+  registry:SetDouble("BottomJointWidth", options.bottomtabwidth)     -- Added by Gremlin
   registry:SetDouble("Allowance", options.allowance)                 -- Added by Sharkcutup
-  registry:SetDouble("EdgeMargin", options.edge_margin)               -- Added by Sharkcutup
+  registry:SetDouble("EdgeMargin", options.edge_margin)              -- Added by Sharkcutup
   registry:SetBool("CutDovetails", options.cut_dovetails)
   registry:SetBool("FlatLid", options.flat_lid)
   registry:SetDouble("DoveTailWidth", dovetail.min_width)
@@ -1984,7 +2003,7 @@ function SaveDefaults(options, dovetail)
 
 end
 
-function LoadDefaults(options, dovetail)
+function LoadDefaults(options, dovetail, bottomdovetail)
   local registry = Registry("BoxCreator_5.6")
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
@@ -1993,9 +2012,11 @@ function LoadDefaults(options, dovetail)
   options.height = registry:GetDouble("Height", options.height)
   options.depth = registry:GetDouble("Depth", options.depth)
   options.tabwidth = registry:GetDouble("JointWidth", options.tabwidth)
+  options.bottomtabwidth = registry:GetDouble("BottomJointWidth", options.tabwidth)  --Added by Gremlin
   options.allowance = registry:GetDouble("Allowance", options.allowance)     -- Added by Sharkcutup
   options.edge_margin = registry:GetDouble("EdgeMargin", options.edge_margin)      -- Added by Sherkcutup
   dovetail.min_width = options.tabwidth
+  bottomdovetail.min_width = options.bottomtabwidth
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
   options.default_toolid = ToolDBId("BoxCreator_5.6", "")
