@@ -1762,18 +1762,18 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local inner_width = options.width - double_thickness
     local inner_depth = options.depth - double_thickness
     local inner_height = options.height - double_thickness
-    local num_flaps_w = math.floor((0.5*inner_width) / dovetail.min_width)
-    local total_tab_space_w = (inner_width - num_flaps_w*dovetail.min_width)
-    local num_flaps_d = math.floor((0.5*inner_depth) / dovetail.min_width)
-    local total_tab_space_d = (inner_depth - num_flaps_d*dovetail.min_width)
+    local num_flaps_w = math.floor((0.5*inner_width) / bottomdovetail.min_width)
+    local total_tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width)
+    local num_flaps_d = math.floor((0.5*inner_depth) / bottomdovetail.min_width)
+    local total_tab_space_d = (inner_depth - num_flaps_d*bottomdovetail.min_width)
     local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
     local total_tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)
     if (num_flaps_w < 1) or (total_tab_space_w < 0) then
-      DisplayMessageBox(string.format("The joint width %f is too big given box inner width is %f", dovetail.min_width, inner_width))
+      DisplayMessageBox(string.format("The bottom joint width %f is too big given box inner width is %f", dovetail.min_width, inner_width))
       return false
     end
     if (num_flaps_d < 1) or (total_tab_space_d < 0) then
-      DisplayMessageBox(string.format("The joint width %f is too big given box inner depth is %f", dovetail.min_width, inner_depth))
+      DisplayMessageBox(string.format("The bottom joint width %f is too big given box inner depth is %f", dovetail.min_width, inner_depth))
       return false
     end
     if (num_flaps_h < 1) or (total_tab_space_h < 0) then
@@ -1795,21 +1795,22 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       
     if options.cut_dovetails then
       local min_space = dovetail.max_width - dovetail.min_width
+      local bottom_min_space = bottomdovetail.max_width - bottomdovetail.min_width
 
       -- make sure dovetails don't overlap
-      if (tab_space_w <= min_space) or (tab_space_d <= min_space) or (tab_space_h <= min_space) then        
+      if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) or (tab_space_h <= min_space) then        
         DisplayMessageBox("The joint width is too small")
         return false
       end      
 
       min_space = min_space + dia
-      if (tab_space_w <= min_space) or (tab_space_d <= min_space) or (tab_space_h <= min_space) then        
+      if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) or (tab_space_h <= min_space) then        
         DisplayMessageBox("The selected tool will not fit between the joints")
         return false
       end  
     else
-      tab_space_w = math.min(tab_space_w, dovetail.min_width)
-      tab_space_d = math.min(tab_space_d, dovetail.min_width)
+      tab_space_w = math.min(tab_space_w, bottomdovetail.min_width)
+      tab_space_d = math.min(tab_space_d, bottomdovetail.min_width)
       tab_space_h = math.min(tab_space_h, dovetail.min_width)
       if (tab_space_w <= dia) or (tab_space_d <= dia) or (tab_space_h <= dia) then        
         DisplayMessageBox("The selected tool will not fit between the joints")
@@ -1914,6 +1915,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail)
 
   -- dovetail.angle = dialog:GetDoubleField("DovetailAngleField")
   dovetail.max_width = dovetail.min_width + (2 * options.thickness / math.tan(dovetail.angle))
+  bottomdovetail.max_width = bottomdovetail.min_width + (2* options.thickness/ math.tan(bottomdovetail.angle))
 
   local tab_index = dialog:GetRadioIndex("TabTypeRadio")
   if tab_index == 1 then
