@@ -1,0 +1,105 @@
+/* lte IE 9 style*/
+a.button6 {
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button6:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button6 {
+	position: relative;
+}
+
+a.button5 {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button5:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button5 {
+	position: relative;
+}
+
+a.button1 {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button1:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button1 {
+	position: relative;
+}
+
+a.button {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button {
+	position: relative;
+}
+
+a.button4 {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button4:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button4 {
+	position: relative;
+}
+
+a.button2 {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button2:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button2 {
+	position: relative;
+}
+
+a.button3 {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #23C8FE 4%,  #01B6F1 98%);
+	border-radius: 16px;
+	position: relative;
+}
+
+a.button3:hover {
+	-pie-background: linear-gradient( top,#8AE2FF 0%,  #01BDFC 4%,  #019FD3 98%);
+	position: relative;
+}
+
+a.button3 {
+	position: relative;
+}
+
