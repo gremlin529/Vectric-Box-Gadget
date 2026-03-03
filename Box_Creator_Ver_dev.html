@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+ <head>
+  <link href="stylesheets/reset.css" rel="stylesheet" type="text/css" />
+  <title>Box Creator Gadget</title>
+  <link href="stylesheets/layout-css-8.css" rel="stylesheet" type="text/css" />
+  <script type="text/javascript" src="scripts/browser-compatibility.js"></script>
+ </head>
+ <body>--
+  <div class="main_wrapper">
+   <div class="row_1">
+    <div class="column_1">
+     <img src="Images/boxdim.png" class="image" />
+    </div>
+    <div class="column_2">
+     <p class="paragraph">This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
+     <p class="paragraph">The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
+     <p class="paragraph">The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved.</p>
+     <p class="paragraph"><u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calculation Warning</u> for <u>Better Productivity</u>.</p>
+    </div>
+   </div>
+   <div class="row_73">
+    <div class="column_32">
+      <h3 class="heading13">Geometry Options</h3>
+
+    </div>
+   </div>
+   <div class="row_49">
+    <div class="column_50">
+     <div class="row_80">
+      <label for="WidthField" class="col-xs-5 control-label">Width:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="WidthField" placeholder="Width of Box">
+      </div>
+     </div>
+     <div class="row_81">
+      <label for="DepthField" class="col-xs-5 control-label">Depth:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="DepthField" placeholder="Depth of Box">
+      </div>
+     </div>
+    </div>
+    <div class="column_51">
+     <div class="row_86">
+      <label for="HeightField" class="col-xs-5 control-label">Height:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="HeightField" placeholder="Height of Box">
+      </div>
+     </div>
+     <div class="row_93">
+      <label for="TabWidthField" class="col-xs-5 control-label">Side Joint Width:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="TabWidthField" placeholder="Width of Joint">
+      </div>
+     </div>
+     <div class="row_93">
+      <label for="BottomTabWidthField" class="col-xs-5 control-label">Bottom Joint Width:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="BottomTabWidthField" placeholder="Width of Bottom Joint">
+      </div>
+     </div>
+    </div>
+    <div class="column_52">
+     <div class="row_94">
+      <label for="AllowanceField" class="col-xs-5 control-label">Allowance:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="AllowanceField" placeholder="Allowance">
+      </div>
+     </div>
+     <div class="row_95">
+      <label for="EdgeField" class="col-xs-5 control-label">Clamping Margin:</label>
+      <div class="col-xs-7">
+       <input type="email" class="form-control" id="EdgeField" placeholder="Clamping Margin">
+      </div>
+     </div>
+    </div>
+   </div>
+   <div class="row_119 row_119_align">
+     <h3 class="heading11">Faces To Machine:&nbsp;</h3>
+
+   </div>
+   <div class="column_57">
+    <label for="faces-0" class="customClass2">
+     <input type="checkbox" name="faces" id="MakeLid" value="1" class="LuaButton">Lid</label>
+   </div>
+   <div class="column_58">
+    <label for="faces-1">
+     <input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton">Bottom</label>
+   </div>
+   <div class="column_59">
+    <label for="faces-2">
+     <input type="checkbox" name="faces" id="MakeSide1" value="" class="LuaButton">Side 1</label>
+   </div>
+   <div class="column_60">
+    <label for="faces-3">
+     <input type="checkbox" name="faces" id="MakeSide2" value="" class="LuaButton">Side 2</label>
+   </div>
+   <div class="column_61">
+    <label for="faces-4">
+     <input type="checkbox" name="faces" id="MakeEnd1" value="" class="LuaButton">End 1</label>
+   </div>
+   <div class="column_62">
+    <label for="faces-5" class="customClass1">
+     <input type="checkbox" name="faces" id="MakeEnd2" value="" class="LuaButton">End 2</label>
+   </div>
+   <div class="row_105">
+    <div class="column_53">
+     <div class="row_118">
+      <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool"><span class="text-right text-muted" id="ToolNameField" placeholder="- No Tool Selected -"></span>
+
+     </div>
+    </div>
+   </div>
+   <div class="row_4">
+    <div class="column_7">
+      <h3 class="heading13">Joint Type</h3>
+
+    </div>
+    <div class="column_8">
+      <h3 class="heading13">Lid Type</h3>
+
+    </div>
+   </div>
+   <div class="row_5">
+    <div class="column_15">
+     <div class="row_30">
+      <div class="column_17">
+       <label>
+        <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1">Finger Joint</label>
+      </div>
+      <div class="column_18">
+       <img src="Images/tabs.png" />
+      </div>
+     </div>
+     <div class="row_31">
+      <div class="column_19">
+       <label>
+        <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2">Dovetail Joint</label>
+      </div>
+      <div class="column_20">
+       <img src="Images/dovetails.png" />
+      </div>
+     </div>
+    </div>
+    <div class="column_16">
+     <div class="row_32">
+      <div class="column_21">
+       <label>
+        <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1">Flat Lid</label>
+      </div>
+      <div class="column_22">
+       <img src="Images/flatlid.png" />
+      </div>
+     </div>
+     <div class="row_33">
+      <div class="column_23">
+       <label>
+        <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2">Tabbed Lid</label>
+      </div>
+      <div class="column_24">
+       <img src="Images/tabbedlid.png" />
+      </div>
+     </div>
+    </div>
+   </div>
+   <div class="row_6">
+    <div class="column_45 column_45_align">
+     <button type="button" class="btn btn-default btn-block" id="ButtonOK">OK</button>
+    </div>
+    <div class="column_46">
+     <label for="WarnDovetail">
+      <input type="checkbox" id="WarnDovetail">Show Dovetail Re-Calculation Warning.</label>
+    </div>
+    <div class="column_47">
+     <button type="button" class="btn btn-default btn-block" id="ButtonCancel">Cancel</button>
+    </div>
+   </div>
+  </div>
+ </body>
+
+</html>
