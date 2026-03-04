@@ -8,6 +8,7 @@ body {
     min-width: 960px;
     font-weight: bold;
     background-color: #CCC4CC;
+    zoom: 100%;
 }
 body h1 {
     font-size: 30px;
