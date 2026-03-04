@@ -54,7 +54,7 @@ body a:visited {
 }
 .main_wrapper {
     clear: both;
-    min-height: 800px;
+    min-height: 581px;
     width: 960px;
     margin: 0px auto;
 }
@@ -97,10 +97,11 @@ body a:visited {
     padding-bottom:10px;
 }
 .column_32 {
-    float: left;
     width: 960px;
     min-height: 56px;
     background-color:#000000;
+    margin-left:auto;
+    margin-right:auto;
 }
 .column_33 {
     float: left;
@@ -111,6 +112,9 @@ body a:visited {
 .row_49 {
     clear: both;
     min-height: 138px;
+    width:960px;
+    margin-left:auto;
+    margin-right:auto;
 }
 .row_119 {
     clear: both;
@@ -167,24 +171,83 @@ body a:visited {
 .row_105 {
     clear: both;
     min-height: 35px;
+    width:960px;
+    margin-left:auto;
+    margin-right:auto;
+}
+.column_70 {
+    float: left;
+    width: 600px;
+    min-height: 35px;
+    margin-left:0px;
+}
+.column_70_align {
+    margin-left: 80px;
+}
+.column_71 {
+    float: left;
+    width: 360px;
+    min-height: 35px;
+}
+.column_73 {
+    float: left;
+    width: 567px;
+    min-height: 35px;
+}
+.column_7_align {
+    margin-left: 13px;
+}
+.column_74 {
+    float: left;
+    width: 393px;
+    min-height: 32px;
 }
 .column_53 {
-    width: 749px;
+    width: 960px;
     min-height: 35px;
     margin-left:auto;
     margin-right:auto;
+}
+.column_66 {
+    float: left;
+    width: 480px;
+    min-height: 35px;
+}
+.column_69 {
+    float: left;
+    width: 450px;
+    min-height: 35px;
+}
+.column_67 {
+    float: left;
+    width: 480px;
+    min-height: 42px;
+}
+.column_68 {
+    float: left;
+    width: 352px;
+    min-height: 32px;
+}
+.row_302 {
+    min-height: 32px;
+    width:352px;
+    text-align:right;
 }
 .row_117 {
     clear: both;
     min-height: 57px;
     width: auto;
 }
-.row_118 {
-    clear: both;
+.row_300 {
+    clear: none;
     min-height: 35px;
-    width: 600px;
-    margin-left:auto;
+    width: 360px;
     margin-right:0px;
+    margin-left:auto;
+}
+.row_120 {
+    clear: both;
+    min-height: 43px;
 }
 .ToolPicker {
     width: 128px;
@@ -299,8 +362,8 @@ a.button5:active {
 }
 .column_50 {
     float: left;
-    width: 320px;
-    min-height: 136px;
+    width: 240px;
+    min-height: 120px;
 }
 .row_79 {
     clear: both;
@@ -314,12 +377,28 @@ a.button5:active {
 }
 .column_51 {
     float: left;
-    width: 320px;
+    width: 240px;
+    min-height: 116px;
+}
+.column_64 {
+    float: left;
+    min-height: 133px;
+    width: 240px;
+}
+.column_65 {
+    float: left;
     min-height: 138px;
+    width: 192px;
+}
+.row_186 {
+    min-height: 68px;
+}
+.row_193 {
+    min-height: 68px;
 }
 .column_52 {
     float: left;
-    width: 320px;
+    width: 192px;
     min-height: 138px;
 }
 .column_30 {
@@ -340,30 +419,38 @@ a.button5:active {
 }
 .row_81 {
     clear: both;
-    min-height: 68px;
+    min-height: 52px;
     width: auto;
     background-color:#CCC4CC;
 }
 .row_86 {
     clear: both;
-    min-height: 70px;
+    min-height: 64px;
     width: auto;
     background-color:#CCC4CC;
+}
+.row_123 {
+    clear: both;
+    min-height: 52px;
 }
 .column_39 {
     float: left;
     width: 240px;
     min-height: 206px;
 }
-.row_93 {
+.row_122 {
     clear: both;
     min-height: 68px;
+}
+.row_93 {
+    clear: both;
+    min-height: 52px;
     width: auto;
     background-color:#CCC4CC;
 }
 .row_94 {
     clear: both;
-    min-height: 68px;
+    min-height: 52px;
     width: auto;
     background-color:#CCC4CC;
 }
@@ -751,7 +838,7 @@ a.button5:active {
     text-align: center;
 }
 .btn {
-    width: 100px;
+    width: 93px;
     min-height:12px;
     margin:13px auto 0 auto;
 }
@@ -827,25 +914,32 @@ a.button1:active {
 .row_4 {
     clear: both;
     min-height: 56px;
-    width: auto;
+    width: 960px;
     padding-bottom:10px;
+    margin-left:auto;
+    margin-right:auto;
 }
 .column_7 {
     float: left;
-    width: 480px;
+    width: 467px;
     min-height: 56px;
     background-color:#000000;
 }
 .column_8 {
     float: left;
-    width: 480px;
+    width: 467px;
     min-height: 56px;
     background-color:#000000;
 }
 .row_5 {
     clear: both;
     min-height: 133px;
-    width: auto;
+    width: 960px;
+    margin-left:auto;
+    margin-right:auto;
+}
+.row_118 {
+    width: 480px;
 }
 .row_103 {
     clear: both;
@@ -881,6 +975,7 @@ a.button1:active {
     width: 240px;
     min-height: 66px;
     background-color:#CCC4CC;
+    text-align:center;
 }
 .column_18 {
     float: left;
@@ -898,6 +993,7 @@ a.button1:active {
     width: 240px;
     min-height: 67px;
     background-color:#CCC4CC;
+    text-align:center;
 }
 .column_20 {
     float: left;
@@ -920,6 +1016,7 @@ a.button1:active {
     width: 240px;
     min-height: 66px;
     background-color:#CCC4CC;
+    text-align:center;
 }
 .customClass {
     min-height:34px;
@@ -940,6 +1037,7 @@ a.button1:active {
     width: 240px;
     min-height: 67px;
     background-color:#CCC4CC;
+    text-align:center;
 }
 .column_24 {
     float: left;
@@ -950,17 +1048,19 @@ a.button1:active {
 .row_6 {
     clear: both;
     min-height: 56px;
-    width: auto;
+    width: 960px;
     text-align:center;
     background-color:#CCC4CC;
+    margin-left:auto;
+    margin-right:auto;
 }
 .column_45 {
     float: left;
-    width: 241px;
+    width: 234px;
     min-height: 56px;
 }
 .column_45_align {
-    margin-left: 12px;
+    margin-left: 25px;
 }
 a.button {
     display:block;
@@ -1007,12 +1107,17 @@ a.button:active {
 }
 .column_46 {
     float: left;
-    width: 420px;
+    width: 409px;
     min-height: 56px;
+}
+.row_301 {
+    clear: both;
+    min-height: 35px;
+    width:556px;
 }
 .column_47 {
     float: left;
-    width: 275px;
+    width: 268px;
     min-height: 56px;
 }
 a.button4 {
@@ -1258,4 +1363,29 @@ h3.heading11 {
 }
 span.text-right {
     padding-left: 50px;
+}
+.form-control {
+    width: 122px;
+}
+img.image9 {
+    width:100px;
+    height:46px;
+    margin-left:auto;
+    margin-right:auto;
+    display:block;
+}
+img.image10 {
+    margin-left: auto;
+    margin-right:auto;
+    display:block;
+}
+img.image11 {
+    margin-left: auto;
+    margin-right:auto;
+    display:block;
+}
+img.image12 {
+    margin-left: auto;
+    margin-right:auto;
+    display:block;
 }
