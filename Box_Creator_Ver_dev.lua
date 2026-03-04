@@ -134,7 +134,7 @@ end
 function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Pocket toolpath: Please Select a Valid Tool Before Continuing.")
+  DisplayMessageBox("Pocket Toolpath: Please Select a Valid Tool Before Continuing.")
   return false
 end
 
@@ -330,11 +330,17 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdov
   -- Gremlin added bottomdovetail seperation from side which is just dovetail
   -- in this case the _w is the width of the side and _h is the height so 
   -- we use bottomdovetail across wthe width
-	local num_flaps_w = math.floor((0.5*inner_width) / bottomdovetail.min_width )
-	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
+	-- Bottom edge (mates to bottom panel): use bottomdovetail width
+	local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomdovetail.min_width )
+	local tab_space_w_bottom = (inner_width - num_flaps_w_bottom*bottomdovetail.min_width)/ (num_flaps_w_bottom + 1)
 
-	local tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width)/ (num_flaps_w + 1)
+	-- Vertical edges: use side joint width (dovetail.min_width)
+	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 	local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)/ (num_flaps_h + 1)
+
+	-- Top edge (mates to lid): use side/lid joint width (dovetail.min_width)
+	local num_flaps_w_lid = math.floor((0.5*inner_width) / dovetail.min_width )
+	local tab_space_w_lid = (inner_width - num_flaps_w_lid*dovetail.min_width)/ (num_flaps_w_lid + 1)
 
 
 	-- Create the contour
@@ -342,12 +348,12 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdov
 	contour:AppendPoint(inner_start_point)
 
 	--  blc ->brc
-	LineToVector(contour, tab_space_w*unit_x)
+	LineToVector(contour, tab_space_w_bottom*unit_x)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_w, tab_space_w)
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_w_bottom, tab_space_w_bottom)
 	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w_bottom, unit_x, -unit_y, contour, num_flaps_w_bottom)
 	end
 	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
@@ -370,9 +376,9 @@ function MakeSideFace(width, height, thickness, start_point, dovetail, bottomdov
     AddMiddleOfLastSpanToList(contour, tablist)
     contour:LineTo(inner_tlc)
   else 
-    LineToVector(contour, -tab_space_w*unit_x)
+    LineToVector(contour, -tab_space_w_lid*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
+    AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w_lid, -unit_x, unit_y, contour, num_flaps_w_lid)
     contour:LineTo(inner_tlc)
     AddMiddleOfLastSpanToList(contour, tablist)
   end
@@ -413,22 +419,28 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, bottomdove
   -- Gremlin added bottomdovetail seperation from side which is just dovetail
   -- in this case the _w is the width of the side and _h is the height so 
   -- we use bottomdovetail across wthe width
-	local num_flaps_w = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
-	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
+	-- Bottom edge (mates to bottom panel): use bottomdovetail width
+	local num_flaps_w_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
+	local tab_space_w_bottom = (inner_width - num_flaps_w_bottom*bottomdovetail.min_width) / (num_flaps_w_bottom + 1)
 
-	local tab_space_w = (inner_width - num_flaps_w*bottomdovetail.min_width) / (num_flaps_w + 1)
+	-- Vertical edges: use side joint width (dovetail.min_width)
+	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 	local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width) / (num_flaps_h + 1)
+
+	-- Top edge (mates to lid): use side/lid joint width (dovetail.min_width)
+	local num_flaps_w_lid = math.floor((0.5*inner_width)/ dovetail.min_width)
+	local tab_space_w_lid = (inner_width - num_flaps_w_lid*dovetail.min_width) / (num_flaps_w_lid + 1)
 
 	local contour = Contour(0.0)
 	contour:AppendPoint(inner_start_point)
 
 	-- blc --> brc
-	LineToVector(contour, (tab_space_w + thickness)*unit_x)
+	LineToVector(contour, (tab_space_w_bottom + thickness)*unit_x)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_w, tab_space_w)
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_w_bottom, tab_space_w_bottom)
 	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w_bottom, unit_x, -unit_y, contour, num_flaps_w_bottom)
 	end
 	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
@@ -448,10 +460,10 @@ function MakeEndFace(width, height, thickness, start_point, dovetail, bottomdove
 		contour:LineTo(inner_tlc)
 	else
 		-- trc -> tlc (top line so has flaps for lid)
-		LineToVector(contour, (tab_space_w + thickness) * (-unit_x))
+		LineToVector(contour, (tab_space_w_lid + thickness) * (-unit_x))
 		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_w, -unit_x, unit_y, contour, num_flaps_w)
-		-- AddMaleDoveTailsAlongLine(thickness, dovetail, -unit_x, unit_y, contour, num_flaps_w, tab_space_w)
+		AddFlapsAlongLine(thickness, dovetail.min_width, tab_space_w_lid, -unit_x, unit_y, contour, num_flaps_w_lid)
+		-- AddMaleDoveTailsAlongLine(thickness, dovetail, -unit_x, unit_y, contour, num_flaps_w_lid, tab_space_w_lid)
 		contour:LineTo(inner_tlc)
 		AddMiddleOfLastSpanToList(contour, tablist)
 	end
@@ -547,7 +559,7 @@ function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, nam
 		contour:AppendPoint(start_point)
 
 		--- blc -> brc
-		LineToVector(contour, (thickness + tab_space_w)*unit_x)
+		LineToVector(contour, (thickness + tab_space_w) * unit_x)
 		AddMiddleOfLastSpanToList(contour, tablist)
 		AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
 		contour:LineTo(outer_brc)
@@ -1171,7 +1183,7 @@ end
 function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, layer_name)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Cutout Toolpath: Please select a Valid Tool before continuing.")
+  DisplayMessageBox("Cutout Toolpath: Please Select a Valid Tool Before Continuing.")
   return false
 end
 
@@ -1216,7 +1228,7 @@ end
 		)
 
 	if toolpath == nil then
-		DisplayMessageBox("Error Creating toolpath")
+		DisplayMessageBox("Error Creating Toolpath")
 	end
 end
 
@@ -1382,7 +1394,7 @@ end
 function CreateDoveTailToolpath(markers, dovetail, tool, allowance, warn_user)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Dovetail toolpath: please select a valid tool before continuing.")
+  DisplayMessageBox("Dovetail Toolpath: Please Select a Valid Tool Before Continuing.")
   return false
 end
   
@@ -1406,7 +1418,7 @@ end
   )
 
   if #side_rails == 0 then
-    DisplayMessageBox("Unable to create dovetails")
+    DisplayMessageBox("Unable to Create Dovetails")
     return false
   end
 
@@ -1439,7 +1451,7 @@ end
 
   -- Emit external toolpath
   if contour_group.IsEmpty then
-    DisplayMessageBox("No dove tails created")
+    DisplayMessageBox("No Dovetails Created")
     return false
   end
 
@@ -1483,10 +1495,10 @@ end
 -- MotazA 16/9/2020 check if job Exists 
 function main(script_path)
 	local job = VectricJob()
-	local mtl_block = MaterialBlock()
+  local mtl_block = MaterialBlock()
 
 	if not job.Exists then
-       DisplayMessageBox("No job loaded.")
+       DisplayMessageBox("No Job Loaded.")
        return false
     end
  
@@ -1507,6 +1519,7 @@ function main(script_path)
   options.warn_dovetail = true   -- show dovetail warning after create
 	options.cut_dovetails = false
 	options.flat_lid = true
+  options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
 
@@ -1663,22 +1676,25 @@ function main(script_path)
 
 	if options.make_lid then
 		if options.flat_lid then 
+      
+	  
 			CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets" )
 		end
 	end
-
+  if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
-	local dovetail_markers = GetAllMarkers(faces)
-	if options.cut_dovetails and (#dovetail_markers > 0) then
-		CreateDoveTailToolpath(dovetail_markers, dovetail, options.tool, options.allowance, options.warn_dovetail)
-	end
+	   local dovetail_markers = GetAllMarkers(faces)
+	  if options.cut_dovetails and (#dovetail_markers > 0) then
+		  CreateDoveTailToolpath(dovetail_markers, dovetail, options.tool, options.allowance, options.warn_dovetail)
+	  end
 
-	CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.tabwidth, options.cut_layer_name)
-	SaveDefaults(options, dovetail)
-	job:Refresh2DView()
-	return true
+	  CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.tabwidth, options.cut_layer_name)
+  end
+	  SaveDefaults(options, dovetail)
+	  job:Refresh2DView()
+	  return true
 
-end
+ end
 
 -- Gremlin added bottomdovetail seperation from side which is just dovetail 
 function DisplayDialog(script_path, options, dovetail, bottomdovetail)
@@ -1715,6 +1731,7 @@ function DisplayDialog(script_path, options, dovetail, bottomdovetail)
   dialog:AddLabelField("ToolNameField", "")
 	dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
 	dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
+  dialog:AddCheckBox("NoToolpath", options.no_toolpath)
  
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
 local tab_default_index
@@ -1760,18 +1777,20 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       return false
     end
     
+    -- Tool must be chosen and valid (only when creating toolpaths)
+  if not options.no_toolpath then
     -- Tool must be chosen and valid
-  if not _tool_ok(options.tool) then
-    DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid end mill.")
-    return false
+    if not _tool_ok(options.tool) then
+     DisplayMessageBox("No Tool Selected or Tool Diameter is Invalid.\n\nClick 'Select Tool' and Pick a Valid End Mill.")
+     return false
+    end
   end
-
   -- At least one face must be selected
   local at_least_one =
     options.make_lid or options.make_bottom or options.make_side1 or
     options.make_side2 or options.make_end1 or options.make_end2
   if not at_least_one then
-    DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
+    DisplayMessageBox("Select at Least One Face to Create (Lid / Bottom / Sides / Ends).")
     return false
   end
 
@@ -1792,15 +1811,15 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
     local total_tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)
     if (num_flaps_w < 1) or (total_tab_space_w < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %f is too big given box inner width is %f", dovetail.min_width, inner_width))
+      DisplayMessageBox(string.format("The Bottom Joint Width %f is Too Big Given Box Inner Width is %f", dovetail.min_width, inner_width))
       return false
     end
     if (num_flaps_d < 1) or (total_tab_space_d < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %f is too big given box inner depth is %f", dovetail.min_width, inner_depth))
+      DisplayMessageBox(string.format("The Bottom Joint Width %f is Too Big Given Box Inner Depth is %f", dovetail.min_width, inner_depth))
       return false
     end
     if (num_flaps_h < 1) or (total_tab_space_h < 0) then
-      DisplayMessageBox(string.format("The joint width %f is too big given box inner height is %f", dovetail.min_width, inner_height))
+      DisplayMessageBox(string.format("The Corner/Lid Joint Width %f is Too Big Given Box Inner Height is %f", dovetail.min_width, inner_height))
       return false
     end
     
@@ -1821,24 +1840,31 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       -- Gremlin added bottomdovetail seperation from side which is just dovetail
       local bottom_min_space = bottomdovetail.max_width - bottomdovetail.min_width
 
-      -- make sure dovetails don't overlap
-      if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) or (tab_space_h <= min_space) then        
-        DisplayMessageBox("The joint width is too small")
+     if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) then        
+        DisplayMessageBox("Bottom Joint Widths are Too Small")
         return false
+      end
+      if (tab_space_h <= min_space) then
+      	DisplayMessageBox("Corner/Side Joint Widths are Too Small")
+      	return false
       end      
 
       min_space = min_space + dia
-      if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) or (tab_space_h <= min_space) then        
-        DisplayMessageBox("The selected tool will not fit between the joints")
+      if (tab_space_w <= bottom_min_space) or (tab_space_d <= bottom_min_space) then        
+        DisplayMessageBox("The Selected Tool will not Fit between the Bottom Joint")
         return false
-      end  
+      end
+      if (tab_space_h <= min_space) then
+        DisplayMessageBox("The Selected Tool will not Fit between the Corner/Side Joint")
+        return false
+      end
     else
       -- Gremlin added bottomdovetail seperation from side which is just dovetail
       tab_space_w = math.min(tab_space_w, bottomdovetail.min_width)
       tab_space_d = math.min(tab_space_d, bottomdovetail.min_width)
       tab_space_h = math.min(tab_space_h, dovetail.min_width)
       if (tab_space_w <= dia) or (tab_space_d <= dia) or (tab_space_h <= dia) then        
-        DisplayMessageBox("The selected tool will not fit between the joints")
+        DisplayMessageBox("The selected Tool will not Fit between the Bottom Joints")
         return false
       end
     end
@@ -1914,6 +1940,13 @@ function OnLuaButton_WarnDovetail()
   return true
 end
 
+-- HTML checkbox id="NoToolpath" is marked class="LuaButton".
+-- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
+-- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
+function OnLuaButton_NoToolpath()
+  return true
+end
+
 -- Gremlin added bottomdovetail seperation from side which is just dovetail
 function ReadOptions(dialog, options, dovetail, bottomdovetail)
   -- Read back data from the form
@@ -1933,6 +1966,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail)
   end
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
+  options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
   options.make_side1    = dialog:GetCheckBox("MakeSide1")
@@ -2020,10 +2054,11 @@ function SaveDefaults(options, dovetail)
   registry:SetBool("FlatLid", options.flat_lid)
   registry:SetDouble("DoveTailWidth", dovetail.min_width)
   if options.tool ~= nil then
-   options.tool.ToolDBId:SaveDefaults("BoxCreator_5.6", "")
+   options.tool.ToolDBId:SaveDefaults("BoxCreator_" .. g_version, "")
   end
 
   registry:SetBool("WarnDovetail", options.warn_dovetail)
+  registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
   registry:SetBool("MakeBottom", options.make_bottom)
@@ -2036,8 +2071,7 @@ end
 
 -- Gremlin added bottomdovetail seperation from side which is just dovetail
 function LoadDefaults(options, dovetail, bottomdovetail)
-  local registry =  Registry("BoxCreator_" .. g_version)
-
+  local registry = Registry("BoxCreator_".. g_version)
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
 
@@ -2052,9 +2086,10 @@ function LoadDefaults(options, dovetail, bottomdovetail)
   bottomdovetail.min_width = options.bottomtabwidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
-  options.default_toolid = ToolDBId("BoxCreator_5.6", "")
+  options.default_toolid = ToolDBId("BoxCreator_" .. g_version, "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
+  options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
 
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)
   options.make_bottom = registry:GetBool("MakeBottom", options.make_bottom)
