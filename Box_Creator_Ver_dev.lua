@@ -2005,7 +2005,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail)
 end
 
 function SaveDefaults(options, dovetail)
-  local registry = Registry("BoxCreator_5.6")
+  local registry = Registry("BoxCreator_" .. g_version)
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
 
@@ -2036,7 +2036,8 @@ end
 
 -- Gremlin added bottomdovetail seperation from side which is just dovetail
 function LoadDefaults(options, dovetail, bottomdovetail)
-  local registry = Registry("BoxCreator_5.6")
+  local registry =  Registry("BoxCreator_" .. g_version)
+
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
 
