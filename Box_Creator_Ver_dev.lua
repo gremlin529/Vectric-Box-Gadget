@@ -1910,7 +1910,13 @@ function OnLuaButton_MakeEnd2()
   return true
 end
 
-function OnLuaButton_WarnDovetail()
+function OnLuaButton_WarnDovetail(dialog)
+  local cbvalue = dialog:GetCheckBox("WarnDovetail")
+  if (cbvalue) then
+    dialog:SetOuterHtml("theoneiwant", "<fieldset class='theanswer' id='theoneiwant'><label>Here it is!</label></fieldset>")
+  else
+    dialog:SetOuterHtml("theoneiwant", "<fieldset class='theanswer' id='theoneiwant' style='display: none;'></fieldset>")
+  end
   return true
 end
 
