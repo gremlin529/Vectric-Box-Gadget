@@ -1506,6 +1506,7 @@ function main(script_path)
 	options.allowance = 0.0                   --- allowance default 
   options.edge_margin = 0.75                 --- edge margin default
   options.warn_dovetail = true   -- show dovetail warning after create
+  options.high_dpi_mode = false       --- if true then use high dpi mode for dialog (if false use normal mode)
 	options.cut_dovetails = false
 	options.flat_lid = true
   options.no_toolpath = false
@@ -1699,7 +1700,6 @@ function main(script_path)
 	end
 
   if not options.no_toolpath then
-     CreateAssemblyToolpaths(job, faces, options.tool, options.allowance, options.edge_margin, options.cut_layer_name)
     -- if we are doing dovetails make toolpath for them
     local dovetail_markers = GetAllMarkers(faces)
     if options.cut_dovetails and (#dovetail_markers > 0) then
@@ -1737,6 +1737,7 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   dialog:AddDoubleField("EdgeField", options.edge_margin)
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
+  dialog:AddCheckBox("HighDPIMode", options.high_dpi_mode)
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
@@ -2004,6 +2005,10 @@ function OnLuaButton_AllJointWidths()
   return true
 end
 
+function OnLuaButton_HighDPIMode()  
+  return true
+end
+
 -- HTML checkbox id="NoToolpath" is marked class="LuaButton".
 -- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
 -- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
@@ -2033,6 +2038,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   end
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
+  options.high_dpi_mode = dialog:GetCheckBox("HighDPIMode")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
@@ -2127,6 +2133,7 @@ function SaveDefaults(options)
   end
 
   registry:SetBool("WarnDovetail", options.warn_dovetail)
+  registry:SetBool("HighDPIMode", options.high_dpi_mode)
   registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
@@ -2162,6 +2169,7 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.default_toolid = ToolDBId("BoxCreator_5.6", "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
+  options.high_dpi_mode = registry:GetBool("HighDPIMode", false) 
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
 
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)

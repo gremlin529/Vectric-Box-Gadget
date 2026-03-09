@@ -53,7 +53,19 @@
         if (checkbox) {
           onShowAllWidthsChanged(checkbox);
         }
+        var highDPICheckbox = document.getElementById("HighDPIMode");
+        if (highDPICheckbox) {
+          onHighDPIModeChanged(highDPICheckbox);
+        }
       }, 100);
+      function onHighDPIModeChanged(checkbox) {
+        var isHighDPI = checkbox.checked;
+        if (isHighDPI) {
+          document.body.style.zoom="125%";
+        } else {
+          document.body.style.zoom="100%";
+        }
+      }
       function onShowAllWidthsChanged(checkbox) {
         var showAll = checkbox.checked;
         var bottomTopJoints = document.getElementById("showHideTopBottomJoints");
@@ -204,6 +216,8 @@
     <div class="column_46">
      <label for="WarnDovetail">
       <input type="checkbox" class="LuaButton" id="WarnDovetail">Show Dovetail Re-Calculation Warning.</label>
+      <label for="HighDPIMode">
+      <input type="checkbox"  class="LuaButton" id="HighDPIMode" onclick="onHighDPIModeChanged(this)">Enable High DPI Mode</label>
     </div>
     <div class="column_47">
      <button type="button" class="btn btn-default btn-block" id="ButtonCancel">Cancel</button>
