@@ -1508,6 +1508,7 @@ function main(script_path)
   options.warn_dovetail = true   -- show dovetail warning after create
 	options.cut_dovetails = false
 	options.flat_lid = true
+  options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
 
@@ -1697,13 +1698,17 @@ function main(script_path)
 		end
 	end
 
+  if not options.no_toolpath then
+     CreateAssemblyToolpaths(job, faces, options.tool, options.allowance, options.edge_margin, options.cut_layer_name)
     -- if we are doing dovetails make toolpath for them
-	local dovetail_markers = GetAllMarkers(faces)
-	if options.cut_dovetails and (#dovetail_markers > 0) then
-		CreateDoveTailToolpath(dovetail_markers, sidedovetail, options.tool, options.allowance, options.warn_dovetail)
-	end
+    local dovetail_markers = GetAllMarkers(faces)
+    if options.cut_dovetails and (#dovetail_markers > 0) then
+      CreateDoveTailToolpath(dovetail_markers, sidedovetail, options.tool, options.allowance, options.warn_dovetail)
+    end
 
-	CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sidetabwidth, options.cut_layer_name)
+    CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sidetabwidth, options.cut_layer_name)
+  end
+
 	SaveDefaults(options)
 	job:Refresh2DView()
 	return true
@@ -1747,6 +1752,7 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   dialog:AddLabelField("ToolNameField", "")
 	dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
 	dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
+  dialog:AddCheckBox("NoToolpath", options.no_toolpath)
  
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
 local tab_default_index
@@ -1792,10 +1798,13 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       return false
     end
     
+    -- Tool must be chosen and valid (only when creating toolpaths)
+  if not options.no_toolpath then
     -- Tool must be chosen and valid
-  if not _tool_ok(options.tool) then
-    DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid end mill.")
-    return false
+    if not _tool_ok(options.tool) then
+     DisplayMessageBox("No Tool Selected or Tool Diameter is Invalid.\n\nClick 'Select Tool' and Pick a Valid End Mill.")
+     return false
+    end
   end
 
   -- At least one face must be selected
@@ -1995,6 +2004,13 @@ function OnLuaButton_AllJointWidths()
   return true
 end
 
+-- HTML checkbox id="NoToolpath" is marked class="LuaButton".
+-- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
+-- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
+function OnLuaButton_NoToolpath()
+  return true
+end
+
 -- Gremlin added joint width seperation for sides top and bottom
 function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   -- Read back data from the form
@@ -2017,6 +2033,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   end
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
+  options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
   options.make_side1    = dialog:GetCheckBox("MakeSide1")
@@ -2110,6 +2127,7 @@ function SaveDefaults(options)
   end
 
   registry:SetBool("WarnDovetail", options.warn_dovetail)
+  registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
   registry:SetBool("MakeBottom", options.make_bottom)
@@ -2144,6 +2162,7 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.default_toolid = ToolDBId("BoxCreator_5.6", "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
+  options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
 
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)
   options.make_bottom = registry:GetBool("MakeBottom", options.make_bottom)

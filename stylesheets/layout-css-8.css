@@ -209,6 +209,12 @@ body a:visited {
     width: 297px;
     min-height: 58px;
     text-align:center;
+}.column_71 {
+    float: left;
+    width: 360px;
+    min-height: 35px;
+    margin-left: 15px;
+    margin-top: 5px;
 }
 a.button6 {
     display:block;
