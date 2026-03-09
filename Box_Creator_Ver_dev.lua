@@ -134,7 +134,7 @@ end
 function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Pocket toolpath: Please Select a Valid Tool Before Continuing.")
+  DisplayMessageBox("Pocket Toolpath: Please select a valid tool before continuing.")
   return false
 end
 
@@ -1048,7 +1048,7 @@ function AddTabsToContour(cad_contour, pt_list)
 			cad_contour:InsertToolpathTabAtPoint(pt_list[i])
 		end
 	else
-		DisplayMessageBox("No tabs to Add")
+		DisplayMessageBox("No tabs to add.")
 	end
 end
 
@@ -1170,7 +1170,7 @@ end
 function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, layer_name)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Cutout Toolpath: Please select a Valid Tool before continuing.")
+  DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
   return false
 end
 
@@ -1215,7 +1215,7 @@ end
 		)
 
 	if toolpath == nil then
-		DisplayMessageBox("Error Creating toolpath")
+		DisplayMessageBox("Error creating toolpath.")
 	end
 end
 
@@ -1381,9 +1381,9 @@ end
 function CreateDoveTailToolpath(markers, dovetail, tool, allowance, warn_user)
   
   if not _tool_ok(tool) then
-  DisplayMessageBox("Dovetail toolpath: please select a valid tool before continuing.")
-  return false
-end
+    DisplayMessageBox("Dovetail Toolpath: please select a valid tool before continuing.")
+    return false
+  end
   
   -- Calculate side rails
   local side_rails = {}
@@ -1405,7 +1405,7 @@ end
   )
 
   if #side_rails == 0 then
-    DisplayMessageBox("Unable to create dovetails")
+    DisplayMessageBox("Unable to create dovetails.")
     return false
   end
 
@@ -1438,7 +1438,7 @@ end
 
   -- Emit external toolpath
   if contour_group.IsEmpty then
-    DisplayMessageBox("No dove tails created")
+    DisplayMessageBox("No dovetails created.")
     return false
   end
 
@@ -1458,7 +1458,7 @@ local toolpath = ExternalToolpath(
 )
 
 if toolpath:Error() then
-  DisplayMessageBox("Error Creating Toolpath")
+  DisplayMessageBox("Error creating toolpath.")
   return true
 end
 
@@ -1470,11 +1470,11 @@ toolpath_manager:AddExternalToolpath(toolpath)
 if warn_user then
 DisplayMessageBox(
   "Dovetail Toolpath Notice:\n\n"
-  .. "This Dovetail Toolpath is Created as an *External Toolpath* by the Gadget.\n"
-  .. "External Toolpaths CANNOT be Recalculated in VCarve/Aspire.\n\n"
-  .. "If User Moves the Vectors (e.g., center on material) and Needs this Toolpath Again:\n"
-  .. "  • The User will Need to Re-Run this Gadget after Proper Planning is Achieved.\n\n"
-  .. "Tip: Plan Vector Placement Before Running the Box Creator Gadget."
+  .. "This Dovetail Toolpath is created as an *External Toolpath* by the Gadget.\n"
+  .. "External toolpaths CANNOT be recalculated in VCarve/Aspire.\n\n"
+  .. "If user moves the cectors (e.g., center on material) and needs this Toolpath Again:\n"
+  .. "  • The User will Need to Re-Run this Gadget after proper planning is achieved.\n\n"
+  .. "Tip: Plan vector placement before running the Box Creator Gadget."
 )
   end
 end
@@ -1787,23 +1787,22 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     local double_thickness = options.thickness * 2
     if options.width <= double_thickness then
-      DisplayMessageBox(string.format("The box width %.3f is too small for material thickness %.3f", options.width, options.thickness))
+      DisplayMessageBox(string.format("The box width %.3f is too small for material thickness %.3f.", options.width, options.thickness))
       return false
     end
     if options.depth <= double_thickness then
-      DisplayMessageBox(string.format("The box depth %.3f is too small for material thickness %.3f", options.depth, options.thickness))
+      DisplayMessageBox(string.format("The box depth %.3f is too small for material thickness %.3f.", options.depth, options.thickness))
       return false
     end
     if options.height <= double_thickness then
-      DisplayMessageBox(string.format("The box height %.3f is too small for material thickness %.3f", options.height, options.thickness))
+      DisplayMessageBox(string.format("The box height %.3f is too small for material thickness %.3f.", options.height, options.thickness))
       return false
     end
     
     -- Tool must be chosen and valid (only when creating toolpaths)
   if not options.no_toolpath then
-    -- Tool must be chosen and valid
     if not _tool_ok(options.tool) then
-     DisplayMessageBox("No Tool Selected or Tool Diameter is Invalid.\n\nClick 'Select Tool' and Pick a Valid End Mill.")
+     DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid End Mill.")
      return false
     end
   end
@@ -1819,7 +1818,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
   -- Edge margin must be non-negative
   if not _is_nonneg(options.edge_margin) then
-    DisplayMessageBox("Edge Margin must be ≥ 0.")
+    DisplayMessageBox("Edge margin must be ≥ 0.")
     return false
   end
 
@@ -1834,11 +1833,11 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomdovetail.min_width)
 
     if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f", bottomdovetail.min_width, inner_width))
+      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
       return false
     end
     if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f", bottomdovetail.min_width, inner_depth))
+      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
       return false
     end
 
@@ -1848,11 +1847,11 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*topdovetail.min_width)
 
     if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f", topdovetail.min_width, inner_width))
+      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", topdovetail.min_width, inner_width))
       return false
     end
     if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f", topdovetail.min_width, inner_depth)) 
+      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", topdovetail.min_width, inner_depth)) 
       return false
     end
 
@@ -1860,7 +1859,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local total_tab_space_h = (inner_height - num_flaps_h*sidedovetail.min_width)
 
     if (num_flaps_h < 1) or (total_tab_space_h < 0) then
-      DisplayMessageBox(string.format("The side joint width %.3f is too big given box inner height is %.3f", sidedovetail.min_width, inner_height))
+      DisplayMessageBox(string.format("The side joint width %.3f is too big given box inner height is %.3f.", sidedovetail.min_width, inner_height))
       return false
     end
     
@@ -1888,23 +1887,23 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
       -- make sure dovetails don't overlap
       if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) then
-        DisplayMessageBox("The joint width is too small for the bottom")
+        DisplayMessageBox("The joint width is too small for the bottom.")
         return false
       end      
 
       if (tab_space_h <= min_space) then        
-        DisplayMessageBox("The joint width is too small for the side")
+        DisplayMessageBox("The joint width is too small for the side.")
         return false
       end
 
       if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
-        DisplayMessageBox("The joint width is too small for the lid")
+        DisplayMessageBox("The joint width is too small for the lid.")
         return false
       end
 
       min_space = min_space + dia
       if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) or (tab_space_h <= min_space) or (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then        
-        DisplayMessageBox("The selected tool will not fit between the joints")
+        DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
       end  
     else
@@ -1915,16 +1914,16 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       tab_space_d_top = math.min(tab_space_d_top, topdovetail.min_width)
       tab_space_h = math.min(tab_space_h, sidedovetail.min_width)
       if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then        
-        DisplayMessageBox("The selected tool will not fit between the bottom joints")
+        DisplayMessageBox("The selected tool will not fit between the bottom joints.")
         return false
       end
       if (tab_space_h <= dia) then        
-          DisplayMessageBox("The selected tool will not fit between the side joints")
+          DisplayMessageBox("The selected tool will not fit between the side joints.")
           return false
       end 
       if (options.allJointWidths) then
         if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
-          DisplayMessageBox("The selected tool will not fit between the lid joints")
+          DisplayMessageBox("The selected tool will not fit between the lid joints.")
           return false
         end
       end
@@ -2129,7 +2128,7 @@ function SaveDefaults(options)
   registry:SetBool("CutDovetails", options.cut_dovetails)
   registry:SetBool("FlatLid", options.flat_lid)
   if options.tool ~= nil then
-   options.tool.ToolDBId:SaveDefaults("BoxCreator_5.6", "")
+   options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
 
   registry:SetBool("WarnDovetail", options.warn_dovetail)
@@ -2166,7 +2165,7 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   topdovetail.min_width = options.toptabwidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
-  options.default_toolid = ToolDBId("BoxCreator_5.6", "")
+  options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.high_dpi_mode = registry:GetBool("HighDPIMode", false) 
