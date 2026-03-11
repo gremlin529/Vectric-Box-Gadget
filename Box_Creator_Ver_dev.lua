@@ -1674,7 +1674,10 @@ function main(script_path)
 
 	-- Arrange the contours
   local mtl_block = MaterialBlock()
-  local converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+  local converted_tool_diameter = 0.25
+  if _tool_ok(options.tool) then
+    converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+  end
   local part_gap    = 2 * converted_tool_diameter
   local edge_margin = math.max(options.edge_margin or 0.0, 0.75)
   faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, edge_margin)
@@ -1865,8 +1868,11 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     
     -- Check if tool will fit
     local mtl_block = MaterialBlock()
-    local converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block) ;
-
+    local converted_tool_diameter = 0.25
+    if _tool_ok(options.tool) then
+      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+    end
+    
     local dia = converted_tool_diameter
     if options.allowance > 0 then
       dia = dia - 2 * options.allowance
