@@ -55,7 +55,7 @@ body a:visited {
 }
 .main_wrapper {
     clear: both;
-    min-height: 581px;
+    min-height: 800px;
     width: 960px;
     margin: 0px auto;
 }
@@ -98,11 +98,10 @@ body a:visited {
     padding-bottom:10px;
 }
 .column_32 {
+    float: left;
     width: 960px;
     min-height: 56px;
     background-color:#000000;
-    margin-left:auto;
-    margin-right:auto;
 }
 .column_33 {
     float: left;
@@ -113,19 +112,6 @@ body a:visited {
 .row_49 {
     clear: both;
     min-height: 138px;
-    width:960px;
-    margin-left:auto;
-    margin-right:auto;
-}
-.row_119 {
-    clear: both;
-    min-height: 32px;
-    width:197px;
-    float:left;
-    background-color:#000000;
-}
-.row_119_align {
-    margin-left: 51px;
 }
 .column_57 {
     float: left;
@@ -172,86 +158,30 @@ body a:visited {
 .row_105 {
     clear: both;
     min-height: 35px;
-    width:960px;
-    margin-left:auto;
-    margin-right:auto;
-}
-.column_70 {
-    float: left;
-    width: 600px;
-    min-height: 35px;
-    margin-left:0px;
-}
-.column_70_align {
-    margin-left: 80px;
-}
-.column_71 {
-    float: left;
-    width: 360px;
-    min-height: 35px;
-}
-.column_73 {
-    float: left;
-    width: 567px;
-    min-height: 35px;
-}
-.column_7_align {
-    margin-left: 13px;
-}
-.column_74 {
-    float: left;
-    width: 393px;
-    min-height: 32px;
 }
 .column_53 {
-    width: 960px;
+    width: 749px;
     min-height: 35px;
-    margin-left:auto;
+    margin-left:10px;
     margin-right:auto;
-}
-.column_66 {
-    float: left;
-    width: 480px;
-    min-height: 35px;
-}
-.column_69 {
-    float: left;
-    width: 450px;
-    min-height: 35px;
-}
-.column_67 {
-    float: left;
-    width: 480px;
-    min-height: 42px;
-}
-.column_68 {
-    float: left;
-    width: 352px;
-    min-height: 32px;
-}
-.row_302 {
-    min-height: 32px;
-    width:352px;
-    text-align:right;
 }
 .row_117 {
     clear: both;
     min-height: 57px;
     width: auto;
 }
-.row_300 {
-    clear: none;
+.row_118 {
+    display: flex;
+    align-items: center;
     min-height: 35px;
-    width: 360px;
+    width: auto;
+    margin-left:10px;
     margin-right:0px;
-    margin-left:auto;
-}
-.row_120 {
-    clear: both;
-    min-height: 43px;
 }
 .ToolPicker {
-    width: 128px;
+    width: auto;
+    padding: 5px 15px;
+    white-space: nowrap;
     vertical-align: middle;
 }
 .column_54 {
@@ -279,6 +209,12 @@ body a:visited {
     width: 297px;
     min-height: 58px;
     text-align:center;
+}.column_NoToolpath {
+    float: left;
+    width: 360px;
+    min-height: 35px;
+    margin-left: 25px;
+    margin-top: 5px;
 }
 a.button6 {
     display:block;
@@ -361,10 +297,16 @@ a.button5:hover {
 a.button5:active {
     color:#FFF;
 }
-.column_50 {
+.column_BoxSize {
     float: left;
-    width: 240px;
-    min-height: 120px;
+    width: 250px;
+    margin-left: 15px;
+    margin-bottom: 10px;
+    min-height: 136px;
+    padding: 10px;
+    margin-right: 10px;
+    border: darkgray solid 3px;
+    border-radius: 10px;
 }
 .row_79 {
     clear: both;
@@ -376,31 +318,24 @@ a.button5:active {
     min-height: 103px;
     width: auto;
 }
-.column_51 {
+.column_JointWidths {
     float: left;
-    width: 240px;
-    min-height: 116px;
-}
-.column_64 {
-    float: left;
-    min-height: 133px;
-    width: 240px;
-}
-.column_65 {
-    float: left;
+    width:260px;
     min-height: 138px;
-    width: 192px;
+    padding: 10px;
+    margin-right: 10px;
+    margin-bottom: 10px;
+    border: darkgray solid 3px;
+    border-radius: 10px;
 }
-.row_186 {
-    min-height: 68px;
-}
-.row_193 {
-    min-height: 68px;
-}
-.column_52 {
+.column_MachiningAllowances {
     float: left;
-    width: 192px;
+    width: 290px;
     min-height: 138px;
+    padding: 10px;
+    margin-right: 10px;
+    border: darkgray solid 3px;
+    border-radius: 10px;
 }
 .column_30 {
     float: left;
@@ -412,54 +347,46 @@ a.button5:active {
     width: 240px;
     min-height: 206px;
 }
-.row_80 {
+.row_BoxSize {
     clear: both;
-    min-height: 68px;
+    min-height: 58px;
     width: auto;
     background-color:#CCC4CC;
+    /* ensure contents stay within the column width */
+    overflow: hidden;
 }
-.row_81 {
-    clear: both;
-    min-height: 52px;
-    width: auto;
-    background-color:#CCC4CC;
-}
-.row_86 {
-    clear: both;
-    min-height: 64px;
-    width: auto;
-    background-color:#CCC4CC;
-}
-.row_123 {
-    clear: both;
-    min-height: 52px;
+
+/* ensure form controls in box size column do not overflow */
+.form-control {
+    width: 100%;
+    box-sizing: border-box;
 }
 .column_39 {
     float: left;
     width: 240px;
     min-height: 206px;
 }
-.row_122 {
+.row_JointWidthEdits {
     clear: both;
-    min-height: 68px;
+    min-height: 58px;
+    width: auto;
+    background-color:#CCC4CC;
+    /* ensure contents stay within the column width */
+    overflow: hidden;
 }
-.row_93 {
+.row_JointWidthsCheckbox {
     clear: both;
-    min-height: 52px;
+    min-height: 30px;
     width: auto;
     background-color:#CCC4CC;
 }
-.row_94 {
+.row_MachiningAllowances {
     clear: both;
-    min-height: 52px;
+    min-height: 58px;
     width: auto;
     background-color:#CCC4CC;
-}
-.row_95 {
-    clear: both;
-    min-height: 70px;
-    width: auto;
-    background-color:#CCC4CC;
+    /* ensure contents stay within the column width */
+    overflow: hidden;
 }
 .row_66 {
     clear: both;
@@ -731,6 +658,7 @@ a.button5:active {
     min-height: 64px;
 }
 .row_41 {
+    margin-top: 15px;
     clear: both;
     min-height: 100px;
 }
@@ -839,7 +767,8 @@ a.button5:active {
     text-align: center;
 }
 .btn {
-    width: 93px;
+    width: auto;
+    padding: 8px 16px;
     min-height:12px;
     margin:13px auto 0 auto;
 }
@@ -915,32 +844,25 @@ a.button1:active {
 .row_4 {
     clear: both;
     min-height: 56px;
-    width: 960px;
+    width: auto;
     padding-bottom:10px;
-    margin-left:auto;
-    margin-right:auto;
 }
 .column_7 {
     float: left;
-    width: 467px;
+    width: 480px;
     min-height: 56px;
     background-color:#000000;
 }
 .column_8 {
     float: left;
-    width: 467px;
+    width: 480px;
     min-height: 56px;
     background-color:#000000;
 }
 .row_5 {
     clear: both;
     min-height: 133px;
-    width: 960px;
-    margin-left:auto;
-    margin-right:auto;
-}
-.row_118 {
-    width: 480px;
+    width: auto;
 }
 .row_103 {
     clear: both;
@@ -976,7 +898,6 @@ a.button1:active {
     width: 240px;
     min-height: 66px;
     background-color:#CCC4CC;
-    text-align:center;
 }
 .column_18 {
     float: left;
@@ -994,7 +915,6 @@ a.button1:active {
     width: 240px;
     min-height: 67px;
     background-color:#CCC4CC;
-    text-align:center;
 }
 .column_20 {
     float: left;
@@ -1017,7 +937,6 @@ a.button1:active {
     width: 240px;
     min-height: 66px;
     background-color:#CCC4CC;
-    text-align:center;
 }
 .customClass {
     min-height:34px;
@@ -1038,7 +957,6 @@ a.button1:active {
     width: 240px;
     min-height: 67px;
     background-color:#CCC4CC;
-    text-align:center;
 }
 .column_24 {
     float: left;
@@ -1049,19 +967,17 @@ a.button1:active {
 .row_6 {
     clear: both;
     min-height: 56px;
-    width: 960px;
+    width: auto;
     text-align:center;
     background-color:#CCC4CC;
-    margin-left:auto;
-    margin-right:auto;
 }
 .column_45 {
     float: left;
-    width: 234px;
+    width: 241px;
     min-height: 56px;
 }
 .column_45_align {
-    margin-left: 25px;
+    margin-left: 12px;
 }
 a.button {
     display:block;
@@ -1108,17 +1024,12 @@ a.button:active {
 }
 .column_46 {
     float: left;
-    width: 409px;
+    width: 420px;
     min-height: 56px;
-}
-.row_301 {
-    clear: both;
-    min-height: 35px;
-    width:556px;
 }
 .column_47 {
     float: left;
-    width: 268px;
+    width: 275px;
     min-height: 56px;
 }
 a.button4 {
@@ -1363,30 +1274,26 @@ h3.heading11 {
     margin-bottom:0px;
 }
 span.text-right {
-    padding-left: 50px;
+    flex: 1;
+    padding-left: 15px;
+    min-width: 0;
 }
-.form-control {
-    width: 122px;
+.facesSelection {
+    clear: both;
+    padding: 10px;
+    margin: 20px 15px 10px 15px;
+    border: darkgray solid 3px;
+    border-radius: 10px;
+    overflow: auto;
 }
-img.image9 {
-    width:100px;
-    height:46px;
-    margin-left:auto;
-    margin-right:auto;
-    display:block;
+.row_119 {
+    clear: both;
+    min-height: 32px;
+    width:197px;
+    float:left;
+    background-color:#000000;
 }
-img.image10 {
-    margin-left: auto;
-    margin-right:auto;
-    display:block;
-}
-img.image11 {
-    margin-left: auto;
-    margin-right:auto;
-    display:block;
-}
-img.image12 {
-    margin-left: auto;
-    margin-right:auto;
-    display:block;
+.row_119_align {
+    margin-left: 20px;
+    margin-bottom: 25px;
 }
