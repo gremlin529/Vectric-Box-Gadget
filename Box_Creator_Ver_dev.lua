@@ -1962,7 +1962,7 @@ function main(script_path)
     CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sidetabwidth, options.cut_layer_name)
   end
 
-	SaveDefaults(options)
+	SaveDefaults(options, false)
 	job:Refresh2DView()
 	return true
 
@@ -2194,6 +2194,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local success = dialog:ShowDialog()
 
     if not success then
+      ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
+      SaveDefaults(options, true) -- the user hit cancel but save the window settings anyways
       return false
     end
   else  
@@ -2373,10 +2375,18 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.window_height = dialog.WindowHeight
 end
 
-function SaveDefaults(options)
+function SaveDefaults(options, justwindowinfo)
   local registry = Registry("BoxCreator_" .. g_version)
+
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
+  registry:SetBool("WarnDovetail", options.warn_dovetail)
+  registry:SetBool("HighDPIMode", options.high_dpi_mode)
+  registry:SetBool("DarkMode", options.dark_mode)
+
+  if justwindowinfo then
+    return
+  end
 
   registry:SetDouble("Width", options.width)
   registry:SetDouble("Height", options.height)
@@ -2393,9 +2403,6 @@ function SaveDefaults(options)
    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
 
-  registry:SetBool("WarnDovetail", options.warn_dovetail)
-  registry:SetBool("HighDPIMode", options.high_dpi_mode)
-  registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
