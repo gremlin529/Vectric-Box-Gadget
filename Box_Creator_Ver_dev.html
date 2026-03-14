@@ -1,241 +1,575 @@
-<!DOCTYPE html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+  "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
- <head>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=7" />
   <link href="stylesheets/reset.css" rel="stylesheet" type="text/css" />
   <title>Box Creator Gadget</title>
   <link href="stylesheets/layout-css-8.css" rel="stylesheet" type="text/css" />
   <script type="text/javascript" src="scripts/browser-compatibility.js"></script>
- </head>
- <body>
-  <div class="main_wrapper">
-   <div class="row_1">
-    <div class="column_1">
-     <img src="Images/boxdim.png" class="image" />
-    </div>
-    <div class="column_2">
-     <p class="paragraph">This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
-     <p class="paragraph">The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
-     <p class="paragraph">The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved.</p>
-     <p class="paragraph"><u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calculation Warning</u> for <u>Better Productivity</u>.</p>
-    </div>
-   </div>
-   <div class="row_73">
-    <div class="column_32">
-      <h3 class="heading13">Geometry Options</h3>
-    </div>
-   </div>
-   <div class="row_49">
-    <div class="column_BoxSize">
-     <div class="row_BoxSize">
-      <label for="WidthField" class="col-xs-5 control-label">Width:</label>
-      <div class="col-xs-7">
-       <input type="number" step="any" class="form-control" id="WidthField" placeholder="Width of Box">
-      </div>
-     </div>
-     <div class="row_BoxSize">
-      <label for="DepthField" class="col-xs-5 control-label">Depth:</label>
-      <div class="col-xs-7">
-       <input type="email" class="form-control" id="DepthField" placeholder="Depth of Box">
-      </div>
-     </div>
-     <div class="row_BoxSize">
-      <label for="HeightField" class="col-xs-5 control-label">Height:</label>
-      <div class="col-xs-7">
-       <input type="email" class="form-control" id="HeightField" placeholder="Height of Box">
-      </div>
-     </div>
-    </div>
-    <script>
-      // Set initial visibility of top and bottom joint width fields based on the "Show All Joint Widths" checkbox
-      setTimeout(function() {
-        var checkbox = document.getElementById("AllJointWidths");
-        if (checkbox) {
-          onShowAllWidthsChanged(checkbox);
-        }
-        var highDPICheckbox = document.getElementById("HighDPIMode");
-        if (highDPICheckbox) {
-          onHighDPIModeChanged(highDPICheckbox);
-        }
-      }, 100);
-      function onHighDPIModeChanged(checkbox) {
-        var isHighDPI = checkbox.checked;
-        if (isHighDPI) {
-          document.body.style.zoom="125%";
-          // var bodyElement = document.getElementById("TheBody");
+  <style type="text/css">
+    /* === BASE === */
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 12px;
+      background-color: #e8eaf0;
+      color: #1a1f2e;
+      margin: 0;
+      padding: 0;
+    }
 
-          // var windowWidth = bodyElement.clientWidth;
-          // var windowHeight = bodyElement.clientHeight;
-          // var newWindowWidth = windowWidth * 1.25;
-          // var newWindowHeight = windowHeight * 1.25;
-          
-          // var windowDescription = 'Current Window Size: ' + windowWidth + ' x ' + windowHeight + '. Desired Window Size: ' + newWindowWidth + ' x ' + newWindowHeight + '.';
-          // alert(windowDescription);
+    .main_wrapper {
+      width: 940px;
+      margin: 0 auto;
+      padding: 10px;
+    }
 
-          // bodyElement.style.width = newWindowWidth + "px";
-          // bodyElement.style.height = newWindowHeight + "px";
-          
-        } else {
-          document.body.style.zoom="100%";
-        }
-      }
-      function onShowAllWidthsChanged(checkbox) {
-        var showAll = checkbox.checked;
-        var bottomTopJoints = document.getElementById("showHideTopBottomJoints");
-        if (showAll) {
-          bottomTopJoints.style.display = "block";
-        } else {
-          bottomTopJoints.style.display = "none";
-        }
-      }
-    </script>
-    <div class="column_JointWidths">
-    <div class="row_JointWidthsCheckbox">
-        <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)">Show All Joint Widths</label>
-     </div>
-     <div class="row_JointWidthEdits">
-      <label for="SideTabWidthField" class="col-xs-5 control-label">Side Joint Width:</label>
-      <div class="col-xs-7">
-       <input type="email" class="form-control" id="SideTabWidthField" placeholder="Width of Joint">
-      </div>
-     </div>
-    <div  id="showHideTopBottomJoints" style="display: none;">
-      <div class="row_JointWidthEdits">
-        <label for="BottomTabWidthField" class="col-xs-5 control-label">Bottom Joint Width:</label>
-        <div class="col-xs-7">
-        <input type="email" class="form-control" id="BottomTabWidthField" placeholder="Width of Bottom Joint">
-        </div>
-      </div>
-      <div class="row_JointWidthEdits">
-        <label for="TopTabWidthField" class="col-xs-5 control-label">Lid Joint Width:</label>
-        <div class="col-xs-7">
-        <input type="email" class="form-control" id="TopTabWidthField" placeholder="Width of Lid Joint">
-        </div>
-      </div>
-     </div>
-    </div>
-    <div class="column_MachiningAllowances">
-     <div class="row_MachiningAllowances">
-      <label for="AllowanceField" class="col-xs-5 control-label">Allowance:</label>
-      <div class="col-xs-7">
-       <input type="email" class="form-control" id="AllowanceField" placeholder="Allowance">
-      </div>
-     </div>
-     <div class="row_MachiningAllowances">
-      <label for="EdgeField" class="col-xs-5 control-label">Clamping Margin:</label>
-      <div class="col-xs-7">
-       <input type="email" class="form-control" id="EdgeField" placeholder="Clamping Margin">
-      </div>
-     </div>
-   </div>
-   <div class="facesSelection">
-    <div class="row_119 row_119_align">
-      <h3 class="heading11">Faces To Machine:&nbsp;</h3>
-    </div>
-    <div class="column_57">
-      <label for="faces-0" class="customClass2">
-      <input type="checkbox" name="faces" id="MakeLid" value="1" class="LuaButton">Lid</label>
-    </div>
-    <div class="column_58">
-      <label for="faces-1">
-      <input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton">Bottom</label>
-    </div>
-    <div class="column_59">
-      <label for="faces-2">
-      <input type="checkbox" name="faces" id="MakeSide1" value="" class="LuaButton">Side 1</label>
-    </div>
-    <div class="column_60">
-      <label for="faces-3">
-      <input type="checkbox" name="faces" id="MakeSide2" value="" class="LuaButton">Side 2</label>
-    </div>
-    <div class="column_61">
-      <label for="faces-4">
-      <input type="checkbox" name="faces" id="MakeEnd1" value="" class="LuaButton">End 1</label>
-    </div>
-    <div class="column_62">
-      <label for="faces-5" class="customClass1">
-      <input type="checkbox" name="faces" id="MakeEnd2" value="" class="LuaButton">End 2</label>
-    </div>
-   </div>
-   <div class="row_105">
-    <div class="column_53">
-     <div class="row_118">
-      <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool"><span class="text-right text-muted" id="ToolNameField" placeholder="- No Tool Selected -"></span>
-     </div>
-    </div>
-    <div class="column_NoToolpath">
-        <label><input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="">No Toolpath (create vectors only)</label>
-    </div>
-   </div>
-   <div class="row_4">
-    <div class="column_7">
-      <h3 class="heading13">Joint Type</h3>
+    /* === CLEARFIX for IE7 === */
+    .cf { zoom: 1; } /* triggers hasLayout */
+    .cf:after { content: ""; display: table; clear: both; }
 
-    </div>
-    <div class="column_8">
-      <h3 class="heading13">Lid Type</h3>
+    /* === SECTION HEADER BAR === */
+    .sec-bar {
+      background-color: #2255aa;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 5px 10px;
+      margin-bottom: 0;
+    }
 
+    /* === CARD (white box) === */
+    .card {
+      background-color: #ffffff;
+      border: 1px solid #c0c4d0;
+      margin-bottom: 10px;
+    }
+    .card-body {
+      padding: 10px;
+    }
+
+    /* === PANEL (light-gray sub-box) === */
+    .panel {
+      background-color: #f2f4f8;
+      border: 1px solid #d0d4de;
+      padding: 8px 10px;
+    }
+    .panel-title {
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #2255aa;
+      margin-bottom: 7px;
+    }
+
+    /* === THREE-COLUMN GEO ROW === */
+    .geo-col {
+      float: left;
+      width: 295px;
+      margin-right: 10px;
+    }
+    .geo-col-last {
+      float: left;
+      width: 295px;
+      margin-right: 0;
+    }
+
+    /* === FIELD ROW (label + input) === */
+    .field-row {
+      margin-bottom: 6px;
+    }
+    .field-row label {
+      display: block;
+      font-size: 11px;
+      font-weight: bold;
+      color: #374151;
+      margin-bottom: 2px;
+    }
+    .field-row input {
+      width: 100%;
+      font-family: Courier New, monospace;
+      font-size: 12px;
+      border: 1px solid #b0b8cc;
+      background-color: #ffffff;
+      color: #1a1f2e;
+      padding: 3px 5px;
+    }
+
+    /* === TOGGLE ROW === */
+    .toggle-row {
+      margin-bottom: 7px;
+      font-size: 11px;
+      font-weight: bold;
+      color: #374151;
+    }
+    .toggle-row input {
+      margin-right: 4px;
+    }
+
+    /* === FACES SECTION === */
+    .faces-panel {
+      background-color: #f2f4f8;
+      border: 1px solid #d0d4de;
+      padding: 8px 10px;
+      margin-top: 8px;
+    }
+    .face-item {
+      float: left;
+      margin-right: 10px;
+      margin-bottom: 4px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #374151;
+      white-space: nowrap;
+    }
+    .face-item input {
+      margin-right: 3px;
+    }
+
+    /* === TOOL ROW === */
+    .tool-bar {
+      background-color: #ffffff;
+      border: 1px solid #c0c4d0;
+      padding: 8px 10px;
+      margin-bottom: 10px;
+    }
+    .tool-bar-left {
+      float: left;
+      width: 580px;
+    }
+    .tool-bar-right {
+      float: left;
+      width: 320px;
+      padding-top: 3px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    /* Select Tool button */
+    input.ToolPicker {
+      background-color: #dce8ff;
+      color: #2255aa;
+      border: 1px solid #2255aa;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 11px;
+      font-weight: bold;
+      padding: 4px 12px;
+      cursor: pointer;
+    }
+
+    /* Tool name span */
+    #ToolNameField {
+      font-size: 11px;
+      color: #6b7280;
+      font-style: italic;
+      margin-left: 8px;
+    }
+
+    /* No toolpath label */
+    .no-tp-label {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .no-tp-label input {
+      margin-right: 4px;
+    }
+
+    /* === TYPE PANELS (joint / lid) === */
+    .type-col {
+      float: left;
+      width: 460px;
+      margin-right: 10px;
+    }
+    .type-col-last {
+      float: left;
+      width: 460px;
+      margin-right: 0;
+    }
+    .type-panel {
+      background-color: #ffffff;
+      border: 1px solid #c0c4d0;
+    }
+    .type-panel-header {
+      background-color: #e8eaf0;
+      border-bottom: 1px solid #c0c4d0;
+      padding: 5px 10px;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #6b7280;
+    }
+    .type-option {
+      border-bottom: 1px solid #e8eaf0;
+      padding: 8px 10px;
+    }
+    .type-option-last {
+      padding: 8px 10px;
+    }
+    .type-option-label {
+      float: left;
+      width: 200px;
+      padding-top: 8px;
+      font-size: 12px;
+      font-weight: bold;
+      color: #374151;
+    }
+    .type-option-label input {
+      margin-right: 5px;
+    }
+    .type-option-img {
+      float: left;
+    }
+    .type-option-img img {
+      height: 40px;
+      width: auto;
+      display: block;
+    }
+
+    /* === FOOTER BAR === */
+    .footer-bar {
+      background-color: #ffffff;
+      border: 1px solid #c0c4d0;
+      padding: 10px 12px;
+    }
+    .footer-btn-ok {
+      float: left;
+      margin-right: 14px;
+    }
+    .footer-checks {
+      float: left;
+      padding-top: 4px;
+      width: 560px;
+    }
+    .footer-check-item {
+      font-size: 11px;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+    .footer-check-item input {
+      margin-right: 4px;
+    }
+    .footer-btn-cancel {
+      float: right;
+    }
+
+    /* OK button */
+    #ButtonOK {
+      background-color: #1e8040;
+      color: #ffffff;
+      border: 1px solid #166032;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 7px 28px;
+      cursor: pointer;
+    }
+
+    /* Cancel button */
+    #ButtonCancel {
+      background-color: #f2f4f8;
+      color: #6b7280;
+      border: 1px solid #c0c4d0;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 13px;
+      font-weight: bold;
+      padding: 7px 20px;
+      cursor: pointer;
+    }
+
+    /* === HEADER BANNER === */
+    /* card is 940px wide with 1px border each side = 938px inner.
+       left col: 220px content + 10px padding each side = 240px total (box-sizing not in IE7,
+       so we must account for padding manually).
+       We use explicit widths that add up: 240 + 1 (border) + 697 = 938px. */
+    .header-left {
+      float: left;
+      width: 220px;
+      background-color: #f2f4f8;
+      border-right: 1px solid #d0d4de;
+      padding: 10px;
+      text-align: center;
+    }
+    .header-left img {
+      max-width: 220px;
+      height: auto;
+    }
+    .header-right {
+      float: left;
+      width: 655px;
+      padding: 10px 14px;
+    }
+    .header-right p {
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 5px;
+    }
+    .header-right p u {
+      color: #2255aa;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    /* spacer utility */
+    .spacer8  { height: 8px;  font-size: 0; line-height: 0; }
+  </style>
+</head>
+<body>
+<div class="main_wrapper">
+
+  <!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
+  <div class="card cf" style="margin-bottom:10px; overflow:hidden;">
+    <div class="header-left">
+      <img src="Images/boxdim.png" alt="Box dimensions" />
     </div>
-   </div>
-   <div class="row_5">
-    <div class="column_15">
-     <div class="row_30">
-      <div class="column_17">
-       <label>
-        <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1">Finger Joint</label>
-      </div>
-      <div class="column_18">
-       <img src="Images/tabs.png" />
-      </div>
-     </div>
-     <div class="row_31">
-      <div class="column_19">
-       <label>
-        <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2">Dovetail Joint</label>
-      </div>
-      <div class="column_20">
-       <img src="Images/dovetails.png" />
-      </div>
-     </div>
+    <div class="header-right">
+      <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
+      <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
+      <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved.</p>
+      <p><u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calculation Warning</u> for <u>Better Productivity</u>.</p>
     </div>
-    <div class="column_16">
-     <div class="row_32">
-      <div class="column_21">
-       <label>
-        <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1">Flat Lid</label>
-      </div>
-      <div class="column_22">
-       <img src="Images/flatlid.png" />
-      </div>
-     </div>
-     <div class="row_33">
-      <div class="column_23">
-       <label>
-        <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2">Tabbed Lid</label>
-      </div>
-      <div class="column_24">
-       <img src="Images/tabbedlid.png" />
-      </div>
-     </div>
-    </div>
-   </div>
-   <div class="row_6">
-    <div class="column_45 column_45_align">
-     <button type="button" class="btn btn-default btn-block" id="ButtonOK">OK</button>
-    </div>
-    <fieldset class="theanswer" id="theoneiwant" style="display: none;">
-      <label>Here it is!</label>
-    </fieldset>
-    <div class="column_46">
-     <label for="WarnDovetail">
-      <input type="checkbox" class="LuaButton" id="WarnDovetail">Show Dovetail Re-Calculation Warning.</label>
-      <label for="HighDPIMode">
-      <input type="checkbox"  class="LuaButton" id="HighDPIMode" onclick="onHighDPIModeChanged(this)">Enable High DPI Mode</label>
-    </div>
-    <div class="column_47">
-     <button type="button" class="btn btn-default btn-block" id="ButtonCancel">Cancel</button>
-    </div>
-   </div>
   </div>
- </body>
 
+  <!-- ═══ GEOMETRY OPTIONS ══════════════════════════════════════════════ -->
+  <div class="sec-bar">Geometry Options</div>
+  <div class="card">
+    <div class="card-body cf">
+
+      <!-- Three panels side by side -->
+      <div class="geo-col">
+        <div class="panel">
+          <div class="panel-title">Box Dimensions</div>
+          <div class="field-row">
+            <label for="WidthField">Width:</label>
+            <input type="number" step="any" id="WidthField" class="form-control" placeholder="Width of Box" />
+          </div>
+          <div class="field-row">
+            <label for="DepthField">Depth:</label>
+            <input type="email" id="DepthField" class="form-control" placeholder="Depth of Box" />
+          </div>
+          <div class="field-row">
+            <label for="HeightField">Height:</label>
+            <input type="email" id="HeightField" class="form-control" placeholder="Height of Box" />
+          </div>
+        </div>
+      </div>
+
+      <div class="geo-col">
+        <div class="panel">
+          <div class="panel-title">Joint Widths</div>
+          <div class="toggle-row">
+            <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)" />
+            <label for="AllJointWidths" style="display:inline; font-size:11px; font-weight:bold; color:#374151;">Show All Joint Widths</label>
+          </div>
+          <div class="field-row">
+            <label for="SideTabWidthField">Side Joint Width:</label>
+            <input type="email" id="SideTabWidthField" class="form-control" placeholder="Width of Joint" />
+          </div>
+          <div id="showHideTopBottomJoints" style="display:none;">
+            <div class="field-row">
+              <label for="BottomTabWidthField">Bottom Joint Width:</label>
+              <input type="email" id="BottomTabWidthField" class="form-control" placeholder="Width of Bottom Joint" />
+            </div>
+            <div class="field-row">
+              <label for="TopTabWidthField">Lid Joint Width:</label>
+              <input type="email" id="TopTabWidthField" class="form-control" placeholder="Width of Lid Joint" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="geo-col-last">
+        <div class="panel">
+          <div class="panel-title">Machining</div>
+          <div class="field-row">
+            <label for="AllowanceField">Allowance:</label>
+            <input type="email" id="AllowanceField" class="form-control" placeholder="Allowance" />
+          </div>
+          <div class="field-row">
+            <label for="EdgeField">Clamping Margin:</label>
+            <input type="email" id="EdgeField" class="form-control" placeholder="Clamping Margin" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Faces to machine -->
+      <div class="faces-panel cf">
+        <div class="panel-title">Faces To Machine</div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label>
+        </div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton" />Bottom</label>
+        </div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label>
+        </div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label>
+        </div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label>
+        </div>
+        <div class="face-item">
+          <label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══ TOOL PICKER ════════════════════════════════════════════════════ -->
+  <div class="tool-bar cf">
+    <div class="tool-bar-left">
+      <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool" />
+      <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
+    </div>
+    <div class="tool-bar-right">
+      <label class="no-tp-label">
+        <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" />
+        No Toolpath (create vectors only)
+      </label>
+    </div>
+  </div>
+
+  <!-- ═══ JOINT TYPE + LID TYPE ══════════════════════════════════════════ -->
+  <div class="cf" style="margin-bottom:10px;">
+    <!-- Joint Type -->
+    <div class="type-col">
+      <div class="type-panel">
+        <div class="type-panel-header">Joint Type</div>
+        <div class="type-option cf">
+          <div class="type-option-label">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger Joint</label>
+          </div>
+          <div class="type-option-img">
+            <img src="Images/tabs.png" alt="Finger Joint" />
+          </div>
+        </div>
+        <div class="type-option-last cf">
+          <div class="type-option-label">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail Joint</label>
+          </div>
+          <div class="type-option-img">
+            <img src="Images/dovetails.png" alt="Dovetail Joint" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Lid Type -->
+    <div class="type-col-last">
+      <div class="type-panel">
+        <div class="type-panel-header">Lid Type</div>
+        <div class="type-option cf">
+          <div class="type-option-label">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" />Flat Lid</label>
+          </div>
+          <div class="type-option-img">
+            <img src="Images/flatlid.png" alt="Flat Lid" />
+          </div>
+        </div>
+        <div class="type-option-last cf">
+          <div class="type-option-label">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" />Tabbed Lid</label>
+          </div>
+          <div class="type-option-img">
+            <img src="Images/tabbedlid.png" alt="Tabbed Lid" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ FOOTER ═════════════════════════════════════════════════════════ -->
+  <div class="footer-bar cf">
+    <div class="footer-btn-ok">
+      <button type="button" id="ButtonOK">OK</button>
+    </div>
+    <div class="footer-checks">
+      <div class="footer-check-item">
+        <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
+      </div>
+      <div class="footer-check-item">
+        <label><input type="checkbox" class="LuaButton" id="HighDPIMode" onclick="onHighDPIModeChanged(this)" />Enable High DPI Mode</label>
+      </div>
+    </div>
+    <div class="footer-btn-cancel">
+      <button type="button" id="ButtonCancel">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Hidden legacy fieldset -->
+  <fieldset class="theanswer" id="theoneiwant" style="display:none;">
+    <label>Here it is!</label>
+  </fieldset>
+
+</div><!-- /main_wrapper -->
+
+<script type="text/javascript">
+  // --- HiDPI auto-detection (IE-specific properties) ---
+  // screen.deviceXDPI  = physical pixels per inch of the display
+  // screen.logicalXDPI = pixels per inch the OS is treating as "normal" (usually 96)
+  // Their ratio gives us the OS display scaling factor.
+  // e.g. 144 device / 96 logical = 1.5 = 150% scaling
+  function detectDPIZoom() {
+    var ratio = 1;
+    if (screen.deviceXDPI && screen.logicalXDPI && screen.logicalXDPI !== 0) {
+      ratio = screen.deviceXDPI / screen.logicalXDPI;
+    }
+    return ratio;
+  }
+
+  // Convert a DPI ratio to a CSS zoom percentage string
+  // We clamp to a few sensible steps so the layout doesn't go wild
+  function ratioToZoom(ratio) {
+    if (ratio >= 1.75) { return "80%";  }  // 175-200% OS scaling -> shrink to fit
+    if (ratio >= 1.4)  { return "90%";  }  // 150% OS scaling
+    if (ratio >= 1.1)  { return "100%"; }  // 125% OS scaling -> already handled by OS
+    return "100%";                          // 100% or unknown -> no adjustment needed
+  }
+
+  // Called by the manual checkbox in the footer (preserved for Lua compatibility)
+  function onHighDPIModeChanged(checkbox) {
+    if (checkbox.checked) {
+      // Manual override: always apply 125% zoom regardless of auto-detection
+      document.body.style.zoom = "125%";
+    } else {
+      // Revert to whatever auto-detection decided
+      ratio = ratioToZoom(detectDPIZoom());
+      alert("Auto-detected DPI scaling ratio: " + detectDPIZoom().toFixed(2) + "\nApplying zoom: " + ratio +"." + screen.deviceXDPI + " device DPI, " + screen.logicalXDPI + " logical DPI.");
+      document.body.style.zoom = ratioToZoom(detectDPIZoom());
+    }
+  }
+
+  function onShowAllWidthsChanged(checkbox) {
+    var el = document.getElementById("showHideTopBottomJoints");
+    if (el) {
+      el.style.display = checkbox.checked ? "block" : "none";
+    }
+  }
+
+  // --- Initialise on load ---
+  setTimeout(function() {
+    // 1. Auto-detect DPI and apply zoom
+    var ratio = detectDPIZoom();
+    var autoZoom = ratioToZoom(ratio);
+    document.body.style.zoom = autoZoom;
+
+    // 2. If the Lua registry had HighDPIMode checked, honour that too
+    //    (onHighDPIModeChanged will override the auto value if checkbox is checked)
+    var dpi = document.getElementById("HighDPIMode");
+    if (dpi) { onHighDPIModeChanged(dpi); }
+
+    // 3. Restore joint width visibility from saved state
+    var cb = document.getElementById("AllJointWidths");
+    if (cb) { onShowAllWidthsChanged(cb); }
+  }, 100);
+
+</script>
+</body>
 </html>
