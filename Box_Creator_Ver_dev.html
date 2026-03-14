@@ -8,7 +8,8 @@
   <link href="stylesheets/layout-css-8.css" rel="stylesheet" type="text/css" />
   <script type="text/javascript" src="scripts/browser-compatibility.js"></script>
   <style type="text/css">
-    /* === BASE === */
+
+    /* ── Base ─────────────────────────────────────────────────────────── */
     body {
       font-family: Tahoma, Arial, sans-serif;
       font-size: 12px;
@@ -18,18 +19,18 @@
       padding: 0;
     }
 
-    .main_wrapper {
+    #page-wrapper {
       width: 940px;
       margin: 0 auto;
       padding: 10px;
     }
 
-    /* === CLEARFIX for IE7 === */
-    .cf { zoom: 1; } /* triggers hasLayout */
-    .cf:after { content: ""; display: table; clear: both; }
+    /* IE7 clearfix: zoom triggers hasLayout, :after clears floats in other browsers */
+    .clearfix { zoom: 1; }
+    .clearfix:after { content: ""; display: table; clear: both; }
 
-    /* === SECTION HEADER BAR === */
-    .sec-bar {
+    /* ── Section header bar ───────────────────────────────────────────── */
+    .section-header {
       background-color: #2255aa;
       color: #ffffff;
       font-size: 11px;
@@ -37,10 +38,9 @@
       letter-spacing: 1px;
       text-transform: uppercase;
       padding: 5px 10px;
-      margin-bottom: 0;
     }
 
-    /* === CARD (white box) === */
+    /* ── White card container ─────────────────────────────────────────── */
     .card {
       background-color: #ffffff;
       border: 1px solid #c0c4d0;
@@ -50,13 +50,13 @@
       padding: 10px;
     }
 
-    /* === PANEL (light-gray sub-box) === */
-    .panel {
+    /* ── Light-gray sub-panel ─────────────────────────────────────────── */
+    .sub-panel {
       background-color: #f2f4f8;
       border: 1px solid #d0d4de;
       padding: 8px 10px;
     }
-    .panel-title {
+    .sub-panel-title {
       font-size: 10px;
       font-weight: bold;
       letter-spacing: 1px;
@@ -65,21 +65,53 @@
       margin-bottom: 7px;
     }
 
-    /* === THREE-COLUMN GEO ROW === */
-    .geo-col {
+    /* ── Header banner ────────────────────────────────────────────────── */
+    .header-image {
+      float: left;
+      width: 200px;
+      background-color: #f2f4f8;
+      border-right: 1px solid #d0d4de;
+      padding: 10px;
+      text-align: center;
+    }
+    .header-image img {
+      max-width: 200px;
+      height: auto;
+    }
+    .header-text {
+      float: left;
+      width: 658px;
+      padding: 10px 14px;
+    }
+    .header-text p {
+      font-size: 11px;
+      color: #6b7280;
+      line-height: 1.6;
+      margin-bottom: 5px;
+    }
+    .header-text p:last-child {
+      margin-bottom: 0;
+    }
+    .header-text u {
+      color: #2255aa;
+      text-decoration: none;
+      font-weight: bold;
+    }
+
+    /* ── Geometry columns ─────────────────────────────────────────────── */
+    .geometry-column {
       float: left;
       width: 295px;
       margin-right: 10px;
       margin-bottom: 10px;
     }
-    .geo-col-last {
+    .geometry-column-last {
       float: left;
       width: 295px;
-      margin-right: 0;
       margin-bottom: 10px;
     }
 
-    /* === FIELD ROW (label + input) === */
+    /* ── Label + input field row ──────────────────────────────────────── */
     .field-row {
       margin-bottom: 6px;
     }
@@ -100,18 +132,18 @@
       padding: 3px 5px;
     }
 
-    /* === TOGGLE ROW === */
-    .toggle-row {
+    /* ── Checkbox + label row ─────────────────────────────────────────── */
+    .checkbox-row {
       margin-bottom: 7px;
       font-size: 11px;
       font-weight: bold;
       color: #374151;
     }
-    .toggle-row input {
+    .checkbox-row input {
       margin-right: 4px;
     }
 
-    /* === FACES SECTION === */
+    /* ── Faces to machine ─────────────────────────────────────────────── */
     .faces-panel {
       background-color: #f2f4f8;
       border: 1px solid #d0d4de;
@@ -120,7 +152,7 @@
       clear: both;
       overflow: hidden;
     }
-    .face-item {
+    .face-checkbox {
       float: left;
       margin-right: 10px;
       margin-bottom: 4px;
@@ -129,11 +161,11 @@
       color: #374151;
       white-space: nowrap;
     }
-    .face-item input {
+    .face-checkbox input {
       margin-right: 3px;
     }
 
-    /* === TOOL ROW === */
+    /* ── Tool picker bar ──────────────────────────────────────────────── */
     .tool-bar {
       background-color: #ffffff;
       border: 1px solid #c0c4d0;
@@ -151,8 +183,6 @@
       font-size: 11px;
       color: #6b7280;
     }
-
-    /* Select Tool button */
     input.ToolPicker {
       background-color: #dce8ff;
       color: #2255aa;
@@ -163,34 +193,29 @@
       padding: 4px 12px;
       cursor: pointer;
     }
-
-    /* Tool name span */
     #ToolNameField {
       font-size: 11px;
       color: #6b7280;
       font-style: italic;
       margin-left: 8px;
     }
-
-    /* No toolpath label */
-    .no-tp-label {
+    .no-toolpath-label {
       font-size: 11px;
       color: #6b7280;
     }
-    .no-tp-label input {
+    .no-toolpath-label input {
       margin-right: 4px;
     }
 
-    /* === TYPE PANELS (joint / lid) === */
-    .type-col {
+    /* ── Joint type / Lid type side-by-side panels ────────────────────── */
+    .type-column {
       float: left;
       width: 460px;
       margin-right: 10px;
     }
-    .type-col-last {
+    .type-column-last {
       float: left;
       width: 460px;
-      margin-right: 0;
     }
     .type-panel {
       background-color: #ffffff;
@@ -207,13 +232,13 @@
       color: #6b7280;
     }
     .type-option {
-      border-bottom: 1px solid #e8eaf0;
       padding: 8px 10px;
+      border-bottom: 1px solid #e8eaf0;
     }
     .type-option-last {
       padding: 8px 10px;
     }
-    .type-option-label {
+    .type-option-radio {
       float: left;
       width: 200px;
       padding-top: 8px;
@@ -221,46 +246,46 @@
       font-weight: bold;
       color: #374151;
     }
-    .type-option-label input {
+    .type-option-radio input {
       margin-right: 5px;
     }
-    .type-option-img {
+    .type-option-preview {
       float: left;
     }
-    .type-option-img img {
+    .type-option-preview img {
       height: 40px;
       width: auto;
       display: block;
     }
 
-    /* === FOOTER BAR === */
+    /* ── Footer bar ───────────────────────────────────────────────────── */
     .footer-bar {
       background-color: #ffffff;
       border: 1px solid #c0c4d0;
       padding: 10px 12px;
     }
-    .footer-btn-ok {
+    .footer-ok-button {
       float: left;
       margin-right: 14px;
     }
-    .footer-checks {
+    .footer-options {
       float: left;
       padding-top: 4px;
       width: 560px;
     }
-    .footer-check-item {
+    .footer-option-item {
       font-size: 11px;
       color: #6b7280;
       margin-bottom: 4px;
     }
-    .footer-check-item input {
+    .footer-option-item input {
       margin-right: 4px;
     }
-    .footer-btn-cancel {
+    .footer-cancel-button {
       float: right;
     }
 
-    /* OK button */
+    /* ── OK / Cancel buttons ──────────────────────────────────────────── */
     #ButtonOK {
       background-color: #1e8040;
       color: #ffffff;
@@ -271,8 +296,6 @@
       padding: 7px 28px;
       cursor: pointer;
     }
-
-    /* Cancel button */
     #ButtonCancel {
       background-color: #f2f4f8;
       color: #6b7280;
@@ -284,53 +307,113 @@
       cursor: pointer;
     }
 
-    /* === HEADER BANNER === */
-    /* card is 940px wide with 1px border each side = 938px inner.
-       left col: 220px content + 10px padding each side = 240px total (box-sizing not in IE7,
-       so we must account for padding manually).
-       We use explicit widths that add up: 240 + 1 (border) + 697 = 938px. */
-    .header-left {
-      float: left;
-      width: 220px;
-      background-color: #f2f4f8;
-      border-right: 1px solid #d0d4de;
-      padding: 10px;
-      text-align: center;
+    /* ── Dark mode overrides ──────────────────────────────────────────── */
+    body.dark-mode {
+      background-color: #1a1d24;
+      color: #d4d8e8;
     }
-    .header-left img {
-      max-width: 220px;
-      height: auto;
+    body.dark-mode .card {
+      background-color: #22262f;
+      border-color: #383d4a;
     }
-    .header-right {
-      float: left;
-      width: 655px;
-      padding: 10px 14px;
+    body.dark-mode .card-body {
+      background-color: #22262f;
     }
-    .header-right p {
-      font-size: 11px;
-      color: #6b7280;
-      line-height: 1.6;
-      margin-bottom: 5px;
+    body.dark-mode .section-header {
+      background-color: #1a3a6b;
     }
-    .header-right p u {
-      color: #2255aa;
-      text-decoration: none;
-      font-weight: bold;
+    body.dark-mode .sub-panel {
+      background-color: #2a2f3b;
+      border-color: #383d4a;
+    }
+    body.dark-mode .sub-panel-title {
+      color: #6ea0e0;
+    }
+    body.dark-mode .header-image {
+      background-color: #2a2f3b;
+      border-right-color: #383d4a;
+    }
+    body.dark-mode .header-text p {
+      color: #8a92a8;
+    }
+    body.dark-mode .header-text u {
+      color: #6ea0e0;
+    }
+    body.dark-mode .field-row label {
+      color: #b0b8cc;
+    }
+    body.dark-mode .field-row input {
+      background-color: #1a1d24;
+      border-color: #383d4a;
+      color: #d4d8e8;
+    }
+    body.dark-mode .checkbox-row {
+      color: #b0b8cc;
+    }
+    body.dark-mode .faces-panel {
+      background-color: #2a2f3b;
+      border-color: #383d4a;
+    }
+    body.dark-mode .face-checkbox {
+      color: #b0b8cc;
+    }
+    body.dark-mode .tool-bar {
+      background-color: #22262f;
+      border-color: #383d4a;
+    }
+    body.dark-mode .tool-bar-right {
+      color: #8a92a8;
+    }
+    body.dark-mode input.ToolPicker {
+      background-color: #1a3a6b;
+      color: #90bcf0;
+      border-color: #3a6ab0;
+    }
+    body.dark-mode #ToolNameField {
+      color: #8a92a8;
+    }
+    body.dark-mode .no-toolpath-label {
+      color: #8a92a8;
+    }
+    body.dark-mode .type-panel {
+      background-color: #22262f;
+      border-color: #383d4a;
+    }
+    body.dark-mode .type-panel-header {
+      background-color: #2a2f3b;
+      border-bottom-color: #383d4a;
+      color: #8a92a8;
+    }
+    body.dark-mode .type-option {
+      border-bottom-color: #383d4a;
+    }
+    body.dark-mode .type-option-radio {
+      color: #b0b8cc;
+    }
+    body.dark-mode .footer-bar {
+      background-color: #22262f;
+      border-color: #383d4a;
+    }
+    body.dark-mode .footer-option-item {
+      color: #8a92a8;
+    }
+    body.dark-mode #ButtonCancel {
+      background-color: #2a2f3b;
+      color: #8a92a8;
+      border-color: #383d4a;
     }
 
-    /* spacer utility */
-    .spacer8  { height: 8px;  font-size: 0; line-height: 0; }
   </style>
 </head>
 <body>
-<div class="main_wrapper">
+<div id="page-wrapper">
 
-  <!-- ═══ HEADER ═══════════════════════════════════════════════════════ -->
-  <div class="card cf" style="margin-bottom:10px; overflow:hidden;">
-    <div class="header-left">
-      <img src="Images/boxdim.png" alt="Box dimensions" />
+  <!-- ── Header: diagram + description ──────────────────────────────── -->
+  <div class="card clearfix">
+    <div class="header-image">
+      <img src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
-    <div class="header-right">
+    <div class="header-text">
       <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
       <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
       <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved.</p>
@@ -338,185 +421,179 @@
     </div>
   </div>
 
-  <!-- ═══ GEOMETRY OPTIONS ══════════════════════════════════════════════ -->
-  <div class="sec-bar">Geometry Options</div>
+  <!-- ── Geometry Options ────────────────────────────────────────────── -->
+  <div class="section-header">Geometry Options</div>
   <div class="card">
-    <div class="card-body cf">
+    <div class="card-body clearfix">
 
-      <!-- Three panels side by side -->
-      <div class="geo-col">
-        <div class="panel">
-          <div class="panel-title">Box Dimensions</div>
+      <!-- Box dimensions -->
+      <div class="geometry-column">
+        <div class="sub-panel">
+          <div class="sub-panel-title">Box Dimensions</div>
           <div class="field-row">
             <label for="WidthField">Width:</label>
-            <input type="number" step="any" id="WidthField" class="form-control" placeholder="Width of Box" />
+            <input type="number" step="any" id="WidthField" placeholder="Width of Box" />
           </div>
           <div class="field-row">
             <label for="DepthField">Depth:</label>
-            <input type="email" id="DepthField" class="form-control" placeholder="Depth of Box" />
+            <input type="email" id="DepthField" placeholder="Depth of Box" />
           </div>
           <div class="field-row">
             <label for="HeightField">Height:</label>
-            <input type="email" id="HeightField" class="form-control" placeholder="Height of Box" />
+            <input type="email" id="HeightField" placeholder="Height of Box" />
           </div>
         </div>
       </div>
 
-      <div class="geo-col">
-        <div class="panel">
-          <div class="panel-title">Joint Widths</div>
-          <div class="toggle-row">
+      <!-- Joint widths -->
+      <div class="geometry-column">
+        <div class="sub-panel">
+          <div class="sub-panel-title">Joint Widths</div>
+          <div class="checkbox-row">
             <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)" />
-            <label for="AllJointWidths" style="display:inline; font-size:11px; font-weight:bold; color:#374151;">Show All Joint Widths</label>
+            <label for="AllJointWidths">Show All Joint Widths</label>
           </div>
           <div class="field-row">
             <label for="SideTabWidthField">Side Joint Width:</label>
-            <input type="email" id="SideTabWidthField" class="form-control" placeholder="Width of Joint" />
+            <input type="email" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
           <div id="showHideTopBottomJoints" style="display:none;">
             <div class="field-row">
               <label for="BottomTabWidthField">Bottom Joint Width:</label>
-              <input type="email" id="BottomTabWidthField" class="form-control" placeholder="Width of Bottom Joint" />
+              <input type="email" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid Joint Width:</label>
-              <input type="email" id="TopTabWidthField" class="form-control" placeholder="Width of Lid Joint" />
+              <input type="email" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
         </div>
       </div>
 
-      <div class="geo-col-last">
-        <div class="panel">
-          <div class="panel-title">Machining</div>
+      <!-- Machining allowances -->
+      <div class="geometry-column-last">
+        <div class="sub-panel">
+          <div class="sub-panel-title">Machining</div>
           <div class="field-row">
             <label for="AllowanceField">Allowance:</label>
-            <input type="email" id="AllowanceField" class="form-control" placeholder="Allowance" />
+            <input type="email" id="AllowanceField" placeholder="Allowance" />
           </div>
           <div class="field-row">
             <label for="EdgeField">Clamping Margin:</label>
-            <input type="email" id="EdgeField" class="form-control" placeholder="Clamping Margin" />
+            <input type="email" id="EdgeField" placeholder="Clamping Margin" />
           </div>
         </div>
       </div>
 
       <!-- Faces to machine -->
       <div class="faces-panel">
-        <div class="panel-title">Faces To Machine</div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label>
-        </div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton" />Bottom</label>
-        </div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label>
-        </div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label>
-        </div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label>
-        </div>
-        <div class="face-item">
-          <label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label>
-        </div>
+        <div class="sub-panel-title">Faces To Machine</div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton" />Bottom</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
       </div>
 
     </div>
   </div>
 
-  <!-- ═══ TOOL PICKER ════════════════════════════════════════════════════ -->
-  <div class="tool-bar cf">
+  <!-- ── Tool picker ─────────────────────────────────────────────────── -->
+  <div class="tool-bar clearfix">
     <div class="tool-bar-left">
       <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool" />
       <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
     </div>
     <div class="tool-bar-right">
-      <label class="no-tp-label">
+      <label class="no-toolpath-label">
         <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" />
         No Toolpath (create vectors only)
       </label>
     </div>
   </div>
 
-  <!-- ═══ JOINT TYPE + LID TYPE ══════════════════════════════════════════ -->
-  <div class="cf" style="margin-bottom:10px;">
-    <!-- Joint Type -->
-    <div class="type-col">
+  <!-- ── Joint type + Lid type ──────────────────────────────────────── -->
+  <div class="clearfix" style="margin-bottom:10px;">
+
+    <div class="type-column">
       <div class="type-panel">
         <div class="type-panel-header">Joint Type</div>
-        <div class="type-option cf">
-          <div class="type-option-label">
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
             <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger Joint</label>
           </div>
-          <div class="type-option-img">
-            <img src="Images/tabs.png" alt="Finger Joint" />
+          <div class="type-option-preview">
+            <img src="Images/tabs.png" alt="Finger joint preview" />
           </div>
         </div>
-        <div class="type-option-last cf">
-          <div class="type-option-label">
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
             <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail Joint</label>
           </div>
-          <div class="type-option-img">
-            <img src="Images/dovetails.png" alt="Dovetail Joint" />
+          <div class="type-option-preview">
+            <img src="Images/dovetails.png" alt="Dovetail joint preview" />
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Lid Type -->
-    <div class="type-col-last">
+    <div class="type-column-last">
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
-        <div class="type-option cf">
-          <div class="type-option-label">
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
             <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat Lid</label>
           </div>
-          <div class="type-option-img">
-            <img src="Images/flatlid.png" alt="Flat Lid" />
+          <div class="type-option-preview">
+            <img src="Images/flatlid.png" alt="Flat lid preview" />
           </div>
         </div>
-        <div class="type-option-last cf">
-          <div class="type-option-label">
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
             <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed Lid</label>
           </div>
-          <div class="type-option-img">
-            <img src="Images/tabbedlid.png" alt="Tabbed Lid" />
+          <div class="type-option-preview">
+            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
           </div>
         </div>
       </div>
     </div>
+
   </div>
 
-  <!-- ═══ FOOTER ═════════════════════════════════════════════════════════ -->
-  <div class="footer-bar cf">
-    <div class="footer-btn-ok">
+  <!-- ── Footer: OK / options / Cancel ──────────────────────────────── -->
+  <div class="footer-bar clearfix">
+    <div class="footer-ok-button">
       <button type="button" id="ButtonOK">OK</button>
     </div>
-    <div class="footer-checks">
-      <div class="footer-check-item">
+    <div class="footer-options">
+      <div class="footer-option-item">
         <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
       </div>
-      <div class="footer-check-item">
+      <div class="footer-option-item">
         <label><input type="checkbox" class="LuaButton" id="HighDPIMode" onclick="onHighDPIModeChanged(this)" />Enable High DPI Mode</label>
       </div>
+      <div class="footer-option-item">
+        <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
+      </div>
     </div>
-    <div class="footer-btn-cancel">
+    <div class="footer-cancel-button">
       <button type="button" id="ButtonCancel">Cancel</button>
     </div>
   </div>
-</div><!-- /main_wrapper -->
+
+  <!-- Hidden legacy fieldset (read by Lua) -->
+  <fieldset id="theoneiwant" style="display:none;">
+    <label>Here it is!</label>
+  </fieldset>
+
+</div><!-- /page-wrapper -->
 
 <script type="text/javascript">
-  // --- DPI boundary auto-zoom ---
-  // Uses screen.deviceXDPI which is an IE-specific property giving
-  // the physical DPI of the display. We map it to zoom steps:
-  //   < 120 dpi  -> 100%
-  //   120-143    -> 115%
-  //   144-167    -> 125%
-  //   168-191    -> 135%
-  //   192+       -> 150%
+
+  // Returns CSS zoom level based on physical screen DPI (IE-specific property).
+  // Boundaries: <120=100%, 120=115%, 144=125%, 168=150%, 192+=175%
   function dpiToZoom() {
     var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
     if (dpi >= 192) { return "175%"; }
@@ -526,48 +603,54 @@
     return "100%";
   }
 
-  // Called by the manual checkbox - overrides auto zoom
-  function onHighDPIModeChanged(checkbox) {
+  // Applies or removes dark mode by toggling the dark-mode class on body.
+  function onDarkModeChanged(checkbox) {
     if (checkbox.checked) {
-      document.body.style.zoom = "150%";
+      document.body.className = document.body.className + " dark-mode";
     } else {
-      document.body.style.zoom = dpiToZoom();
+      document.body.className = document.body.className.replace(" dark-mode", "").replace("dark-mode", "");
     }
   }
 
+  // Manual High DPI checkbox overrides auto-detection with a fixed 150% zoom.
+  // Unchecking reverts to the auto-detected value.
+  function onHighDPIModeChanged(checkbox) {
+    document.body.style.zoom = checkbox.checked ? "150%" : dpiToZoom();
+  }
+
+  // Hides the Lid Joint Width field when Flat Lid is selected (no joint needed).
   function onLidTypeChanged(radio) {
-    // Hide the Lid Joint Width field when Flat Lid (LidTypeRadio1) is selected,
-    // show it when Tabbed Lid is selected (a tabbed lid has a joint that needs a width).
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) {
-      var isFlatLid = document.getElementById("LidTypeRadio1").checked;
-      lidJointRow.style.display = isFlatLid ? "none" : "block";
+      lidJointRow.style.display = document.getElementById("LidTypeRadio1").checked ? "none" : "block";
     }
   }
 
+  // Shows or hides the Bottom and Lid joint width fields.
   function onShowAllWidthsChanged(checkbox) {
     var el = document.getElementById("showHideTopBottomJoints");
-    if (el) {
-      el.style.display = checkbox.checked ? "block" : "none";
-    }
+    if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
   }
 
-  // --- Initialise on load ---
+  // On load: apply DPI zoom, then restore saved state from Lua registry.
   setTimeout(function() {
-    // Auto-apply zoom based on physical DPI
     document.body.style.zoom = dpiToZoom();
 
-    // If Lua registry had HighDPIMode checked, let it override
-    var dpi = document.getElementById("HighDPIMode");
-    if (dpi) { onHighDPIModeChanged(dpi); }
+    var highDPI = document.getElementById("HighDPIMode");
+    if (highDPI) { onHighDPIModeChanged(highDPI); }
 
-    // Restore lid joint width visibility based on saved lid type
+    // Dark mode: Lua registry restores the checkbox state. If it has never been
+    // saved (first run), the checkbox will be unchecked - we default to dark on.
+    var darkMode = document.getElementById("DarkMode");
+    if (darkMode) {
+      onDarkModeChanged(darkMode);
+    }
+
     var lid1 = document.getElementById("LidTypeRadio1");
     if (lid1) { onLidTypeChanged(lid1); }
 
-    // Restore joint width visibility
-    var cb = document.getElementById("AllJointWidths");
-    if (cb) { onShowAllWidthsChanged(cb); }
+    var allWidths = document.getElementById("AllJointWidths");
+    if (allWidths) { onShowAllWidthsChanged(allWidths); }
   }, 100);
 
 </script>

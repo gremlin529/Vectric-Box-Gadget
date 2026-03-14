@@ -17,7 +17,7 @@
 -- Changed Joint Type Names to "Finger Joint" and "Dovetail Joint" also added to Joint Width:--(Centre to Centre)-- by Sharkcutup 09/09/2025
 -- Added User-defined Material Edge Distance for parts Location applied to Material Sheet               -- by Sharkcutup 11/4/2025
 -- Added some error-trapping into the gadget too                                                        -- by Sharkcutup 11/4/2025
--- Changed Warning Message when not enough Material for Parts.                                         -- by Sharkcutup 11/14/2025
+-- Changed Warning Messaage when not enough Material for Parts.                                         -- by Sharkcutup 11/14/2025
 -- Changed up the User Interface a bit by colorizing and defining lines of images                       -- by Sharkcutup 11/23/2025
 -- Added a separate field for the width of the bottom tabs vs side tabs                                 -- by Gremlin 2/27/2026
 -------------------------------------------------------------------------------------------------------------------------------------------
@@ -25,17 +25,19 @@
 -- In no event will "Sharkcutup" be held liable for any damages arising from this gadgets use.
 -- In no event will "Gremlin" be held liable for any damages arising from this gadgets use.
 
--------------------------- Sharkcutup is NOT The Original Owner/Writer of this Gadget 11/23/2025  -----------------------------------------
----------------------------- Gremlin is NOT The Original Owner/Writer of this Gadget 2/272026  --------------------------------------------
+-------------------------- Sharkcutup is NOT The Origianl Owner/Writer of this Gadget 11/23/2025  -----------------------------------------
+---------------------------- Gremlin is NOT The Origianl Owner/Writer of this Gadget 2/272026  --------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------
 
+-- require("mobdebug").start()
 
 g_version = "dev"                                                    -- Changed by Gremlin
 g_title = "Box Creator"
 g_width = 1025
-g_height = 1100                                                      -- Changed by Sharkcutup
+g_height = 1100                                                    -- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
+-- ---------- VALIDATION HELPERS ----------
 local function _is_pos(x) return type(x)=="number" and x>0 end
 local function _is_nonneg(x) return type(x)=="number" and x>=0 end
 
@@ -47,11 +49,11 @@ local function _tool_ok(tool)
 end
 
 function Face(contour, dovetails, tabs, name)
-  local obj ={}
-  obj.contour = contour
-  obj.dovetail_list = dovetails
-  obj.name = name
-  obj.tabs = tabs
+	local obj ={}
+	obj.contour = contour
+	obj.dovetail_list = dovetails
+	obj.name = name
+	obj.tabs = tabs
   obj.is_lid = false
   return obj
 end
@@ -68,18 +70,18 @@ function Lid(outer_contour, inner_contour, dovetails, tabs, name)
 end
 
 function TransformFace(face, xform)
-  face.contour:Transform(xform)
+	face.contour:Transform(xform)
 
-  if (face.is_lid) then
-    face.inner_contour:Transform(xform)
-  end
+	if (face.is_lid) then
+		face.inner_contour:Transform(xform)
+	end
 
-  -- Transform dovetail markers
-  local dovetails = face.dovetail_list
-  for i=1,#dovetails do
-    local marker = dovetails[i]
-    marker:Transform(xform)
-  end
+	-- Transform dovetail markers
+	local dovetails = face.dovetail_list
+	for i=1,#dovetails do
+		local marker = dovetails[i]
+		marker:Transform(xform)
+	end
   
   -- Transform the tabs
   local tabs = face.tabs
@@ -89,44 +91,45 @@ function TransformFace(face, xform)
 end
 
 function CloneFace(face)
-  local clone = {}
-  clone.contour = face.contour:Clone()
-  clone.dovetail_list = face.dovetail_list
-  clone.tabs = face.tabs
-  clone.is_lid = face.is_lid
-  if (clone.is_lid) then
-    clone.inner_contour = face.inner_contour:Clone()
-  end
-  return clone
+	local clone = {}
+	clone.contour = face.contour:Clone()
+	clone.dovetail_list = face.dovetail_list
+	clone.tabs = face.tabs
+	clone.is_lid = face.is_lid
+  clone.name = face.name
+	if (clone.is_lid) then
+		clone.inner_contour = face.inner_contour:Clone()
+	end
+	return clone
 end
 
 function GetAllProfileContours(faces)
-  local contour_group = ContourGroup(true)
-  for i=1,#faces do
-    contour_group:AddTail(faces[i].contour:Clone())
-  end
-  return contour_group
+	local contour_group = ContourGroup(true)
+	for i=1,#faces do
+		contour_group:AddTail(faces[i].contour:Clone())
+	end
+	return contour_group
 end
 
 function GetAllProfileCadContours(faces)
-  local cad_object_list = CadObjectList(true)	
-  for i=1,#faces do
-    local cur_face = faces[i]
-    local cad_contour = MakeCadAndAddTabs(cur_face.contour, cur_face.tabs)
-    cad_object_list:AddTail(cad_contour)
-  end
-  return cad_object_list
+	local cad_object_list = CadObjectList(true)	
+	for i=1,#faces do
+		local cur_face = faces[i]
+		local cad_contour = MakeCadAndAddTabs(cur_face.contour, cur_face.tabs)
+		cad_object_list:AddTail(cad_contour)
+	end
+	return cad_object_list
 end
 
 function GetAllMarkers(faces)
-  local markers = {}
-  for i=1,#faces do
-    local cur_markers = faces[i].dovetail_list
-    for j=1,#cur_markers do
-      markers[#markers+1] = cur_markers[j]
-    end
-  end
-  return markers;
+	local markers = {}
+	for i=1,#faces do
+		local cur_markers = faces[i].dovetail_list
+		for j=1,#cur_markers do
+			markers[#markers+1] = cur_markers[j]
+		end
+	end
+	return markers;
 end
 
 function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
@@ -136,47 +139,47 @@ function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
   return false
 end
 
-  -- first we must create cad contours from any face which has a lid and select all on that layer
-  local cad_object_list = CadObjectList(true)
-  for i=1,#faces do
-    local cur_face = faces[i]
-    if cur_face.is_lid then
-      local inner = CreateCadContour(cur_face.inner_contour)
-      local outer = CreateCadContour(cur_face.contour)
-      cad_object_list:AddTail(inner)
-      cad_object_list:AddTail(outer)
-    end
-  end
+	-- first we must create cad contours from any face which has a lid and select all on that layer
+	local cad_object_list = CadObjectList(true)
+	for i=1,#faces do
+		local cur_face = faces[i]
+		if cur_face.is_lid then
+			local inner = CreateCadContour(cur_face.inner_contour)
+			local outer = CreateCadContour(cur_face.contour)
+			cad_object_list:AddTail(inner)
+			cad_object_list:AddTail(outer)
+		end
+	end
 
-  AddCadListToJob(job, cad_object_list, layer_name)
-  local layer = job.LayerManager:FindLayerWithName(layer_name)
-  local selection = job.Selection
-  selection:Clear()
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+	AddCadListToJob(job, cad_object_list, layer_name)
+	local layer = job.LayerManager:FindLayerWithName(layer_name)
+	local selection = job.Selection
+	selection:Clear()
+	SelectVectorsOnLayer(layer, selection, true, true, true)
 
-  local pos_data = ToolpathPosData()
-  local pocket_data = PocketParameterData()
-  pocket_data.start_depth = 0
-  pocket_data.CutDepth = 0.5*options.thickness
-  pocket_data.Allowance = -options.allowance
-  pocket_data.DoRaster = false
-  pocket_data.DoRamping = true
-  pocket_data.RampDistance = 0.3*options.height
+	local pos_data = ToolpathPosData()
+	local pocket_data = PocketParameterData()
+	pocket_data.start_depth = 0
+	pocket_data.CutDepth = 0.5*options.thickness
+	pocket_data.Allowance = -options.allowance
+	pocket_data.DoRaster = false
+	pocket_data.DoRamping = true
+	pocket_data.RampDistance = 0.3*options.height
 
-  local geometry_selector = GeometrySelector()
+	local geometry_selector = GeometrySelector()
 
-  local area_clear_tool = nil
+	local area_clear_tool = nil
 
-  local toolpath_manager = ToolpathManager()
-  toolpath_manager:CreatePocketingToolpath(
-    "Pocket",
-    tool,
-    area_clear_tool,
-    pocket_data,
-    pos_data,
-    geometry_selector,
-    true,
-    true)
+	local toolpath_manager = ToolpathManager()
+	toolpath_manager:CreatePocketingToolpath(
+		"Pocket",
+		tool,
+		area_clear_tool,
+		pocket_data,
+		pos_data,
+		geometry_selector,
+		true,
+		true)
 end
 
 --[[  -------------- AddGroupToJob --------------------------------------------------  
@@ -207,16 +210,16 @@ end
 
 --[[  -------------- AddCadContourToJob --------------------------------------------------  
 |
-|  Adds a single CAD contour to a named job layer
+|  Adds a group of contours to a job
 |
 ]]
 function AddCadContourToJob(vectric_job, cad_contour, layer_name)
 
-  --  create a CadObject to represent the group
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  if cad_contour and layer then
-    layer:AddObject(cad_contour, true)
-  end
+	--  create a CadObject to represent the group
+	local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
+	if cad_contour and layer then
+		layer:AddObject(cad_contour, true)
+	end
 end   
 
 --[[  -------------- AddCadContourToJob --------------------------------------------------  
@@ -226,14 +229,263 @@ end
 ]]
 function AddCadListToJob(vectric_job, cad_list, layer_name)
 
-  --  create a CadObject to represent the group
-  local pos = cad_list:GetHeadPosition()
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  while (pos) do
-    local obj
-    obj, pos = cad_list:GetNext(pos)
-    layer:AddObject(obj:Clone(), true)
+	--  create a CadObject to represent the group
+	local pos = cad_list:GetHeadPosition()
+	local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
+	while (pos) do
+		local obj
+		obj, pos = cad_list:GetNext(pos)
+		layer:AddObject(obj:Clone(), true)
+	end
+end
+
+function GetFriendlyFaceLabel(face)
+   local lookup = { BottomFace = "BOTTOM", SideFace1 = "SIDE 1", SideFace2 = "SIDE 2", EndFace1 = "END 1", EndFace2 = "END 2", Lid = "LID" }
+  if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
+end
+
+  function GetFaceLabelHeight(face, thickness)
+    local box = face.contour.BoundingBox2D local min_dim = math.min(box.XLength, box.YLength)
+    local h = math.max(thickness * 0.35, min_dim * 0.08) h = math.min(h, min_dim * 0.16) if h < 0.20 then h = 0.20
   end
+  return h 
+ end
+ 
+function GetFaceLabelPoint(face, text_height, label, ang)
+  local box = face.contour.BoundingBox2D
+
+  local cx = box.MinX + (0.5 * box.XLength)
+  local cy = box.MinY + (0.5 * box.YLength)
+
+  -- estimate label width for DrawWriter stick font
+  local est_width = string.len(label) * text_height * 0.75
+
+  if ang == 90.0 then
+    -- vertical text: shift downward by half estimated width
+    return Point2D(cx, cy - (est_width * 0.5))
+  else
+    -- horizontal text: shift left by half estimated width
+    return Point2D(cx - (est_width * 0.5), cy)
+  end
+end
+
+function GetFaceLabelAngle(face)
+  local box = face.contour.BoundingBox2D
+
+  if box.YLength > box.XLength then
+    return 90.0
+  end
+
+  return 0.0
+end
+
+function DrawWriter(what, where, size, lay, ang)
+  local group
+
+  local function Polar2D_Local(pt, ang2, dis)
+    return Point2D(
+      (pt.X + dis * math.cos(math.rad(ang2))),
+      (pt.Y + dis * math.sin(math.rad(ang2)))
+    )
+  end
+
+  local function MonoFont(job, pt, letter, scl, lay2, ang2)
+    scl = (scl * 0.5)
+
+    local pA0  = pt
+    local pA2  = Polar2D_Local(pt, ang2 + 90.0, 0.5000 * scl)
+    local pA3  = Polar2D_Local(pt, ang2 + 90.0, 0.7500 * scl)
+    local pA4  = Polar2D_Local(pt, ang2 + 90.0, 1.0000 * scl)
+    local pA5  = Polar2D_Local(pt, ang2 + 90.0, 1.2500 * scl)
+    local pA6  = Polar2D_Local(pt, ang2 + 90.0, 1.5000 * scl)
+    local pA8  = Polar2D_Local(pt, ang2 + 90.0, 2.0000 * scl)
+
+    local pB0  = Polar2D_Local(pt, ang2 + 0.0, 0.2500 * scl)
+    local pB3  = Polar2D_Local(pt, ang2 + 71.5651, 0.7906 * scl)
+    local pB4  = Polar2D_Local(pt, ang2 + 75.9638, 1.0308 * scl)
+    local pB8  = Polar2D_Local(pt, ang2 + 82.8750, 2.0156 * scl)
+
+    local pC0  = Polar2D_Local(pt, ang2 + 0.0, 0.5000 * scl)
+    local pC8  = Polar2D_Local(pt, ang2 + 75.9640, 2.0616 * scl)
+
+    local pD0  = Polar2D_Local(pt, ang2 + 0.0, 0.6250 * scl)
+    local pD4  = Polar2D_Local(pt, ang2 + 57.9946, 1.1792 * scl)
+    local pD8  = Polar2D_Local(pt, ang2 + 72.6460, 2.0954 * scl)
+
+    local pE0  = Polar2D_Local(pt, ang2 + 0.0, 0.7500 * scl)
+    local pE2  = Polar2D_Local(pt, ang2 + 33.6901, 0.9014 * scl)
+    local pE3  = Polar2D_Local(pt, ang2 + 45.0000, 1.0607 * scl)
+
+    local pF0  = Polar2D_Local(pt, ang2 + 0.0, 1.0000 * scl)
+    local pF3  = Polar2D_Local(pt, ang2 + 36.8699, 1.2500 * scl)
+    local pF4  = Polar2D_Local(pt, ang2 + 45.0000, 1.4142 * scl)
+    local pF8  = Polar2D_Local(pt, ang2 + 63.4349, 2.2361 * scl)
+
+    local pG0  = Polar2D_Local(pt, ang2 + 0.0, 1.2500 * scl)
+    local pG1  = Polar2D_Local(pt, ang2 + 11.3099, 1.2748 * scl)
+    local pG2  = Polar2D_Local(pt, ang2 + 21.8014, 1.3463 * scl)
+    local pG3  = Polar2D_Local(pt, ang2 + 30.9638, 1.4577 * scl)
+    local pG4  = Polar2D_Local(pt, ang2 + 38.6598, 1.6008 * scl)
+    local pG5  = Polar2D_Local(pt, ang2 + 45.0000, 1.7678 * scl)
+    local pG6  = Polar2D_Local(pt, ang2 + 50.1944, 1.9526 * scl)
+    local pG7  = Polar2D_Local(pt, ang2 + 54.4623, 2.1506 * scl)
+    local pG8  = Polar2D_Local(pt, ang2 + 57.9946, 2.3585 * scl)
+
+    local pH0  = Polar2D_Local(pt, ang2 + 0.0, 1.5000 * scl)
+
+    local function AddLine(a, b)
+      local c = Contour(0.0)
+      c:AppendPoint(a)
+      c:LineTo(b)
+      group:AddTail(c)
+    end
+
+    local function AddPoly(points)
+      local c = Contour(0.0)
+      c:AppendPoint(points[1])
+      for ii = 2, #points do
+        c:LineTo(points[ii])
+      end
+      group:AddTail(c)
+    end
+
+    if letter == 32 then
+      return pH0
+
+    elseif letter == 45 then
+      AddLine(pA4, pG4)
+      return pH0
+
+    elseif letter == 46 then
+      AddPoly({pA2, pB0, pC0, pD0, pA2})
+      return pD0
+
+    elseif letter == 48 then
+      AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+      return pH0
+
+    elseif letter == 49 then
+      AddLine(pD8, pD0)
+      return pH0
+
+    elseif letter == 50 then
+      AddPoly({pA6, pA8, pF8, pG6, pA0, pG0})
+      return pH0
+
+    elseif letter == 65 or letter == 97 then
+      AddPoly({pA0, pD8, pG0, pF3, pB3, pA0})
+      return pH0
+
+    elseif letter == 66 or letter == 98 then
+      AddPoly({pA0, pA8, pF8, pG7, pG5, pF4, pG3, pG1, pF0, pA0})
+      return pH0
+
+    elseif letter == 68 or letter == 100 then
+      AddPoly({pA0, pA8, pF8, pG6, pG2, pF0, pA0})
+      return pH0
+
+    elseif letter == 69 or letter == 101 then
+      AddPoly({pG0, pA0, pA8, pF8})
+      AddLine(pA4, pD4)
+      return pH0
+
+    elseif letter == 73 or letter == 105 then
+      AddLine(pD0, pD8)
+      return pE0
+
+    elseif letter == 76 or letter == 108 then
+      AddPoly({pA8, pA0, pG0})
+      return pH0
+
+    elseif letter == 77 or letter == 109 then
+      AddPoly({pA0, pA8, pD4, pG8, pG0})
+      return pH0
+
+    elseif letter == 78 or letter == 110 then
+      AddPoly({pA0, pA8, pG0, pG8})
+      return pH0
+
+    elseif letter == 79 or letter == 111 then
+      AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+      return pH0
+
+    elseif letter == 83 or letter == 115 then
+      AddPoly({pG5, pG6, pF8, pB8, pA6, pA5, pG3, pG2, pF0, pB0, pA2, pA3})
+      return pH0
+
+    elseif letter == 84 or letter == 116 then
+      AddLine(pA8, pG8)
+      AddLine(pD8, pD0)
+      return pH0
+
+    elseif letter == 88 or letter == 120 then
+      AddLine(pA0, pG8)
+      AddLine(pA8, pG0)
+      return pH0
+
+    else
+      -- simple fallback box for unsupported characters
+      AddPoly({pA0, pA8, pG8, pG0, pA0})
+      return pH0
+    end
+  end
+
+  local function AddGroupToJob_Local(job, group2, layer_name)
+    local cad_object = CreateCadGroup(group2)
+    local layer = job.LayerManager:GetLayerWithName(layer_name)
+    layer:AddObject(cad_object, true)
+    return cad_object
+  end
+
+  local job = VectricJob()
+  if not job.Exists then
+    DisplayMessageBox("Error in DrawWriter: No job loaded")
+    return false
+  end
+
+  local strlen = string.len(what)
+  local i = 1
+  local ptx = where
+  group = ContourGroup(true)
+
+  while i <= strlen do
+    local ch = string.byte(string.sub(what, i, i))
+    if (ch >= 97) and (ch <= 122) then
+      ptx = MonoFont(job, ptx, ch, (size * 0.75), lay, ang)
+      ptx = Polar2D_Local(ptx, ang, size * 0.05)
+    else
+      ptx = MonoFont(job, ptx, ch, size, lay, ang)
+      ptx = Polar2D_Local(ptx, ang, size * 0.07)
+    end
+    i = i + 1
+  end
+
+  AddGroupToJob_Local(job, group, lay)
+  return true
+end
+
+function AddPartsLabelsToJob(job, faces, layer_name, thickness)
+  if not job or not faces or #faces == 0 then
+    return false
+  end
+
+  local layer = job.LayerManager:GetLayerWithName(layer_name)
+  if not layer then
+    DisplayMessageBox("Unable to find label layer: " .. tostring(layer_name))
+    return false
+  end
+
+  for i = 1, #faces do
+    local face = faces[i]
+    local label = GetFriendlyFaceLabel(face)
+    local text_height = GetFaceLabelHeight(face, thickness)
+    local ang = GetFaceLabelAngle(face)
+    local pt = GetFaceLabelPoint(face, text_height, label, ang)
+
+    DrawWriter(label, pt, text_height, layer_name, ang)
+  end
+
+  return true
 end
 
 --[[  -------------- MakeBottomFace --------------------------------------------------  
@@ -244,121 +496,123 @@ end
 ]]
 function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, use_dovetails,name)
 
-  local dovetail_markers = {}
-  local tablist = {}
-  local outer_blc = start_point
-  local outer_brc = start_point  + width*Vector2D(1,0)
-  local outer_trc = outer_brc + height*Vector2D(0,1)
-  local outer_tlc = start_point + height*Vector2D(0, 1)
+	local dovetail_markers = {}
+	local tablist = {}
+	local outer_blc = start_point
+	local outer_brc = start_point  + width*Vector2D(1,0)
+	local outer_trc = outer_brc + height*Vector2D(0,1)
+	local outer_tlc = start_point + height*Vector2D(0, 1)
 
-  -- // Width and height of interior rectangle
-  local inner_width = width - 2*thickness
-  local inner_height = height - 2*thickness
+	-- // Width and height of interior rectangle
+	local inner_width = width - 2*thickness
+	local inner_height = height - 2*thickness
 
-  -- Calculate number of flaps needed. In this case
-  -- then each "flap" represents a piece of the outer 
-  -- contour then goes inwards
-  local num_flaps_w = math.floor((0.5*inner_width) / dovetail.min_width )
-  local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
+	-- Calculate number of flaps needed. In this case
+	-- then each "flap" represents a piece of the outer 
+	-- contour then goes inwards
+	local num_flaps_w = math.floor((0.5*inner_width) / dovetail.min_width )
+	local num_flaps_h = math.floor((0.5*inner_height) / dovetail.min_width)
 
-  local tab_space_w = (inner_width - num_flaps_w*dovetail.min_width)/ (num_flaps_w + 1)
-  local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)/ (num_flaps_h + 1)
+	local tab_space_w = (inner_width - num_flaps_w*dovetail.min_width)/ (num_flaps_w + 1)
+	local tab_space_h = (inner_height - num_flaps_h*dovetail.min_width)/ (num_flaps_h + 1)
 
-  -- Create the contour
-  local contour = Contour(0.0)
-  contour:AppendPoint(start_point)
+	-- Create the contour
+	local contour = Contour(0.0)
+	contour:AppendPoint(start_point)
 
-  -- Create blc -> brc
-  -- Create the internal flaps. 
+	-- Create blc -> brc
+	-- Create the internal flaps. 
 
-  local unit_x = Vector2D(1,0)
-  local unit_y = Vector2D(0,1)
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
 
-  -- line to first
-  LineToVector(contour, (thickness + tab_space_w)*unit_x)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
-  contour:LineTo(outer_brc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- line to first
+	LineToVector(contour, (thickness + tab_space_w)*unit_x)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+	contour:LineTo(outer_brc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
 
-  -- Create brc -> trc
-  LineToVector(contour, (thickness + tab_space_h)*unit_y)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
-  contour:LineTo(outer_trc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- Create brc -> trc
+	LineToVector(contour, (thickness + tab_space_h)*unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+	contour:LineTo(outer_trc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- Create trc -> tlc
-  LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
-  contour:LineTo(outer_tlc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- Create trc -> tlc
+	LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+	contour:LineTo(outer_tlc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- Create tlc -> blc
-  LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
-  contour:LineTo(outer_blc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- Create tlc -> blc
+	LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+	contour:LineTo(outer_blc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  return Face(contour, dovetail_markers, tablist, name)
+	return Face(contour, dovetail_markers, tablist, name)
 end
 
 -- Make the side faces
+-- Gremlin added bottom and top dovetails separate from side
 function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
 
-  local dovetail_markers = {}
-  local tablist = {}
-  local inner_start_point = start_point + Vector2D(thickness, thickness)
-  local inner_width  = width - 2*thickness
-  local inner_height = height - 2*thickness
-  -- DisplayMessageBox("inner_width " .. inner_width)
+	local dovetail_markers = {}
+	local tablist = {}
+	local inner_start_point = start_point + Vector2D(thickness, thickness)
+	local inner_width  = width - 2*thickness
+	local inner_height = height - 2*thickness
+	-- DisplayMessageBox("inner_width " .. inner_width)
 
-  local unit_x = Vector2D(1,0)
-  local unit_y = Vector2D(0,1)
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
 
-  local inner_blc = inner_start_point
-  local inner_brc = inner_start_point + inner_width * unit_x
-  local inner_trc = inner_brc + inner_height*unit_y
-  local inner_tlc = inner_blc + inner_height*unit_y
+	local inner_blc = inner_start_point
+	local inner_brc = inner_start_point + inner_width * unit_x
+	local inner_trc = inner_brc + inner_height*unit_y
+	local inner_tlc = inner_blc + inner_height*unit_y
 
-  local num_flaps_bottom = math.floor((0.5*inner_width) / bottomdovetail.min_width )
+  -- Gremlin added bottom and top dovetails separate from side
+	local num_flaps_bottom = math.floor((0.5*inner_width) / bottomdovetail.min_width )
   local num_flaps_top = math.floor((0.5*inner_width) / topdovetail.min_width )
-  local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
+	local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
 
-  local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
+	local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
   local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)  
-  local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width)/ (num_flaps_side + 1)
+	local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width)/ (num_flaps_side + 1)
 
-  -- Create the contour
-  local contour = Contour(0.0)
-  contour:AppendPoint(inner_start_point)
+	-- Create the contour
+	local contour = Contour(0.0)
+	contour:AppendPoint(inner_start_point)
 
-  --  blc ->brc
-  LineToVector(contour, tab_space_bottom*unit_x)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  if (with_tails) then
-    AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
-  else
-    AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
-  end
-  contour:LineTo(inner_brc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	--  blc ->brc
+	LineToVector(contour, tab_space_bottom*unit_x)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	if (with_tails) then
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
+	else
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+	end
+	contour:LineTo(inner_brc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- -- brc -> trc
-  LineToVector(contour, tab_space_side*unit_y)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  if with_tails then
-    AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
-  else
-    AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
-  end
-  contour:LineTo(inner_trc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- -- brc -> trc
+	LineToVector(contour, tab_space_side*unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	if with_tails then
+		AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
+	else
+		AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
+	end
+	contour:LineTo(inner_trc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- trc -> tlc (top line so has flaps for lid)
+	-- trc -> tlc (top line so has flaps for lid)
   if flat_lid then
     LineToVector(contour, 0.5*thickness*unit_y)
     LineToVector(contour, -inner_width*unit_x)
@@ -372,265 +626,268 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
     AddMiddleOfLastSpanToList(contour, tablist)
   end
 
-  -- tlc -> blc
-  LineToVector(contour, -tab_space_side*unit_y)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  if (with_tails) then
-    AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
-  else
-    AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
-  end
+	-- tlc -> blc
+	LineToVector(contour, -tab_space_side*unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	if (with_tails) then
+		AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
+	else
+		AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
+	end
 
-  contour:LineTo(inner_blc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	contour:LineTo(inner_blc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  return Face(contour, dovetail_markers, tablist, name)
+	return Face(contour, dovetail_markers, tablist, name)
 end
 
 -- Make an end face
+-- Gremlin added doevtail seperation for different sizes
 function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
 
-  local tablist = {}
-  local dovetail_markers = {}
-  local unit_x = Vector2D(1,0)
-  local unit_y = Vector2D(0,1)
-  local inner_start_point = start_point + thickness*unit_y
-  local inner_width = width - 2*thickness;
-  local inner_height  = height - 2*thickness
+	local tablist = {}
+	local dovetail_markers = {}
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
+	local inner_start_point = start_point + thickness*unit_y
+	local inner_width = width - 2*thickness;
+	local inner_height  = height - 2*thickness
 
 
-  local inner_blc = inner_start_point
-  local inner_brc = inner_start_point + width * unit_x
-  local inner_trc = inner_brc + inner_height*unit_y
-  local inner_tlc = inner_blc + inner_height*unit_y
+	local inner_blc = inner_start_point
+	local inner_brc = inner_start_point + width * unit_x
+	local inner_trc = inner_brc + inner_height*unit_y
+	local inner_tlc = inner_blc + inner_height*unit_y
 
-  local num_flaps_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
+  -- Gremlin added doevtail seperation for different sizes
+	local num_flaps_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
   local num_flaps_top = math.floor((0.5*inner_width) / topdovetail.min_width)
-  local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
+	local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
 
-  local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width) / (num_flaps_bottom + 1)
-  local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width) / (num_flaps_top + 1)
-  local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
+	local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width) / (num_flaps_bottom + 1)
+	local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width) / (num_flaps_top + 1)
+	local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
 
-  local contour = Contour(0.0)
-  contour:AppendPoint(inner_start_point)
+	local contour = Contour(0.0)
+	contour:AppendPoint(inner_start_point)
 
-  -- blc --> brc
-  LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  if (with_tails) then
-    AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
-  else
-    AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
-  end
-  contour:LineTo(inner_brc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- blc --> brc
+	LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	if (with_tails) then
+		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
+	else
+		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+	end
+	contour:LineTo(inner_brc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- brc --> trc
-  LineToVector(contour,  tab_space_side*unit_y)
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
-  contour:LineTo(inner_trc)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- brc --> trc
+	LineToVector(contour,  tab_space_side*unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+	contour:LineTo(inner_trc)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  -- if the lid is flat then we go up by half thickness and then across
-  if flat_lid then
-    LineToVector(contour, (0.5*thickness) * (unit_y));
-    LineToVector(contour, (width)*(-unit_x))
-    AddMiddleOfLastSpanToList(contour, tablist)
-    contour:LineTo(inner_tlc)
-  else
-    -- trc -> tlc (top line so has flaps for lid)
-    LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
-    contour:LineTo(inner_tlc)
-    AddMiddleOfLastSpanToList(contour, tablist)
-  end
+	-- if the lid is flat then we go up by half thickness and then across
+	if flat_lid then
+		LineToVector(contour, (0.5*thickness) * (unit_y));
+		LineToVector(contour, (width)*(-unit_x))
+		AddMiddleOfLastSpanToList(contour, tablist)
+		contour:LineTo(inner_tlc)
+	else
+		-- trc -> tlc (top line so has flaps for lid)
+		LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
+		AddMiddleOfLastSpanToList(contour, tablist)
+		AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+		-- AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_x, unit_y, contour, num_flaps_w, tab_space_w)
+		contour:LineTo(inner_tlc)
+		AddMiddleOfLastSpanToList(contour, tablist)
+	end
 
-  -- tlc -> brc
-  LineToVector(contour, (tab_space_side*-unit_y))
-  AddMiddleOfLastSpanToList(contour, tablist)
-  AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
-  AddMiddleOfLastSpanToList(contour, tablist)
+	-- tlc -> brc
+	LineToVector(contour, (tab_space_side*-unit_y))
+	AddMiddleOfLastSpanToList(contour, tablist)
+	AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+	AddMiddleOfLastSpanToList(contour, tablist)
 
-  return Face(contour, dovetail_markers, tablist, name)
+	return Face(contour, dovetail_markers, tablist, name)
 end
 
 function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers)
-  for i=1,num_tails do
-    local start_pos = contour.EndPoint2D
-    AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
-    if (markers) then
-      markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D) 
-    end
-    LineToVector(contour, space_dist*along)
-  end
+	for i=1,num_tails do
+		local start_pos = contour.EndPoint2D
+		AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
+		if (markers) then
+			markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D) 
+		end
+		LineToVector(contour, space_dist*along)
+	end
 end
 
 -- Add male dovetails along this line
 function AddMaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist)
-  for i=1,num_tails do
-    AddMaleDoveTail(thickness, dovetail.max_width, out, along, dovetail.angle, contour)
-    LineToVector(contour, space_dist*along)
-  end
+	for i=1,num_tails do
+		AddMaleDoveTail(thickness, dovetail.max_width, out, along, dovetail.angle, contour)
+		LineToVector(contour, space_dist*along)
+	end
 
 end
 
 function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps)
-  for i=1,num_flaps do
-    AddFemaleDoveTail(flap_height, flap_width, out, along, contour)
-    LineToVector(contour, space_dist*along)
-  end
+	for i=1,num_flaps do
+		AddFemaleDoveTail(flap_height, flap_width, out, along, contour)
+		LineToVector(contour, space_dist*along)
+	end
 end
 
 function AddMaleDoveTail(thickness, max_dovetail_width, out, along, angle, contour)
-  local along_dist  = (thickness/ math.tan(angle))
-  local diag_vector = (-along_dist)*along + thickness*out
-  LineToVector(contour, diag_vector)
-  LineToVector(contour, max_dovetail_width*along)
-  local and_back = (-along_dist)*along  - thickness*out
-  LineToVector(contour, and_back)
+	local along_dist  = (thickness/ math.tan(angle))
+	local diag_vector = (-along_dist)*along + thickness*out
+	LineToVector(contour, diag_vector)
+	LineToVector(contour, max_dovetail_width*along)
+	local and_back = (-along_dist)*along  - thickness*out
+	LineToVector(contour, and_back)
 end
 
 -- Extend the end point of the contour by the given vector
 function LineToVector(contour, vector)
-  local current_pos = contour.EndPoint2D
-  contour:LineTo(current_pos + vector)
+	local current_pos = contour.EndPoint2D
+	contour:LineTo(current_pos + vector)
 end
 
 -- Add a flap
 function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour)
-  LineToVector(contour, thickness*perp_vec)
-  LineToVector(contour, tab_width*along_vec)
-  LineToVector(contour, thickness*(-perp_vec))
+	LineToVector(contour, thickness*perp_vec)
+	LineToVector(contour, tab_width*along_vec)
+	LineToVector(contour, thickness*(-perp_vec))
 end
 
 function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, name)
 
-  local tablist = {}
-  local unit_x = Vector2D(1,0)
-  local unit_y = Vector2D(0,1)
-  local inner_width = width - 2*thickness
-  local inner_height = height - 2*thickness
+	local tablist = {}
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
+	local inner_width = width - 2*thickness
+	local inner_height = height - 2*thickness
 
-  local inner_start_point = start_point + Vector2D(thickness, thickness)
+	local inner_start_point = start_point + Vector2D(thickness, thickness)
 
-  -- Get corners of box
-  local outer_blc = start_point
-  local outer_brc = start_point + width*unit_x
-  local outer_trc = start_point + width*unit_x + height* unit_y
-  local outer_tlc = start_point + height*unit_y
+	-- Get corners of box
+	local outer_blc = start_point
+	local outer_brc = start_point + width*unit_x
+	local outer_trc = start_point + width*unit_x + height* unit_y
+	local outer_tlc = start_point + height*unit_y
 
-  -- Get the corners of the box offset by the thickness
-  local inner_blc = inner_start_point
-  local inner_brc = inner_start_point + inner_width*unit_x
-  local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
-  local inner_tlc = inner_start_point + inner_height*unit_y
+	-- Get the corners of the box offset by the thickness
+	local inner_blc = inner_start_point
+	local inner_brc = inner_start_point + inner_width*unit_x
+	local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
+	local inner_tlc = inner_start_point + inner_height*unit_y
 
-  local num_flaps_w = math.floor( (0.5*inner_width)/tab_width)
-  local num_flaps_h = math.floor( (0.5*inner_height)/tab_width)
+	local num_flaps_w = math.floor( (0.5*inner_width)/tab_width)
+	local num_flaps_h = math.floor( (0.5*inner_height)/tab_width)
 
-  local tab_space_w = (inner_width - num_flaps_w*tab_width) / (num_flaps_w + 1)
-  local tab_space_h = (inner_height - num_flaps_h*tab_width) / (num_flaps_h + 1)
+	local tab_space_w = (inner_width - num_flaps_w*tab_width) / (num_flaps_w + 1)
+	local tab_space_h = (inner_height - num_flaps_h*tab_width) / (num_flaps_h + 1)
 
-  local contour = Contour(0.0)
-  if (not flat_lid) then
-    contour:AppendPoint(start_point)
+	local contour = Contour(0.0)
+	if (not flat_lid) then
+		contour:AppendPoint(start_point)
 
-    --- blc -> brc
-    LineToVector(contour, (thickness + tab_space_w)*unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
-    contour:LineTo(outer_brc)
-    AddMiddleOfLastSpanToList(contour, tablist)
+		--- blc -> brc
+		LineToVector(contour, (thickness + tab_space_w)*unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
+		contour:LineTo(outer_brc)
+		AddMiddleOfLastSpanToList(contour, tablist)
 
-    -- brc --> trc
-    LineToVector(contour, (thickness + tab_space_h) * unit_y)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
-    contour:LineTo(outer_trc)
-    AddMiddleOfLastSpanToList(contour, tablist)
+		-- brc --> trc
+		LineToVector(contour, (thickness + tab_space_h) * unit_y)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+		contour:LineTo(outer_trc)
+		AddMiddleOfLastSpanToList(contour, tablist)
 
-    -- trc --> tlc
-    LineToVector(contour, (thickness + tab_space_w)*-unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
-    contour:LineTo(outer_tlc)
-    AddMiddleOfLastSpanToList(contour, tablist)
+		-- trc --> tlc
+		LineToVector(contour, (thickness + tab_space_w)*-unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+		contour:LineTo(outer_tlc)
+		AddMiddleOfLastSpanToList(contour, tablist)
 
-    -- tlc --> trc
-    LineToVector(contour, (thickness + tab_space_h)* -unit_y)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
-    contour:LineTo(outer_blc)
-    AddMiddleOfLastSpanToList(contour, tablist)
+		-- tlc --> trc
+		LineToVector(contour, (thickness + tab_space_h)* -unit_y)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+		contour:LineTo(outer_blc)
+		AddMiddleOfLastSpanToList(contour, tablist)
 
-  else -- No tabs so just create outer profile contour
-    contour:AppendPoint(start_point)
-    LineToVector(contour, width*unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    LineToVector(contour, height*unit_y)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    LineToVector(contour, -width*unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    LineToVector(contour, -height*unit_y)
-    AddMiddleOfLastSpanToList(contour, tablist)
-  end
+	else -- No tabs so just create outer profile contour
+		contour:AppendPoint(start_point)
+		LineToVector(contour, width*unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		LineToVector(contour, height*unit_y)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		LineToVector(contour, -width*unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		LineToVector(contour, -height*unit_y)
+		AddMiddleOfLastSpanToList(contour, tablist)
+	end
 
-  local inner_contour = Contour(0.0)
-  inner_contour:AppendPoint(inner_blc)
-  inner_contour:LineTo(inner_brc)
-  inner_contour:LineTo(inner_trc)
-  inner_contour:LineTo(inner_tlc)
-  inner_contour:LineTo(inner_blc)
+	local inner_contour = Contour(0.0)
+	inner_contour:AppendPoint(inner_blc)
+	inner_contour:LineTo(inner_brc)
+	inner_contour:LineTo(inner_trc)
+	inner_contour:LineTo(inner_tlc)
+	inner_contour:LineTo(inner_blc)
 
-  return Lid(contour, inner_contour, {}, tablist, name)
+	return Lid(contour, inner_contour, {}, tablist, name)
 end
 
 function MakeLidPocketContours(width, height, thickness, start_point)
 -- local cad_object_list = CadObjectList(true)
 
-  local unit_x = Vector2D(1,0)
-  local unit_y = Vector2D(0,1)
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
 
-  local inner_width = width - 2*thickness
-  local inner_height = height - 2*thickness
-  local inner_start_point = start_point + Vector2D(thickness, thickness)
+	local inner_width = width - 2*thickness
+	local inner_height = height - 2*thickness
+	local inner_start_point = start_point + Vector2D(thickness, thickness)
 
-  -- Get corners of box
-  local outer_blc = start_point
-  local outer_brc = start_point + width*unit_x
-  local outer_trc = start_point + width*unit_x + height* unit_y
-  local outer_tlc = start_point + height*unit_y
+	-- Get corners of box
+	local outer_blc = start_point
+	local outer_brc = start_point + width*unit_x
+	local outer_trc = start_point + width*unit_x + height* unit_y
+	local outer_tlc = start_point + height*unit_y
 
-  -- Get the corners of the box offset by the thickness
-  local inner_blc = inner_start_point
-  local inner_brc = inner_start_point + inner_width*unit_x
-  local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
-  local inner_tlc = inner_start_point + inner_height*unit_y
+	-- Get the corners of the box offset by the thickness
+	local inner_blc = inner_start_point
+	local inner_brc = inner_start_point + inner_width*unit_x
+	local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
+	local inner_tlc = inner_start_point + inner_height*unit_y
 
-  local cad_object_list = CadObjectList(true);
-  local outer_contour = Contour(0.0)
-  outer_contour:AppendPoint(outer_blc)
-  outer_contour:LineTo(outer_brc)
-  outer_contour:LineTo(outer_trc)
-  outer_contour:LineTo(outer_tlc)
-  outer_contour:LineTo(outer_blc)
+	local cad_object_list = CadObjectList(true);
+	local outer_contour = Contour(0.0)
+	outer_contour:AppendPoint(outer_blc)
+	outer_contour:LineTo(outer_brc)
+	outer_contour:LineTo(outer_trc)
+	outer_contour:LineTo(outer_tlc)
+	outer_contour:LineTo(outer_blc)
 
-  local inner_contour = Contour(0.0)
-  inner_contour:AppendPoint(inner_blc)
-  inner_contour:LineTo(inner_brc)
-  inner_contour:LineTo(inner_trc)
-  inner_contour:LineTo(inner_tlc)
-  inner_contour:LineTo(inner_blc)
+	local inner_contour = Contour(0.0)
+	inner_contour:AppendPoint(inner_blc)
+	inner_contour:LineTo(inner_brc)
+	inner_contour:LineTo(inner_trc)
+	inner_contour:LineTo(inner_tlc)
+	inner_contour:LineTo(inner_blc)
 
-  local outer_cad_contour = CreateCadContour(outer_contour)
-  cad_object_list:AddTail(outer_cad_contour)
-  local inner_cad_contour = CreateCadContour(inner_contour)
-  cad_object_list:AddTail(inner_cad_contour)
+	local outer_cad_contour = CreateCadContour(outer_contour)
+	cad_object_list:AddTail(outer_cad_contour)
+	local inner_cad_contour = CreateCadContour(inner_contour)
+	cad_object_list:AddTail(inner_cad_contour)
 
-  return cad_object_list
+	return cad_object_list
 end
 
 --[[  -------------- ArrangeContours --------------------------------------------------  
@@ -900,8 +1157,8 @@ end
 | utility function computing angle swept out by rays 
 |
 ]]
-function utAngleRad2d( x1, y1, x2, y2, x3, y3)
-  local value
+ function utAngleRad2d( x1, y1, x2, y2, x3, y3)
+  local value;
   local x = ( x1 - x2 ) * ( x3 - x2 ) + ( y1 - y2 ) * ( y3 - y2 )
   local y = ( x1 - x2 ) * ( y3 - y2 ) - ( y1 - y2 ) * ( x3 - x2 )
 
@@ -958,7 +1215,7 @@ end
 | Return true if the contour is just a single line span
 |
 ]]
-function IsSpan(ctr)
+  function IsSpan(ctr)
     if (ctr.Count == 1) and ctr:GetFirstSpan().IsLineType then
       return true
     else
@@ -1019,88 +1276,88 @@ end
 function TransferTabs(cad_contour_a, cad_contour_b)
   -- clone because problem with constness on tabs
 
-  local tabs_a = cad_contour_a:GetToolpathTabs()
-  local contour_a = cad_contour_a:GetContour()
-  local pos = tabs_a:GetHeadPosition()
-  while pos do
-    local tab
-    tab, pos = tabs_a:GetNext(pos)
-    local point = tab:Position(contour_a)
-    cad_contour_b:InsertToolpathTabAtPoint(point)
-  end
+	local tabs_a = cad_contour_a:GetToolpathTabs()
+	local contour_a = cad_contour_a:GetContour()
+	local pos = tabs_a:GetHeadPosition()
+	while pos do
+		local tab
+		tab, pos = tabs_a:GetNext(pos)
+		local point = tab:Position(contour_a)
+		cad_contour_b:InsertToolpathTabAtPoint(point)
+	end
 end
 
 function AddMiddleOfLastSpanToList(contour, pt_list)
-  local last_span = contour:GetLastSpan()
-  pt_list[#pt_list + 1] = last_span.StartPoint2D + 0.5*(last_span.EndPoint2D - last_span.StartPoint2D)
+	local last_span = contour:GetLastSpan()
+	pt_list[#pt_list + 1] = last_span.StartPoint2D + 0.5*(last_span.EndPoint2D - last_span.StartPoint2D)
 end
 
 function AddTabsToContour(cad_contour, pt_list)
-  if (pt_list) then
-    for i=1,#pt_list do
-      cad_contour:InsertToolpathTabAtPoint(pt_list[i])
-    end
-  else
-    DisplayMessageBox("No tabs to add.")
-  end
+	if (pt_list) then
+		for i=1,#pt_list do
+			cad_contour:InsertToolpathTabAtPoint(pt_list[i])
+		end
+	else
+		DisplayMessageBox("No tabs to add.")
+	end
 end
 
 function MakeCadAndAddTabs(contour, tab_list)
-  local cad_contour = CreateCadContour(contour)
-  AddTabsToContour(cad_contour, tab_list)
-  return cad_contour
+	local cad_contour = CreateCadContour(contour)
+	AddTabsToContour(cad_contour, tab_list)
+	return cad_contour
 end
 
 function GetContours(cad_object_list)
-  local vdcontours = ContourGroup(true)
-  local pos, obj
-  pos = cad_object_list:GetHeadPosition()
-  while (pos) do
-    obj, pos = cad_object_list:GetNext(pos)
-    local ctr = obj:GetContour()
-    if ctr then
-      vdcontours:AddTail(ctr:Clone())
-    end
-  end
-  return vdcontours
+	local vdcontours = ContourGroup(true)
+	local pos, obj
+	pos = cad_object_list:GetHeadPosition()
+	while (pos) do
+		obj, pos = cad_object_list:GetNext(pos)
+		local ctr = obj:GetContour()
+		if ctr then
+			vdcontours:AddTail(ctr:Clone())
+		end
+	end
+	return vdcontours
 end
 
 -- Create tabbed versions of the vdcontours by creating 
 -- a cad contour version of each contour and transferring all
 -- tabs
 function CreateTabbedCadContours(vdcontours, cadcontours)
-  local cad_obj_list = CadObjectList(true)
-  local pos, vdctr, cdctr
-  vcpos = cadcontours:GetHeadPosition()
-  while vcpos do
-    vcctr, vcpos = cadcontours:GetNext(vcpos)
-    local vcbox = vcctr:GetBoundingBox()
+	local cad_obj_list = CadObjectList(true)
+	local pos, vdctr, cdctr
+	vcpos = cadcontours:GetHeadPosition()
+	while vcpos do
+		vcctr, vcpos = cadcontours:GetNext(vcpos)
+		local vcbox = vcctr:GetBoundingBox()
 
-    -- find the vd contour whose bounding centre is nearest ours
-    vdpos = vdcontours:GetHeadPosition()
-    while vdpos do
-      vdctr, vdpos = vdcontours:GetNext(vdpos)
-      local vdbox = vdctr.BoundingBox2D
-      if (vdbox:IsInside(vcbox)) then
-        local cad_ctr = CreateCadContour(vdctr)
-        TransferTabs(CastCadObjectToCadContour(vcctr), cad_ctr)
-        cad_obj_list:AddTail(cad_ctr)
-      end
-    end
+		-- find the vd contour whose bounding centre is nearest ours
+		vdpos = vdcontours:GetHeadPosition()
+		while vdpos do
+			vdctr, vdpos = vdcontours:GetNext(vdpos)
+			local vdbox = vdctr.BoundingBox2D
+			if (vdbox:IsInside(vcbox)) then
+				local cad_ctr = CreateCadContour(vdctr)
+				TransferTabs(CastCadObjectToCadContour(vcctr), cad_ctr)
+				cad_obj_list:AddTail(cad_ctr)
+			end
+		end
 
-  end
-  return cad_obj_list
+	end
+	return cad_obj_list
 end
 
 function AddToSelection(cadobjlist, job)
-  local selection_list = job.Selection
-  selection_list:Clear()
-  local pos = cadobjlist:GetHeadPosition()
-  local obj
-  while (pos) do
-    obj, pos = cadobjlist:GetNext(pos)
-    selection_list:Add(obj, true, false)
-  end
+	local selection_list = job.Selection
+	selection_list:Clear()
+	local pos = cadobjlist:GetHeadPosition()
+	local obj
+	while (pos) do
+		obj, pos = cadobjlist:GetNext(pos)
+		selection_list:Add(obj, true, false)
+	end
 end
 
 --[[  ---------------- SelectVectorsOnLayer ----------------  
@@ -1122,7 +1379,7 @@ function SelectVectorsOnLayer(layer, selection, select_closed, select_open, sele
    
    local pos = layer:GetHeadPosition()
       while pos ~= nil do
-       local object
+	     local object
          object, pos = layer:GetNext(pos)
          local contour = object:GetContour()
          if contour == nil then
@@ -1167,25 +1424,26 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
   return false
 end
 
-  local profile_data = ProfileParameterData()
-  profile_data.CutDepth = thickness
-  profile_data.StartDepth = 0.0
-  profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
-  profile_data.UseTabs = false                                       --- Changed true to false markjones
-  profile_data.TabThickness = math.min(0.25*thickness, 0.25)
-  profile_data.TabLength = tab_length
+	local profile_data = ProfileParameterData()
+	profile_data.CutDepth = thickness
+	profile_data.StartDepth = 0.0
+	profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+	profile_data.UseTabs = false                                       --- Changed true to false markjones
+	profile_data.TabThickness = math.min(0.25*thickness, 0.25)
+	profile_data.TabLength = tab_length
 
-  local ramping_data = RampingData()
-  ramping_data.DoRamping = false                                     --- Changed true to false markjones
-  ramping_data.RampAngle = 30.0
-  ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
+	local ramping_data = RampingData()
+	ramping_data.DoRamping = false                                     --- Changed true to false markjones
+	ramping_data.RampAngle = 30.0
+	ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
 
-  local lead_data = LeadInOutData()
+	local lead_data = LeadInOutData()
 
-  local pos_data = ToolpathPosData()
+	local pos_data = ToolpathPosData()
 
-  local geometry_selector = GeometrySelector()
+	local geometry_selector = GeometrySelector()
 
+	-- AddToSelection(cad_contours, job)
   
   -- Select all on a layer
   local selection = job.Selection
@@ -1194,21 +1452,21 @@ end
   SelectVectorsOnLayer(layer, selection, true, true, true)
 
   local toolpath_manager = ToolpathManager()
-  local toolpath = toolpath_manager:CreateProfilingToolpath(
-    "Cut Out",
-    tool,
-    profile_data,
-    ramping_data,
-    lead_data,
-    pos_data,
-    geometry_selector,
-    true,
-    true
-    )
+	local toolpath = toolpath_manager:CreateProfilingToolpath(
+		"Cut Out",
+		tool,
+		profile_data,
+		ramping_data,
+		lead_data,
+		pos_data,
+		geometry_selector,
+		true,
+		true
+		)
 
-  if toolpath == nil then
-    DisplayMessageBox("Error creating toolpath.")
-  end
+	if toolpath == nil then
+		DisplayMessageBox("Error creating toolpath.")
+	end
 end
 
 --[[  -------------- CalculateRails --------------------------------------------------  
@@ -1227,6 +1485,10 @@ function CalculateRails
     start_z,     -- depth start cutting
     cut_z        -- depth finish cutting 
     )
+  local is_dodgy = false
+  if side_rail.StartPoint2D:IsCoincident(Point2D(53, 25), 1) then
+    is_dodgy = true
+  end
   local side_length = side_rail.Length
   local blk_material = MaterialBlock()
   local converted_Stepover = ConvertUnitsFrom(tool.Stepover,tool,blk_material)
@@ -1460,7 +1722,7 @@ DisplayMessageBox(
   "Dovetail Toolpath Notice:\n\n"
   .. "This Dovetail Toolpath is created as an *External Toolpath* by the Gadget.\n"
   .. "External toolpaths CANNOT be recalculated in VCarve/Aspire.\n\n"
-  .. "If the user moves the vectors (e.g., center on material) and needs this Toolpath Again:\n"
+  .. "If user moves the cectors (e.g., center on material) and needs this Toolpath Again:\n"
   .. "  • The User will Need to Re-Run this Gadget after proper planning is achieved.\n\n"
   .. "Tip: Plan vector placement before running the Box Creator Gadget."
 )
@@ -1469,81 +1731,86 @@ end
 
 -- MotazA 16/9/2020 check if job Exists 
 function main(script_path)
-  local job = VectricJob()
-  local mtl_block = MaterialBlock()
+	local job = VectricJob()
+	local mtl_block = MaterialBlock()
 
-  if not job.Exists then
+	if not job.Exists then
        DisplayMessageBox("No job loaded.")
        return false
     end
  
- ------------------------------------------- Geometry Options Default Settings ----------------------------------------------------------
- ------------------------------ Added this blocked off and the line descriptions by Sharkcutup
+ ----------------------- Geometry Options Default Settings --------------------------------
+ ------------- Added this blocked off and the line descriptions by Sharkcutup -------------
  
-  local options = {}
-  options.width = 18                        --- width  default               
-  options.height = 12                       --- height default              
-  options.depth = 14                        --- depth default                      
-  options.start_point = Point2D(0,0)
-  options.thickness = mtl_block.Thickness;
-  options.sidetabwidth = 0.3                    --- joint width default      
+	local options = {}
+	options.width = 18                        --- width  default               
+	options.height = 12                       --- height default              
+	options.depth = 14                        --- depth default                      
+	options.start_point = Point2D(0,0)
+	options.thickness = mtl_block.Thickness;
+	options.sidetabwidth = 0.3                    --- joint width default      
+  options.tabwidthbottom = 1.0              --- joint width for the bottom (as a separate value)   
+  options.tabwidthTop = 1.0                 --- joint width for the top (as a separate value)
   options.allJointWidths = false         --- show all joint width options (if false then only show one joint width option and use it for all joints)
-  options.cut_layer_name  = "CutOut"        --- layer name default          
-  options.allowance = 0.0                   --- allowance default 
+  options.cut_layer_name  = "CutOut"        --- layer name default
+	options.allowance = 0.0                   --- allowance default 
   options.edge_margin = 0.75                 --- edge margin default
   options.warn_dovetail = true   -- show dovetail warning after create
   options.high_dpi_mode = false       --- if true then use high dpi mode for dialog (if false use normal mode)
-  options.cut_dovetails = false
-  options.flat_lid = true
+  options.dark_mode     = true        --- default to dark mode on
+	options.cut_dovetails = false
+	options.flat_lid = true
   options.no_toolpath = false
-  options.window_width = g_width
-  options.window_height = g_height
+	options.window_width = g_width
+	options.window_height = g_height
 
-  options.make_lid = true                   --- lid checkbox default       
-  options.make_bottom = true                --- bottom checkbox default     
-  options.make_side1 = true                 --- side 1 checkbox default    
-  options.make_side2 = true                 --- side 2 checkbox default     
-  options.make_end1 =  true                 --- end 1 checkbox default      
-  options.make_end2 = true                  --- end 2 checkbox default      
+	options.make_lid = true                   --- lid checkbox default       
+	options.make_bottom = true                --- bottom checkbox default     
+	options.make_side1 = true                 --- side 1 checkbox default    
+	options.make_side2 = true                 --- side 2 checkbox default     
+	options.make_end1 =  true                 --- end 1 checkbox default      
+	options.make_end2 = true                  --- end 2 checkbox default      
 
 -----------------------------------------------------------------------------------------------------------------------------------------
 
-  local dovetails = ContourGroup(true)
-  
+	local dovetails = ContourGroup(true)
+	
   local sidedovetail = {}
-  sidedovetail.angle = math.rad(60)
-  sidedovetail.min_width = 1.5
-  sidedovetail.depth = options.thickness
+	sidedovetail.angle = math.rad(60)
+	sidedovetail.min_width = 1.5
+	sidedovetail.depth = options.thickness
 
   -- added by Gremlin to allow for separate widths on bottom vs side tabs
   local bottomdovetail = {}   
   bottomdovetail.angle = math.rad(60)
-  bottomdovetail.min_width = 1.5
-  bottomdovetail.depth = options.thickness
+	bottomdovetail.min_width = 1.5
+	bottomdovetail.depth = options.thickness
 
   local topdovetail = {}   
   topdovetail.angle = math.rad(60)
-  topdovetail.min_width = 1.5
-  topdovetail.depth = options.thickness
+	topdovetail.min_width = 1.5
+	topdovetail.depth = options.thickness
 
-  LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
+	LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
 
-  local tool = Tool("0.25 Inch End Mill", Tool.END_MILL)
-  tool.ToolDia = 0.25
-  tool.InMM = false
+	local tool = Tool("0.25 Inch End Mill", Tool.END_MILL)
+	tool.ToolDia = 0.25
+	tool.InMM = false
 
-  options.tool = tool
+	options.tool = tool
 
-  local dialog_displayed = DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
-  if (not dialog_displayed) then 
-    return false
-  end
+  -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
+	local dialog_displayed = DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
+	if (not dialog_displayed) then 
+		return false
+	end
 
+  -- Gremlin added extra dovetail parameters for bottom and top which are the same as the side dovetail except for 
   -- the depth which is just the thickness of the material since we are only cutting one face for those
-  sidedovetail.depth = options.thickness
-  sidedovetail.start_z = mtl_block:CalcAbsoluteZFromDepth(0)
-  sidedovetail.start_depth = 0
-  sidedovetail.cut_z = mtl_block:CalcAbsoluteZFromDepth(options.thickness)
+	sidedovetail.depth = options.thickness
+	sidedovetail.start_z = mtl_block:CalcAbsoluteZFromDepth(0)
+	sidedovetail.start_depth = 0
+	sidedovetail.cut_z = mtl_block:CalcAbsoluteZFromDepth(options.thickness)
 
   bottomdovetail.depth = options.thickness
   bottomdovetail.start_z = mtl_block:CalcAbsoluteZFromDepth(0)
@@ -1563,92 +1830,101 @@ function main(script_path)
   end
 
 -- Make the bottom face
-  local cad_list = CadObjectList(true)
-  local faces = {}
+	local cad_list = CadObjectList(true)
+-- local dovetail_markers = {}
+	local faces = {}
 
-  if options.make_bottom then
+	if options.make_bottom then
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
     -- the bottom face is only the bottom so we didn't need to add
     -- a separate value to it, just pass it the bottom value
-    local bottom_face = MakeBottomFaceContour(options.width, 
-                          options.depth, 
-                          options.thickness, 
-                          options.start_point, 
-                          bottomdovetail, 
-                          options.cut_dovetails,  -- if true then create dovetails
-                          "BottomFace" )
-    faces[#faces + 1] = bottom_face
-  end
+		local bottom_face = MakeBottomFaceContour(options.width, 
+													options.depth, 
+													options.thickness, 
+													options.start_point, 
+													bottomdovetail, 
+													options.cut_dovetails,  -- if true then create dovetails
+													"BottomFace" )
+		faces[#faces + 1] = bottom_face
+	end
 
-  if options.make_side1 then
-    local sideface1 = MakeSideFace(options.width,
-                    options.height, 
-                    options.thickness, 
-                    options.start_point, 
-                    sidedovetail, 
+	-- -- -- Make sides
+	if options.make_side1 then
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
+		local sideface1 = MakeSideFace(options.width,
+									  options.height, 
+									  options.thickness, 
+									  options.start_point, 
+									  sidedovetail, 
                     bottomdovetail,
                     topdovetail,
-                    options.cut_dovetails, 
-                    options.flat_lid,
-                    "SideFace1")
-    faces[#faces + 1] = sideface1
-  end
+									  options.cut_dovetails, 
+									  options.flat_lid,
+									  "SideFace1")
+		faces[#faces + 1] = sideface1
+	end
 
-  if options.make_side2 then
-    local sideface2 = MakeSideFace(options.width,
-                    options.height, 
-                    options.thickness, 
-                    options.start_point, 
-                    sidedovetail, 
+	if options.make_side2 then
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
+		local sideface2 = MakeSideFace(options.width,
+									  options.height, 
+									  options.thickness, 
+									  options.start_point, 
+									  sidedovetail, 
                     bottomdovetail,
                     topdovetail,
-                    options.cut_dovetails, 
-                    options.flat_lid,
-                    "SideFace2")
-    faces[#faces + 1] = sideface2
-  end
+									  options.cut_dovetails, 
+									  options.flat_lid,
+									  "SideFace2")
+		faces[#faces + 1] = sideface2
+	end
 
-  if options.make_end1 then
-    local endface1 = MakeEndFace(options.depth, 
-                         options.height, 
-                         options.thickness,
-                         options.start_point, 
-                         sidedovetail,
+	-- -- -- Make ends
+	if options.make_end1 then
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
+		local endface1 = MakeEndFace(options.depth, 
+											   options.height, 
+											   options.thickness,
+											   options.start_point, 
+											   sidedovetail,
                          bottomdovetail,
                          topdovetail,
-                         options.cut_dovetails, 
-                         options.flat_lid,
-                         "EndFace1")
-    faces[#faces + 1] = endface1
-  end
+											   options.cut_dovetails, 
+											   options.flat_lid,
+											   "EndFace1")
+		faces[#faces + 1] = endface1
+	end
 
-  if options.make_end2 then
-    local endface2 = MakeEndFace(options.depth, 
-                         options.height, 
-                         options.thickness,
-                         options.start_point, 
-                         sidedovetail,
+	if options.make_end2 then
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
+		local endface2 = MakeEndFace(options.depth, 
+											   options.height, 
+											   options.thickness,
+											   options.start_point, 
+											   sidedovetail,
                          bottomdovetail,
                          topdovetail,
-                         options.cut_dovetails, 
-                         options.flat_lid,
-                         "EndFace2")
-    faces[#faces + 1] = endface2
-  end
+											   options.cut_dovetails, 
+											   options.flat_lid,
+											   "EndFace2")
+		faces[#faces + 1] = endface2
+	end
 
-  -- Make lid
-  if options.make_lid then
-    local lid = MakeLid(options.width,
-                           options.depth,
-                           options.thickness,
-                           topdovetail.min_width,
-                           options.start_point,
-                           options.flat_lid,
-                           "Lid"
-                         )
-    faces[#faces + 1] = lid
-  end
+	-- Make lid
+	if options.make_lid then
+		local lid = MakeLid(options.width,
+												   options.depth,
+												   options.thickness,
+												   topdovetail.min_width,
+												   options.start_point,
+												   options.flat_lid,
+												   "Lid"
+	                       )
+		faces[#faces + 1] = lid
+	end
 
-  -- Arrange the contours
+	-- Arrange the contours
+  local mtl_block = MaterialBlock()
   local converted_tool_diameter = 0.25
   if _tool_ok(options.tool) then
     converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
@@ -1657,25 +1933,24 @@ function main(script_path)
   local edge_margin = math.max(options.edge_margin or 0.0, 0.75)
   faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, edge_margin)
 
-  -- Get at the actual contours and dogbone them. Then transfer the tabs
-  local vdcontours = GetAllProfileContours(faces)
-  local cdcontours = GetAllProfileCadContours(faces)
+	-- Get at the actual contours and dogbone them. Then transfer the tabs
+	local vdcontours = GetAllProfileContours(faces)
+	local cdcontours = GetAllProfileCadContours(faces)
   
-  local offset_radius = 0.5* converted_tool_diameter - options.allowance
-  local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-  local dogboned_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+	local offset_radius = 0.5* converted_tool_diameter - options.allowance
+	local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
+	local dogboned_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
 
-  -- -- AddCadContourToJob(job, cad_contour, "Box")
+	-- -- AddCadContourToJob(job, cad_contour, "Box")
   -- These extra vectors represent the actual output
   -- so you can place extra details on them if you wish
-  AddCadListToJob(job, cdcontours, "Box")
+	AddCadListToJob(job, cdcontours, "Box")
   AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
+  AddPartsLabelsToJob(job, faces, "Box", options.thickness)
 
-  if options.make_lid then
-    if options.flat_lid then 
-      CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets" )
-    end
-  end
+		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
+		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
+	end
 
   if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
@@ -1687,47 +1962,51 @@ function main(script_path)
     CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sidetabwidth, options.cut_layer_name)
   end
 
-  SaveDefaults(options)
-  job:Refresh2DView()
-  return true
+	SaveDefaults(options)
+	job:Refresh2DView()
+	return true
 
 end
 
+-- Gremlin added bottomdovetail seperation from side which is just sidedovetail 
 function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
-  local html_path = "file:" .. script_path .. "\\" .. g_html_file
-  local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
+	local html_path = "file:" .. script_path .. "\\" .. g_html_file
+	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
   
 
-  dialog:AddLabelField("GadgetTitle", g_title)
-  dialog:AddLabelField("GadgetVersion", g_version)
+	dialog:AddLabelField("GadgetTitle", g_title)
+	dialog:AddLabelField("GadgetVersion", g_version)
 
-  -- Add Geometry fields
-  dialog:AddDoubleField("WidthField", options.width)
-  dialog:AddDoubleField("DepthField", options.depth)
-  dialog:AddDoubleField("HeightField", options.height)
-  dialog:AddDoubleField("SideTabWidthField", sidedovetail.min_width)
+	-- Add Geometry fields
+	dialog:AddDoubleField("WidthField", options.width)
+	dialog:AddDoubleField("DepthField", options.depth)
+	dialog:AddDoubleField("HeightField", options.height)
+	dialog:AddDoubleField("SideTabWidthField", sidedovetail.min_width)
+  -- Gremlin added bottomdovetail seperation from side
   dialog:AddDoubleField("BottomTabWidthField", bottomdovetail.min_width)
   dialog:AddDoubleField("TopTabWidthField", topdovetail.min_width)
   dialog:AddCheckBox("AllJointWidths", options.allJointWidths)
-  dialog:AddDoubleField("AllowanceField", options.allowance)
+	dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("EdgeField", options.edge_margin)
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
   dialog:AddCheckBox("HighDPIMode", options.high_dpi_mode)
+  dialog:AddCheckBox("DarkMode", options.dark_mode)
 
+	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
-  dialog:AddCheckBox("MakeLid", options.make_lid)
-  dialog:AddCheckBox("MakeBottom", options.make_bottom)
-  dialog:AddCheckBox("MakeSide1", options.make_side1)
-  dialog:AddCheckBox("MakeSide2", options.make_side2)
-  dialog:AddCheckBox("MakeEnd1", options.make_end1)
-  dialog:AddCheckBox("MakeEnd2", options.make_end2)
+	dialog:AddCheckBox("MakeLid", options.make_lid)
+	dialog:AddCheckBox("MakeBottom", options.make_bottom)
+	dialog:AddCheckBox("MakeSide1", options.make_side1)
+	dialog:AddCheckBox("MakeSide2", options.make_side2)
+	dialog:AddCheckBox("MakeEnd1", options.make_end1)
+	dialog:AddCheckBox("MakeEnd2", options.make_end2)
   
-  -- Add Tool picker
-  -- Add toolpath name field
+	-- Add Tool picker
+	-- Add toolpath name field
   dialog:AddLabelField("ToolNameField", "")
-  dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
-  dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
+	dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
+	dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
  
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
@@ -1749,15 +2028,16 @@ end
 dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
 
-  -- Add units label
-  local units_string = "Inches"
-  if options.tool.InMM then
-    units_string = "MM"
-  end
+	-- Add units label
+	local units_string = "Inches"
+	if options.tool.InMM then
+		units_string = "MM"
+	end
 
-  dialog:AddTextField("UnitsLabel", units_string)
+	dialog:AddTextField("UnitsLabel", units_string)
 
   local validator = function(dialog)
+    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
     ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     local double_thickness = options.thickness * 2
     if options.width <= double_thickness then
@@ -1800,6 +2080,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local inner_depth = options.depth - double_thickness
     local inner_height = options.height - double_thickness
 
+    -- Gremlin added join size seperations overall
     local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomdovetail.min_width)
     local total_tab_space_w_bottom = (inner_width - num_flaps_w_bottom*bottomdovetail.min_width)
     local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomdovetail.min_width)
@@ -1857,6 +2138,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       
     if options.cut_dovetails then
       local min_space = sidedovetail.max_width - sidedovetail.min_width
+      -- Gremlin added bottomdovetail seperation from side which
       local bottom_min_space = bottomdovetail.max_width - bottomdovetail.min_width
       local top_min_space = topdovetail.max_width - topdovetail.min_width
 
@@ -1882,6 +2164,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
         return false
       end  
     else
+      -- Gremlin added bottomdovetail seperation from side
       tab_space_w_bottom = math.min(tab_space_w_bottom, bottomdovetail.min_width)
       tab_space_d_bottom = math.min(tab_space_d_bottom, bottomdovetail.min_width)
       tab_space_w_top = math.min(tab_space_w_top, topdovetail.min_width)
@@ -1923,9 +2206,10 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     until validator(dialog)    
   end
 
+  -- Gremlin added joint width seperation
   ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
 
-  return true
+	return true
 
 end
 
@@ -1981,6 +2265,10 @@ function OnLuaButton_HighDPIMode()
   return true
 end
 
+function OnLuaButton_DarkMode()
+  return true
+end
+
 -- HTML checkbox id="NoToolpath" is marked class="LuaButton".
 -- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
 -- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
@@ -1988,6 +2276,7 @@ function OnLuaButton_NoToolpath()
   return true
 end
 
+-- Gremlin added joint width seperation for sides top and bottom
 function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   -- Read back data from the form
   options.width     = dialog:GetDoubleField("WidthField")
@@ -1995,6 +2284,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.height    = dialog:GetDoubleField("HeightField")
   options.sidetabwidth  = dialog:GetDoubleField("SideTabWidthField")
   dovetail.min_width = options.sidetabwidth
+  -- Gremlin added joint width seperation for sides top and bottom
   options.allJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomtabwidth = dialog:GetDoubleField("BottomTabWidthField")
   options.toptabwidth = dialog:GetDoubleField("TopTabWidthField")
@@ -2009,6 +2299,7 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
   options.high_dpi_mode = dialog:GetCheckBox("HighDPIMode")
+  options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
@@ -2018,7 +2309,9 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.make_end2     = dialog:GetCheckBox("MakeEnd2")
   
 
+  -- dovetail.angle = dialog:GetDoubleField("DovetailAngleField")
   dovetail.max_width = dovetail.min_width + (2 * options.thickness / math.tan(dovetail.angle))
+  -- Gremlin added bottomdovetail seperation from side which is just dovetail
   bottomdovetail.max_width = bottomdovetail.min_width + (2* options.thickness/ math.tan(bottomdovetail.angle))
   topdovetail.max_width = topdovetail.min_width + (2 * options.thickness / math.tan(topdovetail.angle))
 
@@ -2102,6 +2395,7 @@ function SaveDefaults(options)
 
   registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("HighDPIMode", options.high_dpi_mode)
+  registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
@@ -2113,6 +2407,7 @@ function SaveDefaults(options)
 
 end
 
+-- Gremlin added bottomdovetail separation from side which is just dovetail
 function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   local registry =  Registry("BoxCreator_" .. g_version)
 
@@ -2125,9 +2420,9 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.sidetabwidth = registry:GetDouble("JointWidth", options.sidetabwidth)
   options.bottomtabwidth = registry:GetDouble("BottomJointWidth", options.sidetabwidth)  --Added by Gremlin
   options.toptabwidth = registry:GetDouble("TopJointWidth", options.sidetabwidth)      --Added by Gremlin
-  options.allJointWidths = registry:GetBool("AllJointWidths", options.allJointWidths)           -- Added by Gremlin
-  options.allowance = registry:GetDouble("Allowance", options.allowance)     -- Added by Sharkcutup
-  options.edge_margin = registry:GetDouble("EdgeMargin", options.edge_margin)      -- Added by Sharkcutup
+  options.allJointWidths = registry:GetBool("AllJointWidths", options.allJointWidths)  -- Added by Gremlin
+  options.allowance = registry:GetDouble("Allowance", options.allowance)           -- Added by Sharkcutup
+  options.edge_margin = registry:GetDouble("EdgeMargin", options.edge_margin)      -- Added by Sherkcutup
   sidedovetail.min_width = options.sidetabwidth
   bottomdovetail.min_width = options.bottomtabwidth -- Added by Gremlin
   topdovetail.min_width = options.toptabwidth -- Added by Gremlin
@@ -2137,8 +2432,9 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.high_dpi_mode = registry:GetBool("HighDPIMode", false) 
+  options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
-
+  
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)
   options.make_bottom = registry:GetBool("MakeBottom", options.make_bottom)
   options.make_side1 = registry:GetBool("MakeSide1", options.make_side1)
