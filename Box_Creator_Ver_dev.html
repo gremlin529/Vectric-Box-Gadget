@@ -70,11 +70,13 @@
       float: left;
       width: 295px;
       margin-right: 10px;
+      margin-bottom: 10px;
     }
     .geo-col-last {
       float: left;
       width: 295px;
       margin-right: 0;
+      margin-bottom: 10px;
     }
 
     /* === FIELD ROW (label + input) === */
@@ -114,7 +116,9 @@
       background-color: #f2f4f8;
       border: 1px solid #d0d4de;
       padding: 8px 10px;
-      margin-top: 8px;
+      margin-top: 12px;
+      clear: both;
+      overflow: hidden;
     }
     .face-item {
       float: left;
@@ -374,7 +378,7 @@
               <label for="BottomTabWidthField">Bottom Joint Width:</label>
               <input type="email" id="BottomTabWidthField" class="form-control" placeholder="Width of Bottom Joint" />
             </div>
-            <div class="field-row">
+            <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid Joint Width:</label>
               <input type="email" id="TopTabWidthField" class="form-control" placeholder="Width of Lid Joint" />
             </div>
@@ -397,7 +401,7 @@
       </div>
 
       <!-- Faces to machine -->
-      <div class="faces-panel cf">
+      <div class="faces-panel">
         <div class="panel-title">Faces To Machine</div>
         <div class="face-item">
           <label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label>
@@ -467,7 +471,7 @@
         <div class="type-panel-header">Lid Type</div>
         <div class="type-option cf">
           <div class="type-option-label">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" />Flat Lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat Lid</label>
           </div>
           <div class="type-option-img">
             <img src="Images/flatlid.png" alt="Flat Lid" />
@@ -475,7 +479,7 @@
         </div>
         <div class="type-option-last cf">
           <div class="type-option-label">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" />Tabbed Lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed Lid</label>
           </div>
           <div class="type-option-img">
             <img src="Images/tabbedlid.png" alt="Tabbed Lid" />
@@ -502,47 +506,42 @@
       <button type="button" id="ButtonCancel">Cancel</button>
     </div>
   </div>
-
-  <!-- Hidden legacy fieldset -->
-  <fieldset class="theanswer" id="theoneiwant" style="display:none;">
-    <label>Here it is!</label>
-  </fieldset>
-
 </div><!-- /main_wrapper -->
 
 <script type="text/javascript">
-  // --- HiDPI auto-detection (IE-specific properties) ---
-  // screen.deviceXDPI  = physical pixels per inch of the display
-  // screen.logicalXDPI = pixels per inch the OS is treating as "normal" (usually 96)
-  // Their ratio gives us the OS display scaling factor.
-  // e.g. 144 device / 96 logical = 1.5 = 150% scaling
-  function detectDPIZoom() {
-    var ratio = 1;
-    if (screen.deviceXDPI && screen.logicalXDPI && screen.logicalXDPI !== 0) {
-      ratio = screen.deviceXDPI / screen.logicalXDPI;
-    }
-    return ratio;
+  // --- DPI boundary auto-zoom ---
+  // Uses screen.deviceXDPI which is an IE-specific property giving
+  // the physical DPI of the display. We map it to zoom steps:
+  //   < 120 dpi  -> 100%
+  //   120-143    -> 115%
+  //   144-167    -> 125%
+  //   168-191    -> 135%
+  //   192+       -> 150%
+  function dpiToZoom() {
+    var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
+    if (dpi >= 192) { return "175%"; }
+    if (dpi >= 168) { return "150%"; }
+    if (dpi >= 144) { return "125%"; }
+    if (dpi >= 120) { return "115%"; }
+    return "100%";
   }
 
-  // Convert a DPI ratio to a CSS zoom percentage string
-  // We clamp to a few sensible steps so the layout doesn't go wild
-  function ratioToZoom(ratio) {
-    if (ratio >= 1.75) { return "80%";  }  // 175-200% OS scaling -> shrink to fit
-    if (ratio >= 1.4)  { return "90%";  }  // 150% OS scaling
-    if (ratio >= 1.1)  { return "100%"; }  // 125% OS scaling -> already handled by OS
-    return "100%";                          // 100% or unknown -> no adjustment needed
-  }
-
-  // Called by the manual checkbox in the footer (preserved for Lua compatibility)
+  // Called by the manual checkbox - overrides auto zoom
   function onHighDPIModeChanged(checkbox) {
     if (checkbox.checked) {
-      // Manual override: always apply 125% zoom regardless of auto-detection
-      document.body.style.zoom = "125%";
+      document.body.style.zoom = "150%";
     } else {
-      // Revert to whatever auto-detection decided
-      ratio = ratioToZoom(detectDPIZoom());
-      alert("Auto-detected DPI scaling ratio: " + detectDPIZoom().toFixed(2) + "\nApplying zoom: " + ratio +"." + screen.deviceXDPI + " device DPI, " + screen.logicalXDPI + " logical DPI.");
-      document.body.style.zoom = ratioToZoom(detectDPIZoom());
+      document.body.style.zoom = dpiToZoom();
+    }
+  }
+
+  function onLidTypeChanged(radio) {
+    // Hide the Lid Joint Width field when Flat Lid (LidTypeRadio1) is selected,
+    // show it when Tabbed Lid is selected (a tabbed lid has a joint that needs a width).
+    var lidJointRow = document.getElementById("showHideLidJointWidth");
+    if (lidJointRow) {
+      var isFlatLid = document.getElementById("LidTypeRadio1").checked;
+      lidJointRow.style.display = isFlatLid ? "none" : "block";
     }
   }
 
@@ -555,17 +554,18 @@
 
   // --- Initialise on load ---
   setTimeout(function() {
-    // 1. Auto-detect DPI and apply zoom
-    var ratio = detectDPIZoom();
-    var autoZoom = ratioToZoom(ratio);
-    document.body.style.zoom = autoZoom;
+    // Auto-apply zoom based on physical DPI
+    document.body.style.zoom = dpiToZoom();
 
-    // 2. If the Lua registry had HighDPIMode checked, honour that too
-    //    (onHighDPIModeChanged will override the auto value if checkbox is checked)
+    // If Lua registry had HighDPIMode checked, let it override
     var dpi = document.getElementById("HighDPIMode");
     if (dpi) { onHighDPIModeChanged(dpi); }
 
-    // 3. Restore joint width visibility from saved state
+    // Restore lid joint width visibility based on saved lid type
+    var lid1 = document.getElementById("LidTypeRadio1");
+    if (lid1) { onLidTypeChanged(lid1); }
+
+    // Restore joint width visibility
     var cb = document.getElementById("AllJointWidths");
     if (cb) { onShowAllWidthsChanged(cb); }
   }, 100);
