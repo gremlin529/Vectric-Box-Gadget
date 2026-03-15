@@ -196,13 +196,14 @@
 <script type="text/javascript">
 
   // Returns CSS zoom level based on physical screen DPI (IE-specific property).
-  // Boundaries: <120=100%, 120=115%, 144=125%, 168=150%, 192+=175%
+  // Boundaries: <120=100%, 120=125%, 144=150%, 168=175%, 192+=200%
   function dpiToZoom() {
     var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
-    if (dpi >= 192) { return "175%"; }
-    if (dpi >= 168) { return "150%"; }
-    if (dpi >= 144) { return "125%"; }
-    if (dpi >= 120) { return "115%"; }
+    
+    if (dpi >= 192) { return "200%"; }
+    if (dpi >= 168) { return "175%"; }
+    if (dpi >= 144) { return "150%"; }
+    if (dpi >= 120) { return "125%"; }
     return "100%";
   }
 

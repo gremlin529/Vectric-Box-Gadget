@@ -32,6 +32,7 @@
 -- require("mobdebug").start()
 
 g_version = "dev"                                                    -- Changed by Gremlin
+g_subVersion = "development"                                         -- Added by Gremlin
 g_title = "Box Creator"
 g_width = 1025
 g_height = 1100                                                    -- Changed by Sharkcutup
@@ -1822,13 +1823,6 @@ function main(script_path)
   topdovetail.start_depth = 0
   topdovetail.cut_z = mtl_block:CalcAbsoluteZFromDepth(options.thickness) 
 
-  -- if we're using the same joint width for all joints then set the bottom and top dovetail widths to be the same as the side dovetail width 
-  -- so we only have to use one value in the dialog
-  if not options.allJointWidths then
-    bottomdovetail.min_width = sidedovetail.min_width 
-    topdovetail.min_width = sidedovetail.min_width
-  end
-
 -- Make the bottom face
 	local cad_list = CadObjectList(true)
 -- local dovetail_markers = {}
@@ -1971,7 +1965,7 @@ end
 -- Gremlin added bottomdovetail seperation from side which is just sidedovetail 
 function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
 	local html_path = "file:" .. script_path .. "\\" .. g_html_file
-	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
+	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
   
 
 	dialog:AddLabelField("GadgetTitle", g_title)
@@ -2087,11 +2081,20 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomdovetail.min_width)
 
     if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      if (not options.allJointWidths) then
+        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      else
+        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      end
       return false
     end
+
     if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      if (not options.allJointWidths) then
+        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      else
+        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      end
       return false
     end
 
@@ -2100,13 +2103,16 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local num_flaps_d_top = math.floor((0.5*inner_depth) / topdovetail.min_width)
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*topdovetail.min_width)
 
-    if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", topdovetail.min_width, inner_width))
-      return false
-    end
-    if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", topdovetail.min_width, inner_depth)) 
-      return false
+    -- don't check top joint widths if we are doing a flat lid since those joints won't exist in that case  
+    if not options.flat_lid then    
+      if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", topdovetail.min_width, inner_width))
+        return false
+      end
+      if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", topdovetail.min_width, inner_depth)) 
+        return false
+      end
     end
 
     local num_flaps_h = math.floor((0.5*inner_height) / sidedovetail.min_width)
@@ -2209,6 +2215,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
   end
 
   -- Gremlin added joint width seperation
+  -- this is actually getting called twice, once here and once in the
+  -- validator logic, is that correct?
   ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
 
 	return true
@@ -2279,19 +2287,24 @@ function OnLuaButton_NoToolpath()
 end
 
 -- Gremlin added joint width seperation for sides top and bottom
-function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
+function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   -- Read back data from the form
   options.width     = dialog:GetDoubleField("WidthField")
   options.depth     = dialog:GetDoubleField("DepthField")
   options.height    = dialog:GetDoubleField("HeightField")
   options.sidetabwidth  = dialog:GetDoubleField("SideTabWidthField")
-  dovetail.min_width = options.sidetabwidth
+  sidedovetail.min_width = options.sidetabwidth
   -- Gremlin added joint width seperation for sides top and bottom
   options.allJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomtabwidth = dialog:GetDoubleField("BottomTabWidthField")
   options.toptabwidth = dialog:GetDoubleField("TopTabWidthField")
-  bottomdovetail.min_width = options.bottomtabwidth
-  topdovetail.min_width = options.toptabwidth
+  if not options.allJointWidths then
+    bottomdovetail.min_width = sidedovetail.min_width
+    topdovetail.min_width = sidedovetail.min_width
+  else
+    bottomdovetail.min_width = options.bottomtabwidth
+    topdovetail.min_width = options.toptabwidth
+  end 
 
   options.allowance   = dialog:GetDoubleField("AllowanceField")
   options.edge_margin = dialog:GetDoubleField("EdgeField")
@@ -2311,9 +2324,9 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.make_end2     = dialog:GetCheckBox("MakeEnd2")
   
 
-  -- dovetail.angle = dialog:GetDoubleField("DovetailAngleField")
-  dovetail.max_width = dovetail.min_width + (2 * options.thickness / math.tan(dovetail.angle))
-  -- Gremlin added bottomdovetail seperation from side which is just dovetail
+  -- sidedovetail.angle = dialog:GetDoubleField("DovetailAngleField")
+  sidedovetail.max_width = sidedovetail.min_width + (2 * options.thickness / math.tan(sidedovetail.angle))
+  -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
   bottomdovetail.max_width = bottomdovetail.min_width + (2* options.thickness/ math.tan(bottomdovetail.angle))
   topdovetail.max_width = topdovetail.min_width + (2 * options.thickness / math.tan(topdovetail.angle))
 

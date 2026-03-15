@@ -27,7 +27,7 @@ body {
 .section-header {
   background-color: #2255aa;
   color: #ffffff;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -51,7 +51,7 @@ body {
   padding: 8px 10px;
 }
 .sub-panel-title {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -78,8 +78,8 @@ body {
   padding: 10px 14px;
 }
 .header-text p {
-  font-size: 11px;
-  color: #3d4559;
+  font-size: 12px;
+  color: #6b7280;
   line-height: 1.6;
   margin-bottom: 5px;
 }
@@ -111,7 +111,7 @@ body {
 }
 .field-row label {
   display: block;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
   color: #374151;
   margin-bottom: 2px;
@@ -129,7 +129,7 @@ body {
 /* ── Checkbox + label row ─────────────────────────────────────────── */
 .checkbox-row {
   margin-bottom: 7px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
   color: #374151;
 }
@@ -173,7 +173,8 @@ body {
 .tool-bar-right {
   float: left;
   width: 320px;
-  font-size: 11px;
+  padding-top: 3px;
+  font-size: 12px;
   color: #6b7280;
 }
 input.ToolPicker {
@@ -181,27 +182,23 @@ input.ToolPicker {
   color: #2255aa;
   border: 1px solid #2255aa;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: bold;
   padding: 4px 12px;
   cursor: pointer;
-  vertical-align: middle;
 }
 #ToolNameField {
-  font-size: 11px;
+  font-size: 12px;
   color: #6b7280;
   font-style: italic;
   margin-left: 8px;
-  vertical-align: middle;
 }
 .no-toolpath-label {
-  font-size: 11px;
+  font-size: 12px;
   color: #6b7280;
-  vertical-align: middle;
 }
 .no-toolpath-label input {
   margin-right: 4px;
-  vertical-align: middle;
 }
 
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
@@ -222,7 +219,7 @@ input.ToolPicker {
   background-color: #e8eaf0;
   border-bottom: 1px solid #c0c4d0;
   padding: 5px 10px;
-  font-size: 10px;
+  font-size: 12px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -271,7 +268,7 @@ input.ToolPicker {
   width: 560px;
 }
 .footer-option-item {
-  font-size: 11px;
+  font-size: 12px;
   color: #6b7280;
   margin-bottom: 4px;
 }
@@ -331,7 +328,7 @@ body.dark-mode .header-image {
   border-right-color: #383d4a;
 }
 body.dark-mode .header-text p {
-  color: #c4cad8;
+  color: #8a92a8;
 }
 body.dark-mode .header-text u {
   color: #6ea0e0;
