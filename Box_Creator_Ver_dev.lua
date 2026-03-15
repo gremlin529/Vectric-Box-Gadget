@@ -1757,7 +1757,6 @@ function main(script_path)
 	options.allowance = 0.0                   --- allowance default 
   options.edge_margin = 0.75                 --- edge margin default
   options.warn_dovetail = true   -- show dovetail warning after create
-  options.high_dpi_mode = false       --- if true then use high dpi mode for dialog (if false use normal mode)
   options.dark_mode     = true        --- default to dark mode on
 	options.cut_dovetails = false
 	options.flat_lid = true
@@ -1984,7 +1983,6 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   dialog:AddDoubleField("EdgeField", options.edge_margin)
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
-  dialog:AddCheckBox("HighDPIMode", options.high_dpi_mode)
   dialog:AddCheckBox("DarkMode", options.dark_mode)
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
@@ -2271,9 +2269,6 @@ function OnLuaButton_AllJointWidths()
   return true
 end
 
-function OnLuaButton_HighDPIMode()  
-  return true
-end
 
 function OnLuaButton_DarkMode()
   return true
@@ -2313,7 +2308,6 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   end
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
-  options.high_dpi_mode = dialog:GetCheckBox("HighDPIMode")
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
@@ -2394,7 +2388,6 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
   registry:SetBool("WarnDovetail", options.warn_dovetail)
-  registry:SetBool("HighDPIMode", options.high_dpi_mode)
   registry:SetBool("DarkMode", options.dark_mode)
 
   if justwindowinfo then
@@ -2451,7 +2444,6 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
-  options.high_dpi_mode = registry:GetBool("HighDPIMode", false) 
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   

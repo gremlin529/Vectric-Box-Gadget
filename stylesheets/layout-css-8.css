@@ -169,11 +169,12 @@ body {
 .tool-bar-left {
   float: left;
   width: 580px;
+  line-height: 26px;
 }
 .tool-bar-right {
   float: left;
   width: 320px;
-  padding-top: 3px;
+  line-height: 26px;
   font-size: 12px;
   color: #6b7280;
 }
@@ -186,19 +187,23 @@ input.ToolPicker {
   font-weight: bold;
   padding: 4px 12px;
   cursor: pointer;
+  vertical-align: middle;
 }
 #ToolNameField {
   font-size: 12px;
-  color: #6b7280;
+  color: #374151;
   font-style: italic;
   margin-left: 8px;
+  vertical-align: middle;
 }
 .no-toolpath-label {
   font-size: 12px;
-  color: #6b7280;
+  color: #374151;
+  vertical-align: middle;
 }
 .no-toolpath-label input {
   margin-right: 4px;
+  vertical-align: middle;
 }
 
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
