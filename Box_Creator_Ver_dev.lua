@@ -1760,6 +1760,7 @@ function main(script_path)
   options.dark_mode     = true        --- default to dark mode on
 	options.cut_dovetails = false
 	options.flat_lid = true
+  options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
@@ -1939,7 +1940,9 @@ function main(script_path)
   -- so you can place extra details on them if you wish
 	AddCadListToJob(job, cdcontours, "Box")
   AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
-  AddPartsLabelsToJob(job, faces, "Box", options.thickness)
+  if options.label_faces then
+    AddPartsLabelsToJob(job, faces, "Box", options.thickness)
+  end
 
 		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
 		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
@@ -1984,6 +1987,7 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
   dialog:AddCheckBox("DarkMode", options.dark_mode)
+  dialog:AddCheckBox("LabelFaces", options.label_faces)
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
@@ -2274,6 +2278,10 @@ function OnLuaButton_DarkMode()
   return true
 end
 
+function OnLuaButton_LabelFaces()
+  return true
+end
+
 -- HTML checkbox id="NoToolpath" is marked class="LuaButton".
 -- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
 -- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
@@ -2309,6 +2317,7 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
+  options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
@@ -2389,6 +2398,7 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetDouble("WindowHeight", options.window_height)
   registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("DarkMode", options.dark_mode)
+  registry:SetBool("LabelFaces", options.label_faces)
 
   if justwindowinfo then
     return
@@ -2445,6 +2455,7 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
+  options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)

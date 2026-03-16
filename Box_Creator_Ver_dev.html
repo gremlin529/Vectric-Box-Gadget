@@ -171,11 +171,18 @@
       <button type="button" id="ButtonOK">OK</button>
     </div>
     <div class="footer-options">
-      <div class="footer-option-item">
-        <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
+      <div class="footer-options-col">
+        <div class="footer-option-item">
+          <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
+        </div>
+        <div class="footer-option-item">
+          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
+        </div>
       </div>
-      <div class="footer-option-item">
-        <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
+      <div class="footer-options-col">
+        <div class="footer-option-item">
+          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label face vectors</label>
+        </div>
       </div>
     </div>
     <div class="footer-cancel-button">
@@ -197,10 +204,10 @@
   function dpiToZoom() {
     var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
     
-    if (dpi >= 192) { return "200%"; }
-    if (dpi >= 168) { return "175%"; }
+    // if (dpi >= 192) { return "200%"; }
+    if (dpi >= 168) { return "200%"; }
     if (dpi >= 144) { return "150%"; }
-    if (dpi >= 120) { return "125%"; }
+    // if (dpi >= 120) { return "125%"; }
     return "100%";
   }
 
