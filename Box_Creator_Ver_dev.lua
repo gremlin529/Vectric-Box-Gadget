@@ -32,9 +32,10 @@
 -- require("mobdebug").start()
 
 g_version = "dev"                                                    -- Changed by Gremlin
+g_subVersion = "development"                                         -- Added by Gremlin
 g_title = "Box Creator"
-g_width = 1025
-g_height = 1100                                                      -- Changed by Sharkcutup
+g_width = 1020
+g_height = 900                                                    -- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
@@ -96,6 +97,7 @@ function CloneFace(face)
 	clone.dovetail_list = face.dovetail_list
 	clone.tabs = face.tabs
 	clone.is_lid = face.is_lid
+  clone.name = face.name
 	if (clone.is_lid) then
 		clone.inner_contour = face.inner_contour:Clone()
 	end
@@ -236,6 +238,255 @@ function AddCadListToJob(vectric_job, cad_list, layer_name)
 		obj, pos = cad_list:GetNext(pos)
 		layer:AddObject(obj:Clone(), true)
 	end
+end
+
+function GetFriendlyFaceLabel(face)
+   local lookup = { BottomFace = "BOTTOM", SideFace1 = "SIDE 1", SideFace2 = "SIDE 2", EndFace1 = "END 1", EndFace2 = "END 2", Lid = "LID" }
+  if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
+end
+
+  function GetFaceLabelHeight(face, thickness)
+    local box = face.contour.BoundingBox2D local min_dim = math.min(box.XLength, box.YLength)
+    local h = math.max(thickness * 0.35, min_dim * 0.08) h = math.min(h, min_dim * 0.16) if h < 0.20 then h = 0.20
+  end
+  return h 
+ end
+ 
+function GetFaceLabelPoint(face, text_height, label, ang)
+  local box = face.contour.BoundingBox2D
+
+  local cx = box.MinX + (0.5 * box.XLength)
+  local cy = box.MinY + (0.5 * box.YLength)
+
+  -- estimate label width for DrawWriter stick font
+  local est_width = string.len(label) * text_height * 0.75
+
+  if ang == 90.0 then
+    -- vertical text: shift downward by half estimated width
+    return Point2D(cx, cy - (est_width * 0.5))
+  else
+    -- horizontal text: shift left by half estimated width
+    return Point2D(cx - (est_width * 0.5), cy)
+  end
+end
+
+function GetFaceLabelAngle(face)
+  local box = face.contour.BoundingBox2D
+
+  if box.YLength > box.XLength then
+    return 90.0
+  end
+
+  return 0.0
+end
+
+function DrawWriter(what, where, size, lay, ang)
+  local group
+
+  local function Polar2D_Local(pt, ang2, dis)
+    return Point2D(
+      (pt.X + dis * math.cos(math.rad(ang2))),
+      (pt.Y + dis * math.sin(math.rad(ang2)))
+    )
+  end
+
+  local function MonoFont(job, pt, letter, scl, lay2, ang2)
+    scl = (scl * 0.5)
+
+    local pA0  = pt
+    local pA2  = Polar2D_Local(pt, ang2 + 90.0, 0.5000 * scl)
+    local pA3  = Polar2D_Local(pt, ang2 + 90.0, 0.7500 * scl)
+    local pA4  = Polar2D_Local(pt, ang2 + 90.0, 1.0000 * scl)
+    local pA5  = Polar2D_Local(pt, ang2 + 90.0, 1.2500 * scl)
+    local pA6  = Polar2D_Local(pt, ang2 + 90.0, 1.5000 * scl)
+    local pA8  = Polar2D_Local(pt, ang2 + 90.0, 2.0000 * scl)
+
+    local pB0  = Polar2D_Local(pt, ang2 + 0.0, 0.2500 * scl)
+    local pB3  = Polar2D_Local(pt, ang2 + 71.5651, 0.7906 * scl)
+    local pB4  = Polar2D_Local(pt, ang2 + 75.9638, 1.0308 * scl)
+    local pB8  = Polar2D_Local(pt, ang2 + 82.8750, 2.0156 * scl)
+
+    local pC0  = Polar2D_Local(pt, ang2 + 0.0, 0.5000 * scl)
+    local pC8  = Polar2D_Local(pt, ang2 + 75.9640, 2.0616 * scl)
+
+    local pD0  = Polar2D_Local(pt, ang2 + 0.0, 0.6250 * scl)
+    local pD4  = Polar2D_Local(pt, ang2 + 57.9946, 1.1792 * scl)
+    local pD8  = Polar2D_Local(pt, ang2 + 72.6460, 2.0954 * scl)
+
+    local pE0  = Polar2D_Local(pt, ang2 + 0.0, 0.7500 * scl)
+    local pE2  = Polar2D_Local(pt, ang2 + 33.6901, 0.9014 * scl)
+    local pE3  = Polar2D_Local(pt, ang2 + 45.0000, 1.0607 * scl)
+
+    local pF0  = Polar2D_Local(pt, ang2 + 0.0, 1.0000 * scl)
+    local pF3  = Polar2D_Local(pt, ang2 + 36.8699, 1.2500 * scl)
+    local pF4  = Polar2D_Local(pt, ang2 + 45.0000, 1.4142 * scl)
+    local pF8  = Polar2D_Local(pt, ang2 + 63.4349, 2.2361 * scl)
+
+    local pG0  = Polar2D_Local(pt, ang2 + 0.0, 1.2500 * scl)
+    local pG1  = Polar2D_Local(pt, ang2 + 11.3099, 1.2748 * scl)
+    local pG2  = Polar2D_Local(pt, ang2 + 21.8014, 1.3463 * scl)
+    local pG3  = Polar2D_Local(pt, ang2 + 30.9638, 1.4577 * scl)
+    local pG4  = Polar2D_Local(pt, ang2 + 38.6598, 1.6008 * scl)
+    local pG5  = Polar2D_Local(pt, ang2 + 45.0000, 1.7678 * scl)
+    local pG6  = Polar2D_Local(pt, ang2 + 50.1944, 1.9526 * scl)
+    local pG7  = Polar2D_Local(pt, ang2 + 54.4623, 2.1506 * scl)
+    local pG8  = Polar2D_Local(pt, ang2 + 57.9946, 2.3585 * scl)
+
+    local pH0  = Polar2D_Local(pt, ang2 + 0.0, 1.5000 * scl)
+
+    local function AddLine(a, b)
+      local c = Contour(0.0)
+      c:AppendPoint(a)
+      c:LineTo(b)
+      group:AddTail(c)
+    end
+
+    local function AddPoly(points)
+      local c = Contour(0.0)
+      c:AppendPoint(points[1])
+      for ii = 2, #points do
+        c:LineTo(points[ii])
+      end
+      group:AddTail(c)
+    end
+
+    if letter == 32 then
+      return pH0
+
+    elseif letter == 45 then
+      AddLine(pA4, pG4)
+      return pH0
+
+    elseif letter == 46 then
+      AddPoly({pA2, pB0, pC0, pD0, pA2})
+      return pD0
+
+    elseif letter == 48 then
+      AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+      return pH0
+
+    elseif letter == 49 then
+      AddLine(pD8, pD0)
+      return pH0
+
+    elseif letter == 50 then
+      AddPoly({pA6, pA8, pF8, pG6, pA0, pG0})
+      return pH0
+
+    elseif letter == 65 or letter == 97 then
+      AddPoly({pA0, pD8, pG0, pF3, pB3, pA0})
+      return pH0
+
+    elseif letter == 66 or letter == 98 then
+      AddPoly({pA0, pA8, pF8, pG7, pG5, pF4, pG3, pG1, pF0, pA0})
+      return pH0
+
+    elseif letter == 68 or letter == 100 then
+      AddPoly({pA0, pA8, pF8, pG6, pG2, pF0, pA0})
+      return pH0
+
+    elseif letter == 69 or letter == 101 then
+      AddPoly({pG0, pA0, pA8, pF8})
+      AddLine(pA4, pD4)
+      return pH0
+
+    elseif letter == 73 or letter == 105 then
+      AddLine(pD0, pD8)
+      return pE0
+
+    elseif letter == 76 or letter == 108 then
+      AddPoly({pA8, pA0, pG0})
+      return pH0
+
+    elseif letter == 77 or letter == 109 then
+      AddPoly({pA0, pA8, pD4, pG8, pG0})
+      return pH0
+
+    elseif letter == 78 or letter == 110 then
+      AddPoly({pA0, pA8, pG0, pG8})
+      return pH0
+
+    elseif letter == 79 or letter == 111 then
+      AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+      return pH0
+
+    elseif letter == 83 or letter == 115 then
+      AddPoly({pG5, pG6, pF8, pB8, pA6, pA5, pG3, pG2, pF0, pB0, pA2, pA3})
+      return pH0
+
+    elseif letter == 84 or letter == 116 then
+      AddLine(pA8, pG8)
+      AddLine(pD8, pD0)
+      return pH0
+
+    elseif letter == 88 or letter == 120 then
+      AddLine(pA0, pG8)
+      AddLine(pA8, pG0)
+      return pH0
+
+    else
+      -- simple fallback box for unsupported characters
+      AddPoly({pA0, pA8, pG8, pG0, pA0})
+      return pH0
+    end
+  end
+
+  local function AddGroupToJob_Local(job, group2, layer_name)
+    local cad_object = CreateCadGroup(group2)
+    local layer = job.LayerManager:GetLayerWithName(layer_name)
+    layer:AddObject(cad_object, true)
+    return cad_object
+  end
+
+  local job = VectricJob()
+  if not job.Exists then
+    DisplayMessageBox("Error in DrawWriter: No job loaded")
+    return false
+  end
+
+  local strlen = string.len(what)
+  local i = 1
+  local ptx = where
+  group = ContourGroup(true)
+
+  while i <= strlen do
+    local ch = string.byte(string.sub(what, i, i))
+    if (ch >= 97) and (ch <= 122) then
+      ptx = MonoFont(job, ptx, ch, (size * 0.75), lay, ang)
+      ptx = Polar2D_Local(ptx, ang, size * 0.05)
+    else
+      ptx = MonoFont(job, ptx, ch, size, lay, ang)
+      ptx = Polar2D_Local(ptx, ang, size * 0.07)
+    end
+    i = i + 1
+  end
+
+  AddGroupToJob_Local(job, group, lay)
+  return true
+end
+
+function AddPartsLabelsToJob(job, faces, layer_name, thickness)
+  if not job or not faces or #faces == 0 then
+    return false
+  end
+
+  local layer = job.LayerManager:GetLayerWithName(layer_name)
+  if not layer then
+    DisplayMessageBox("Unable to find label layer: " .. tostring(layer_name))
+    return false
+  end
+
+  for i = 1, #faces do
+    local face = faces[i]
+    local label = GetFriendlyFaceLabel(face)
+    local text_height = GetFaceLabelHeight(face, thickness)
+    local ang = GetFaceLabelAngle(face)
+    local pt = GetFaceLabelPoint(face, text_height, label, ang)
+
+    DrawWriter(label, pt, text_height, layer_name, ang)
+  end
+
+  return true
 end
 
 --[[  -------------- MakeBottomFace --------------------------------------------------  
@@ -1489,8 +1740,8 @@ function main(script_path)
        return false
     end
  
- ------------------------------------------- Geometry Options Default Settings ----------------------------------------------------------
- ------------------------------ Added this blocked off and the line descriptions by Sharkcutup
+ ----------------------- Geometry Options Default Settings --------------------------------
+ ------------- Added this blocked off and the line descriptions by Sharkcutup -------------
  
 	local options = {}
 	options.width = 18                        --- width  default               
@@ -1502,13 +1753,14 @@ function main(script_path)
   options.tabwidthbottom = 1.0              --- joint width for the bottom (as a separate value)   
   options.tabwidthTop = 1.0                 --- joint width for the top (as a separate value)
   options.allJointWidths = false         --- show all joint width options (if false then only show one joint width option and use it for all joints)
-  options.cut_layer_name  = "CutOut"        --- layer name default          
+  options.cut_layer_name  = "CutOut"        --- layer name default
 	options.allowance = 0.0                   --- allowance default 
   options.edge_margin = 0.75                 --- edge margin default
   options.warn_dovetail = true   -- show dovetail warning after create
-  options.high_dpi_mode = false       --- if true then use high dpi mode for dialog (if false use normal mode)
+  options.dark_mode     = true        --- default to dark mode on
 	options.cut_dovetails = false
 	options.flat_lid = true
+  options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
@@ -1570,13 +1822,6 @@ function main(script_path)
   topdovetail.start_z = mtl_block:CalcAbsoluteZFromDepth(0)
   topdovetail.start_depth = 0
   topdovetail.cut_z = mtl_block:CalcAbsoluteZFromDepth(options.thickness) 
-
-  -- if we're using the same joint width for all joints then set the bottom and top dovetail widths to be the same as the side dovetail width 
-  -- so we only have to use one value in the dialog
-  if not options.allJointWidths then
-    bottomdovetail.min_width = sidedovetail.min_width 
-    topdovetail.min_width = sidedovetail.min_width
-  end
 
 -- Make the bottom face
 	local cad_list = CadObjectList(true)
@@ -1694,12 +1939,13 @@ function main(script_path)
   -- These extra vectors represent the actual output
   -- so you can place extra details on them if you wish
 	AddCadListToJob(job, cdcontours, "Box")
-	AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
+  AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
+  if options.label_faces then
+    AddPartsLabelsToJob(job, faces, "Box", options.thickness)
+  end
 
-	if options.make_lid then
-		if options.flat_lid then 
-			CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets" )
-		end
+		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
+		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
 	end
 
   if not options.no_toolpath then
@@ -1712,7 +1958,7 @@ function main(script_path)
     CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sidetabwidth, options.cut_layer_name)
   end
 
-	SaveDefaults(options)
+	SaveDefaults(options, false)
 	job:Refresh2DView()
 	return true
 
@@ -1721,7 +1967,7 @@ end
 -- Gremlin added bottomdovetail seperation from side which is just sidedovetail 
 function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
 	local html_path = "file:" .. script_path .. "\\" .. g_html_file
-	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s", g_title, g_version))
+	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
   
 
 	dialog:AddLabelField("GadgetTitle", g_title)
@@ -1740,7 +1986,8 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   dialog:AddDoubleField("EdgeField", options.edge_margin)
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
-  dialog:AddCheckBox("HighDPIMode", options.high_dpi_mode)
+  dialog:AddCheckBox("DarkMode", options.dark_mode)
+  dialog:AddCheckBox("LabelFaces", options.label_faces)
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
@@ -1836,11 +2083,20 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomdovetail.min_width)
 
     if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      if (not options.allJointWidths) then
+        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      else
+        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+      end
       return false
     end
+
     if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-      DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      if (not options.allJointWidths) then
+        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      else
+        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      end
       return false
     end
 
@@ -1849,13 +2105,16 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local num_flaps_d_top = math.floor((0.5*inner_depth) / topdovetail.min_width)
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*topdovetail.min_width)
 
-    if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", topdovetail.min_width, inner_width))
-      return false
-    end
-    if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
-      DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", topdovetail.min_width, inner_depth)) 
-      return false
+    -- don't check top joint widths if we are doing a flat lid since those joints won't exist in that case  
+    if not options.flat_lid then    
+      if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", topdovetail.min_width, inner_width))
+        return false
+      end
+      if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", topdovetail.min_width, inner_depth)) 
+        return false
+      end
     end
 
     local num_flaps_h = math.floor((0.5*inner_height) / sidedovetail.min_width)
@@ -1943,6 +2202,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local success = dialog:ShowDialog()
 
     if not success then
+      ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
+      SaveDefaults(options, true) -- the user hit cancel but save the window settings anyways
       return false
     end
   else  
@@ -1956,6 +2217,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
   end
 
   -- Gremlin added joint width seperation
+  -- this is actually getting called twice, once here and once in the
+  -- validator logic, is that correct?
   ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
 
 	return true
@@ -2010,7 +2273,12 @@ function OnLuaButton_AllJointWidths()
   return true
 end
 
-function OnLuaButton_HighDPIMode()  
+
+function OnLuaButton_DarkMode()
+  return true
+end
+
+function OnLuaButton_LabelFaces()
   return true
 end
 
@@ -2022,19 +2290,24 @@ function OnLuaButton_NoToolpath()
 end
 
 -- Gremlin added joint width seperation for sides top and bottom
-function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
+function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   -- Read back data from the form
   options.width     = dialog:GetDoubleField("WidthField")
   options.depth     = dialog:GetDoubleField("DepthField")
   options.height    = dialog:GetDoubleField("HeightField")
   options.sidetabwidth  = dialog:GetDoubleField("SideTabWidthField")
-  dovetail.min_width = options.sidetabwidth
+  sidedovetail.min_width = options.sidetabwidth
   -- Gremlin added joint width seperation for sides top and bottom
   options.allJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomtabwidth = dialog:GetDoubleField("BottomTabWidthField")
   options.toptabwidth = dialog:GetDoubleField("TopTabWidthField")
-  bottomdovetail.min_width = options.bottomtabwidth
-  topdovetail.min_width = options.toptabwidth
+  if not options.allJointWidths then
+    bottomdovetail.min_width = sidedovetail.min_width
+    topdovetail.min_width = sidedovetail.min_width
+  else
+    bottomdovetail.min_width = options.bottomtabwidth
+    topdovetail.min_width = options.toptabwidth
+  end 
 
   options.allowance   = dialog:GetDoubleField("AllowanceField")
   options.edge_margin = dialog:GetDoubleField("EdgeField")
@@ -2043,7 +2316,8 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   end
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
-  options.high_dpi_mode = dialog:GetCheckBox("HighDPIMode")
+  options.dark_mode     = dialog:GetCheckBox("DarkMode")
+  options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
@@ -2053,9 +2327,9 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.make_end2     = dialog:GetCheckBox("MakeEnd2")
   
 
-  -- dovetail.angle = dialog:GetDoubleField("DovetailAngleField")
-  dovetail.max_width = dovetail.min_width + (2 * options.thickness / math.tan(dovetail.angle))
-  -- Gremlin added bottomdovetail seperation from side which is just dovetail
+  -- sidedovetail.angle = dialog:GetDoubleField("DovetailAngleField")
+  sidedovetail.max_width = sidedovetail.min_width + (2 * options.thickness / math.tan(sidedovetail.angle))
+  -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
   bottomdovetail.max_width = bottomdovetail.min_width + (2* options.thickness/ math.tan(bottomdovetail.angle))
   topdovetail.max_width = topdovetail.min_width + (2 * options.thickness / math.tan(topdovetail.angle))
 
@@ -2117,10 +2391,18 @@ function ReadOptions(dialog, options, dovetail, bottomdovetail, topdovetail)
   options.window_height = dialog.WindowHeight
 end
 
-function SaveDefaults(options)
+function SaveDefaults(options, justwindowinfo)
   local registry = Registry("BoxCreator_" .. g_version)
+
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
+  registry:SetBool("WarnDovetail", options.warn_dovetail)
+  registry:SetBool("DarkMode", options.dark_mode)
+  registry:SetBool("LabelFaces", options.label_faces)
+
+  if justwindowinfo then
+    return
+  end
 
   registry:SetDouble("Width", options.width)
   registry:SetDouble("Height", options.height)
@@ -2137,8 +2419,6 @@ function SaveDefaults(options)
    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
 
-  registry:SetBool("WarnDovetail", options.warn_dovetail)
-  registry:SetBool("HighDPIMode", options.high_dpi_mode)
   registry:SetBool("NoToolpath", options.no_toolpath)
 
   registry:SetBool("MakeLid", options.make_lid)
@@ -2150,7 +2430,7 @@ function SaveDefaults(options)
 
 end
 
--- Gremlin added bottomdovetail seperation from side which is just dovetail
+-- Gremlin added bottomdovetail separation from side which is just dovetail
 function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   local registry =  Registry("BoxCreator_" .. g_version)
 
@@ -2163,8 +2443,8 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.sidetabwidth = registry:GetDouble("JointWidth", options.sidetabwidth)
   options.bottomtabwidth = registry:GetDouble("BottomJointWidth", options.sidetabwidth)  --Added by Gremlin
   options.toptabwidth = registry:GetDouble("TopJointWidth", options.sidetabwidth)      --Added by Gremlin
-  options.allJointWidths = registry:GetBool("AllJointWidths", options.allJointWidths)           -- Added by Gremlin
-  options.allowance = registry:GetDouble("Allowance", options.allowance)     -- Added by Sharkcutup
+  options.allJointWidths = registry:GetBool("AllJointWidths", options.allJointWidths)  -- Added by Gremlin
+  options.allowance = registry:GetDouble("Allowance", options.allowance)           -- Added by Sharkcutup
   options.edge_margin = registry:GetDouble("EdgeMargin", options.edge_margin)      -- Added by Sherkcutup
   sidedovetail.min_width = options.sidetabwidth
   bottomdovetail.min_width = options.bottomtabwidth -- Added by Gremlin
@@ -2174,9 +2454,10 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
-  options.high_dpi_mode = registry:GetBool("HighDPIMode", false) 
+  options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
+  options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
-
+  
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)
   options.make_bottom = registry:GetBool("MakeBottom", options.make_bottom)
   options.make_side1 = registry:GetBool("MakeSide1", options.make_side1)

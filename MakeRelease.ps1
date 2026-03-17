@@ -1,6 +1,7 @@
 # PowerShell Script: Update g_version and Create Release ZIP
 param (
-    $version = $null
+    $version = $null,
+    $subversion = $null
 )
 
 Write-Host ""
@@ -12,10 +13,18 @@ if ($version) {
 else {
     # Prompt user for new version
     $version = Read-Host "Enter the new version (e.g., 5.7)"
-    if (-not $newVersion -match '^\d+(\.\d+)*$') {
+    if (-not $version -match '^\d+(\.\d+)*$') {
         Write-Error "Invalid version format. Use numbers and dots only (e.g., 5.7, 6.0.1)."
         exit 1
     }
+}
+
+if ($subversion) {
+    Write-Host "Subversion provided as argument: $subversion"
+}
+else {
+    # Prompt user for subversion string - this is optional, press Enter to leave empty
+    $subversion = Read-Host "Enter the subversion string, or press Enter to leave empty (e.g., beta1, rc2)"
 }
 
 # Files to include in the release ZIP (relative or absolute paths)
@@ -32,28 +41,35 @@ $releaseDir = "release"
 function UpdateVersionInLuaFile {
     param (
         [string]$filePath,
-        [string]$version
+        [string]$version,
+        [string]$subversion
     )       
 
-    #Read file content
+    # Read file content
     $content = Get-Content -Path $filePath -Raw
 
-    # Pattern match to g_version="dev" including white space and trailing characters
-    $pattern = 'g_version\s*=\s*"\s*dev\s*"'
-
-    if ($content -match $pattern) {
-        # Replace with new version
-        $updatedContent = $content -replace $pattern, "g_version=`"$version`""
-
-        # Write updated content back to file
-        Set-Content -Path $filePath -Value $updatedContent 
-
-        Write-Host "Version updated to $version in '$filePath'."
+    # Replace g_version = "dev"
+    $versionPattern = 'g_version\s*=\s*"\s*dev\s*"'
+    if ($content -match $versionPattern) {
+        $content = $content -replace $versionPattern, "g_version=`"$version`""
+        Write-Host "g_version updated to '$version' in '$filePath'."
     } else {
         Write-Warning "No matching g_version line found in '$filePath'. Version not updated."
         Write-Warning "Release Not Created"
         exit 1
     }
+
+    # Replace g_subVersion = "..." with the new subversion string
+    $subVersionPattern = 'g_subVersion\s*=\s*"[^"]*"'
+    if ($content -match $subVersionPattern) {
+        $content = $content -replace $subVersionPattern, "g_subVersion=`"$subversion`""
+        Write-Host "g_subVersion updated to '$subversion' in '$filePath'."
+    } else {
+        Write-Warning "No matching g_subVersion line found in '$filePath'. Subversion not updated."
+    }
+
+    # Write updated content back to file
+    Set-Content -Path $filePath -Value $content
 }
 
 try {
@@ -92,7 +108,7 @@ try {
     $luaFileInRelease = Join-Path $versionDir "Box_Creator_Ver_dev.lua"
     Write-Host "Updating version in '$luaFileInRelease' file in release directory to '$version'..."
     if (Test-Path $luaFileInRelease) {  
-        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version
+        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion
     }
     else {
         Write-Warning "Lua file not found in release directory: $luaFileInRelease (skipping version update)"
