@@ -58,16 +58,16 @@
           </div>
           <div class="field-row">
             <label for="SideTabWidthField">Side Joint Width:</label>
-            <input type="email" id="SideTabWidthField" placeholder="Width of Joint" />
+            <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
           <div id="showHideTopBottomJoints" style="display:none;">
             <div class="field-row">
               <label for="BottomTabWidthField">Bottom Joint Width:</label>
-              <input type="email" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
+              <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid Joint Width:</label>
-              <input type="email" id="TopTabWidthField" placeholder="Width of Lid Joint" />
+              <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
         </div>
@@ -79,11 +79,11 @@
           <div class="sub-panel-title">Machining</div>
           <div class="field-row">
             <label for="AllowanceField">Allowance:</label>
-            <input type="email" id="AllowanceField" placeholder="Allowance" />
+            <input type="text" id="AllowanceField" placeholder="Allowance" />
           </div>
           <div class="field-row">
             <label for="EdgeField">Clamping Margin:</label>
-            <input type="email" id="EdgeField" placeholder="Clamping Margin" />
+            <input type="text" id="EdgeField" placeholder="Clamping Margin" />
           </div>
         </div>
       </div>
@@ -171,18 +171,11 @@
       <button type="button" id="ButtonOK">OK</button>
     </div>
     <div class="footer-options">
-      <div class="footer-options-col">
-        <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
-        </div>
-        <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
-        </div>
+      <div class="footer-option-item">
+        <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
       </div>
-      <div class="footer-options-col">
-        <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label face vectors</label>
-        </div>
+      <div class="footer-option-item">
+        <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
       </div>
     </div>
     <div class="footer-cancel-button">
@@ -199,28 +192,48 @@
 
 <script type="text/javascript">
 
-  // Returns CSS zoom level based on physical screen DPI (IE-specific property).
-  // Boundaries: <120=100%, 120=125%, 144=150%, 168=175%, 192+=200%
-  function dpiToZoom() {
+  function getZoomScale() {
     var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
-    
-    // if (dpi >= 192) { return "200%"; }
-    if (dpi >= 168) { return "200%"; }
-    if (dpi >= 144) { return "150%"; }
-    // if (dpi >= 120) { return "125%"; }
-    return "100%";
+    var scale = dpi / 96;
+
+    if (scale < 1.0) { scale = 1.0; }
+    if (scale > 1.20) { scale = 1.20; }
+
+    return scale;
   }
 
-  // Applies or removes dark mode by toggling the dark-mode class on body.
-  function onDarkModeChanged(checkbox) {
-    if (checkbox.checked) {
-      document.body.className = document.body.className + " dark-mode";
-    } else {
-      document.body.className = document.body.className.replace(" dark-mode", "").replace("dark-mode", "");
+  function hasClass(el, name) {
+    return new RegExp("(^|\\s)" + name + "(\\s|$)").test(el.className);
+  }
+
+  function addClass(el, name) {
+    if (!hasClass(el, name)) {
+      el.className = el.className ? (el.className + " " + name) : name;
     }
   }
 
-  // Hides the Lid Joint Width field when Flat Lid is selected (no joint needed).
+  function removeClass(el, name) {
+    el.className = el.className
+      .replace(new RegExp("(^|\\s)" + name + "(\\s|$)", "g"), " ")
+      .replace(/\s+/g, " ")
+      .replace(/^\s+|\s+$/g, "");
+  }
+
+  function applyScale() {
+    var wrapper = document.getElementById("page-wrapper");
+    if (wrapper) {
+      wrapper.style.zoom = getZoomScale();
+    }
+  }
+
+  function onDarkModeChanged(checkbox) {
+    if (checkbox.checked) {
+      addClass(document.body, "dark-mode");
+    } else {
+      removeClass(document.body, "dark-mode");
+    }
+  }
+
   function onLidTypeChanged(radio) {
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) {
@@ -228,28 +241,30 @@
     }
   }
 
-  // Shows or hides the Bottom and Lid joint width fields.
   function onShowAllWidthsChanged(checkbox) {
     var el = document.getElementById("showHideTopBottomJoints");
-    if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
+    if (el) {
+      el.style.display = checkbox.checked ? "block" : "none";
+    }
   }
 
-  // On load: apply DPI zoom, then restore saved state from Lua registry.
   setTimeout(function() {
-    document.body.style.zoom = dpiToZoom();
+    applyScale();
 
-    // Dark mode: Lua registry restores the checkbox state. If it has never been
-    // saved (first run), the checkbox will be unchecked - we default to dark on.
     var darkMode = document.getElementById("DarkMode");
     if (darkMode) {
       onDarkModeChanged(darkMode);
     }
 
     var lid1 = document.getElementById("LidTypeRadio1");
-    if (lid1) { onLidTypeChanged(lid1); }
+    if (lid1) {
+      onLidTypeChanged(lid1);
+    }
 
     var allWidths = document.getElementById("AllJointWidths");
-    if (allWidths) { onShowAllWidthsChanged(allWidths); }
+    if (allWidths) {
+      onShowAllWidthsChanged(allWidths);
+    }
   }, 100);
 
 </script>

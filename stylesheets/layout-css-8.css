@@ -14,9 +14,10 @@ body {
 }
 
 #page-wrapper {
-  width: 940px;
+  width: 1020px;
   margin: 0 auto;
   padding: 10px;
+  min-width: 1080px;
 }
 
 /* IE7 clearfix: zoom triggers hasLayout, :after clears floats in other browsers */
@@ -62,7 +63,7 @@ body {
 /* ── Header banner ────────────────────────────────────────────────── */
 .header-image {
   float: left;
-  width: 200px;
+  width: 220px;
   background-color: #f2f4f8;
   border-right: 1px solid #d0d4de;
   padding: 10px;
@@ -74,7 +75,7 @@ body {
 }
 .header-text {
   float: left;
-  width: 658px;
+  width: 806px;
   padding: 10px 14px;
 }
 .header-text p {
@@ -95,13 +96,13 @@ body {
 /* ── Geometry columns ─────────────────────────────────────────────── */
 .geometry-column {
   float: left;
-  width: 295px;
+  width: 340px;
   margin-right: 10px;
   margin-bottom: 10px;
 }
 .geometry-column-last {
   float: left;
-  width: 295px;
+  width: 340px;
   margin-bottom: 10px;
 }
 
@@ -124,6 +125,7 @@ body {
   background-color: #ffffff;
   color: #1a1f2e;
   padding: 3px 5px;
+  box-sizing: border-box;
 }
 
 /* ── Checkbox + label row ─────────────────────────────────────────── */
@@ -148,7 +150,7 @@ body {
 }
 .face-checkbox {
   float: left;
-  margin-right: 10px;
+  margin-right: 16px;
   margin-bottom: 4px;
   font-size: 12px;
   font-weight: bold;
@@ -168,12 +170,12 @@ body {
 }
 .tool-bar-left {
   float: left;
-  width: 580px;
+  width: 690px;
   line-height: 26px;
 }
 .tool-bar-right {
   float: left;
-  width: 320px;
+  width: 350px;
   line-height: 26px;
   font-size: 12px;
   color: #6b7280;
@@ -209,12 +211,12 @@ input.ToolPicker {
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 460px;
+  width: 530px;
   margin-right: 10px;
 }
 .type-column-last {
   float: left;
-  width: 460px;
+  width: 530px;
 }
 .type-panel {
   background-color: #ffffff;
@@ -239,7 +241,7 @@ input.ToolPicker {
 }
 .type-option-radio {
   float: left;
-  width: 200px;
+  width: 250px;
   padding-top: 8px;
   font-size: 12px;
   font-weight: bold;
@@ -255,6 +257,7 @@ input.ToolPicker {
   height: 40px;
   width: auto;
   display: block;
+  max-width: 240px;
 }
 
 /* ── Footer bar ───────────────────────────────────────────────────── */
@@ -265,21 +268,16 @@ input.ToolPicker {
 }
 .footer-ok-button {
   float: left;
-  margin-right: 14px;
-  padding-top: 8px;
+  margin-right: 18px;
 }
 .footer-options {
   float: left;
   padding-top: 4px;
-  width: 560px;
-}
-.footer-options-col {
-  float: left;
-  width: 270px;
+  width: 700px;
 }
 .footer-option-item {
   font-size: 12px;
-  color: #374151;
+  color: #6b7280;
   margin-bottom: 4px;
 }
 .footer-option-item input {
@@ -287,7 +285,6 @@ input.ToolPicker {
 }
 .footer-cancel-button {
   float: right;
-  padding-top: 8px;
 }
 
 /* ── OK / Cancel buttons ──────────────────────────────────────────── */

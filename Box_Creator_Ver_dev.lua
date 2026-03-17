@@ -31,11 +31,15 @@
 
 -- require("mobdebug").start()
 
-g_version = "dev"                                                    -- Changed by Gremlin
-g_subVersion = "development"                                         -- Added by Gremlin
+g_version="dev"                                                    -- Changed by Gremlin
+g_subVersion="Alpha 3"                                         -- Added by Gremlin
 g_title = "Box Creator"
-g_width = 1020
-g_height = 900                                                    -- Changed by Sharkcutup
+
+-- Dialog window size tuned to prevent footer clipping in the HTML layout
+-- Smaller widths may hide the Cancel button in some DPI environments.
+g_width = 1400
+g_height = 1180 
+-- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
@@ -246,11 +250,18 @@ function GetFriendlyFaceLabel(face)
 end
 
   function GetFaceLabelHeight(face, thickness)
-    local box = face.contour.BoundingBox2D local min_dim = math.min(box.XLength, box.YLength)
-    local h = math.max(thickness * 0.35, min_dim * 0.08) h = math.min(h, min_dim * 0.16) if h < 0.20 then h = 0.20
+  local box = face.contour.BoundingBox2D
+  local min_dim = math.min(box.XLength, box.YLength)
+
+  local h = math.max(thickness * 0.35, min_dim * 0.08)
+  h = math.min(h, min_dim * 0.16)
+
+  if h < 0.20 then
+    h = 0.20
   end
-  return h 
- end
+
+  return h
+end
  
 function GetFaceLabelPoint(face, text_height, label, ang)
   local box = face.contour.BoundingBox2D
@@ -1760,7 +1771,6 @@ function main(script_path)
   options.dark_mode     = true        --- default to dark mode on
 	options.cut_dovetails = false
 	options.flat_lid = true
-  options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
@@ -1940,9 +1950,7 @@ function main(script_path)
   -- so you can place extra details on them if you wish
 	AddCadListToJob(job, cdcontours, "Box")
   AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
-  if options.label_faces then
-    AddPartsLabelsToJob(job, faces, "Box", options.thickness)
-  end
+  AddPartsLabelsToJob(job, faces, "Box", options.thickness)
 
 		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
 		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
@@ -1987,7 +1995,6 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
   dialog:AddCheckBox("DarkMode", options.dark_mode)
-  dialog:AddCheckBox("LabelFaces", options.label_faces)
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
@@ -2278,10 +2285,6 @@ function OnLuaButton_DarkMode()
   return true
 end
 
-function OnLuaButton_LabelFaces()
-  return true
-end
-
 -- HTML checkbox id="NoToolpath" is marked class="LuaButton".
 -- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
 -- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
@@ -2317,7 +2320,6 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
 
   options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
-  options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.make_lid      = dialog:GetCheckBox("MakeLid")
   options.make_bottom   = dialog:GetCheckBox("MakeBottom")
@@ -2354,33 +2356,44 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   -- NEW: clamp Joint Width (SideTabWidthField) to
   --      max(existing_width, calculated_min_for_tool)
   ------------------------------------------------------------------
-  if _tool_ok(options.tool) then
+    if _tool_ok(options.tool) then
     local mtl_block = MaterialBlock()
-    local raw_dia   = ConvertUnitsFrom(options.tool.ToolDia or 0, options.tool, mtl_block)
+    local raw_dia = ConvertUnitsFrom(options.tool.ToolDia or 0, options.tool, mtl_block)
 
-    -- Apply Allowance the same way as in your validator
+    -- Apply allowance the same way as in the validator
     local effective_dia = raw_dia
     if options.allowance and options.allowance > 0 then
-      effective_dia = effective_dia - 2 * options.allowance
+      effective_dia = effective_dia - (2 * options.allowance)
       if effective_dia < 0 then
         effective_dia = 0
       end
     end
 
-    -- This is the "calculated minimum" joint width for this tool
+    -- Minimum practical joint width based on selected tool
     local calculated_min = effective_dia
 
     if calculated_min and calculated_min > 0 then
-      local current_width = options.sidetabwidth or dovetail.min_width
-      local new_width     = math.max(current_width, calculated_min)
+      local current_width = options.sidetabwidth or sidedovetail.min_width
+      local new_width = math.max(current_width, calculated_min)
 
       if new_width ~= current_width then
-        options.sidetabwidth   = new_width
-        dovetail.min_width = new_width
+        options.sidetabwidth = new_width
+        sidedovetail.min_width = new_width
 
-        -- Push it back into the dialog so user sees the update
+        -- If user is NOT using separate joint widths, keep top/bottom tied to side width
+        if not options.allJointWidths then
+          bottomdovetail.min_width = new_width
+          topdovetail.min_width = new_width
+        end
+
+        -- Push it back into the dialog so the user sees the update
         if dialog.SetDoubleField ~= nil then
           dialog:SetDoubleField("SideTabWidthField", new_width)
+
+          if not options.allJointWidths then
+            dialog:SetDoubleField("BottomTabWidthField", new_width)
+            dialog:SetDoubleField("TopTabWidthField", new_width)
+          end
         end
       end
     end
@@ -2398,7 +2411,6 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetDouble("WindowHeight", options.window_height)
   registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("DarkMode", options.dark_mode)
-  registry:SetBool("LabelFaces", options.label_faces)
 
   if justwindowinfo then
     return
@@ -2437,6 +2449,15 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
 
+-- Never allow saved window size to shrink below the intended base layout size
+  if (not options.window_width) or (options.window_width < g_width) then
+    options.window_width = g_width
+  end
+
+  if (not options.window_height) or (options.window_height < g_height) then
+    options.window_height = g_height
+  end
+
   options.width = registry:GetDouble("Width", options.width)
   options.height = registry:GetDouble("Height", options.height)
   options.depth = registry:GetDouble("Depth", options.depth)
@@ -2455,7 +2476,6 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
-  options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   
   options.make_lid = registry:GetBool("MakeLid", options.make_lid)
