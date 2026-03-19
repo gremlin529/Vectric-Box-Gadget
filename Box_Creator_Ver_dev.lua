@@ -2371,12 +2371,12 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     local calculated_min = effective_dia
 
     if calculated_min and calculated_min > 0 then
-      local current_width = options.sidetabwidth or dovetail.min_width
+      local current_width = options.sidetabwidth or sidedovetail.min_width
       local new_width     = math.max(current_width, calculated_min)
 
       if new_width ~= current_width then
         options.sidetabwidth   = new_width
-        dovetail.min_width = new_width
+        sidedovetail.min_width = new_width
 
         -- Push it back into the dialog so user sees the update
         if dialog.SetDoubleField ~= nil then
