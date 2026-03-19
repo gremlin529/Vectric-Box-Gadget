@@ -14,7 +14,7 @@ body {
 }
 
 #page-wrapper {
-  width: 940px;
+  width: 800px;
   margin: 0 auto;
   padding: 10px;
 }
@@ -62,19 +62,19 @@ body {
 /* ── Header banner ────────────────────────────────────────────────── */
 .header-image {
   float: left;
-  width: 200px;
+  width: 170px;
   background-color: #f2f4f8;
   border-right: 1px solid #d0d4de;
   padding: 10px;
   text-align: center;
 }
 .header-image img {
-  max-width: 200px;
+  max-width: 170px;
   height: auto;
 }
 .header-text {
   float: left;
-  width: 658px;
+  width: 558px;
   padding: 10px 14px;
 }
 .header-text p {
@@ -95,13 +95,13 @@ body {
 /* ── Geometry columns ─────────────────────────────────────────────── */
 .geometry-column {
   float: left;
-  width: 295px;
+  width: 245px;
   margin-right: 10px;
   margin-bottom: 10px;
 }
 .geometry-column-last {
   float: left;
-  width: 295px;
+  width: 245px;
   margin-bottom: 10px;
 }
 
@@ -168,12 +168,12 @@ body {
 }
 .tool-bar-left {
   float: left;
-  width: 580px;
+  width: 490px;
   line-height: 26px;
 }
 .tool-bar-right {
   float: left;
-  width: 320px;
+  width: 225px;
   line-height: 26px;
   font-size: 12px;
   color: #6b7280;
@@ -209,12 +209,12 @@ input.ToolPicker {
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 460px;
+  width: 375px;
   margin-right: 10px;
 }
 .type-column-last {
   float: left;
-  width: 460px;
+  width: 375px;
 }
 .type-panel {
   background-color: #ffffff;
@@ -239,7 +239,7 @@ input.ToolPicker {
 }
 .type-option-radio {
   float: left;
-  width: 200px;
+  width: 170px;
   padding-top: 8px;
   font-size: 12px;
   font-weight: bold;
@@ -265,17 +265,18 @@ input.ToolPicker {
 }
 .footer-ok-button {
   float: left;
-  margin-right: 14px;
+  width: 195px;
   padding-top: 8px;
+  text-align: center;
 }
 .footer-options {
   float: left;
   padding-top: 4px;
-  width: 560px;
+  width: 390px;
 }
 .footer-options-col {
   float: left;
-  width: 270px;
+  width: 195px;
 }
 .footer-option-item {
   font-size: 12px;
@@ -286,8 +287,10 @@ input.ToolPicker {
   margin-right: 4px;
 }
 .footer-cancel-button {
-  float: right;
+  float: left;
+  width: 195px;
   padding-top: 8px;
+  text-align: center;
 }
 
 /* ── OK / Cancel buttons ──────────────────────────────────────────── */

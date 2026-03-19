@@ -34,7 +34,7 @@
 g_version = "dev"                                                    -- Changed by Gremlin
 g_subVersion = "development"                                         -- Added by Gremlin
 g_title = "Box Creator"
-g_width = 1020
+g_width = 840
 g_height = 900                                                    -- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
