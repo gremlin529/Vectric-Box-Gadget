@@ -209,12 +209,12 @@ input.ToolPicker {
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 375px;
+  width: 395px;
   margin-right: 10px;
 }
 .type-column-last {
   float: left;
-  width: 375px;
+  width: 395px;
 }
 .type-panel {
   background-color: #ffffff;
