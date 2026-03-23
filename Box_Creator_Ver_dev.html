@@ -19,8 +19,7 @@
     <div class="header-text">
       <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
       <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
-      <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved.</p>
-      <p><u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calculation Warning</u> for <u>Better Productivity</u>.</p>
+      <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved. <u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calc Warning</u> for <u>Better Productivity</u>.</p>
     </div>
   </div>
 
@@ -39,11 +38,11 @@
           </div>
           <div class="field-row">
             <label for="DepthField">Depth:</label>
-            <input type="email" id="DepthField" placeholder="Depth of Box" />
+            <input type="text" id="DepthField" placeholder="Depth of Box" />
           </div>
           <div class="field-row">
             <label for="HeightField">Height:</label>
-            <input type="email" id="HeightField" placeholder="Height of Box" />
+            <input type="text" id="HeightField" placeholder="Height of Box" />
           </div>
         </div>
       </div>
@@ -58,16 +57,16 @@
           </div>
           <div class="field-row">
             <label for="SideTabWidthField">Side Joint Width:</label>
-            <input type="email" id="SideTabWidthField" placeholder="Width of Joint" />
+            <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
           <div id="showHideTopBottomJoints" style="display:none;">
             <div class="field-row">
               <label for="BottomTabWidthField">Bottom Joint Width:</label>
-              <input type="email" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
+              <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid Joint Width:</label>
-              <input type="email" id="TopTabWidthField" placeholder="Width of Lid Joint" />
+              <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
         </div>
@@ -79,11 +78,11 @@
           <div class="sub-panel-title">Machining</div>
           <div class="field-row">
             <label for="AllowanceField">Allowance:</label>
-            <input type="email" id="AllowanceField" placeholder="Allowance" />
+            <input type="text" id="AllowanceField" placeholder="Allowance" />
           </div>
           <div class="field-row">
             <label for="EdgeField">Clamping Margin:</label>
-            <input type="email" id="EdgeField" placeholder="Clamping Margin" />
+            <input type="text" id="EdgeField" placeholder="Clamping Margin" />
           </div>
         </div>
       </div>
@@ -111,7 +110,7 @@
     <div class="tool-bar-right">
       <label class="no-toolpath-label">
         <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" />
-        No Toolpath (create vectors only)
+        No toolpath (create vectors only)
       </label>
     </div>
   </div>
@@ -173,15 +172,15 @@
     <div class="footer-options">
       <div class="footer-options-col">
         <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show Dovetail Re-Calculation Warning</label>
+          <label><input type="checkbox" class="LuaButton" id="WarnDovetail" />Show dovetail re-calc warning</label>
         </div>
         <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable Dark Mode</label>
+          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable dark mode</label>
         </div>
       </div>
       <div class="footer-options-col">
         <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label face vectors</label>
+          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label face names</label>
         </div>
       </div>
     </div>

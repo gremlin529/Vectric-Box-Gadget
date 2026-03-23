@@ -34,8 +34,8 @@
 g_version = "dev"                                                    -- Changed by Gremlin
 g_subVersion = "development"                                         -- Added by Gremlin
 g_title = "Box Creator"
-g_width = 1020
-g_height = 900                                                    -- Changed by Sharkcutup
+g_width = 865
+g_height = 890                                                    -- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
@@ -2371,12 +2371,12 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     local calculated_min = effective_dia
 
     if calculated_min and calculated_min > 0 then
-      local current_width = options.sidetabwidth or dovetail.min_width
+      local current_width = options.sidetabwidth or sidedovetail.min_width
       local new_width     = math.max(current_width, calculated_min)
 
       if new_width ~= current_width then
         options.sidetabwidth   = new_width
-        dovetail.min_width = new_width
+        sidedovetail.min_width = new_width
 
         -- Push it back into the dialog so user sees the update
         if dialog.SetDoubleField ~= nil then
