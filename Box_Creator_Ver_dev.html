@@ -203,6 +203,7 @@
   function dpiToZoom() {
     var dpi = screen.deviceXDPI ? screen.deviceXDPI : 96;
     
+    alert("Screen DPI: " + dpi);
     // if (dpi >= 192) { return "200%"; }
     if (dpi >= 168) { return "200%"; }
     if (dpi >= 144) { return "150%"; }
