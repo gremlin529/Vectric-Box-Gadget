@@ -2160,14 +2160,20 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
         DisplayMessageBox("The joint width is too small for the side.")
         return false
       end
-
-      if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
-        DisplayMessageBox("The joint width is too small for the lid.")
-        return false
+    
+      if (not options.flat_lid) then
+        if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
+          DisplayMessageBox("The joint width is too small for the lid.")
+          return false
+        end
       end
 
       min_space = min_space + dia
-      if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) or (tab_space_h <= min_space) or (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then        
+      if (tab_space_w_bottom <= bottom_min_space) or 
+         (tab_space_d_bottom <= bottom_min_space) or 
+         (tab_space_h <= min_space) or 
+         ((not options.flat_lid) and 
+          ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
       end  
