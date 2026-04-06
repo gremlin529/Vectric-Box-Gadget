@@ -5,7 +5,7 @@
 /* ── Base ─────────────────────────────────────────────────────────── */
 body {
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 12px;
+  font-size: 15px;
   background-color: #e8eaf0;
   color: #1a1f2e;
   margin: 0;
@@ -27,7 +27,7 @@ body {
 .section-header {
   background-color: #2255aa;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -51,7 +51,7 @@ body {
   padding: 8px 10px;
 }
 .sub-panel-title {
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -78,7 +78,7 @@ body {
   padding: 10px 14px;
 }
 .header-text p {
-  font-size: 12px;
+  font-size: 15px;
   color: #6b7280;
   line-height: 1.6;
   margin-bottom: 5px;
@@ -111,7 +111,7 @@ body {
 }
 .field-row label {
   display: block;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   color: #374151;
   margin-bottom: 2px;
@@ -119,7 +119,7 @@ body {
 .field-row input {
   width: 100%;
   font-family: Courier New, monospace;
-  font-size: 12px;
+  font-size: 15px;
   border: 1px solid #b0b8cc;
   background-color: #ffffff;
   color: #1a1f2e;
@@ -129,7 +129,7 @@ body {
 /* ── Checkbox + label row ─────────────────────────────────────────── */
 .checkbox-row {
   margin-bottom: 7px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   color: #374151;
 }
@@ -150,7 +150,7 @@ body {
   float: left;
   margin-right: 10px;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   color: #374151;
   white-space: nowrap;
@@ -175,7 +175,7 @@ body {
   float: left;
   width: 225px;
   line-height: 26px;
-  font-size: 12px;
+  font-size: 15px;
   color: #6b7280;
 }
 input.ToolPicker {
@@ -183,21 +183,21 @@ input.ToolPicker {
   color: #2255aa;
   border: 1px solid #2255aa;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   padding: 4px 12px;
   cursor: pointer;
   vertical-align: middle;
 }
 #ToolNameField {
-  font-size: 12px;
+  font-size: 15px;
   color: #374151;
   font-style: italic;
   margin-left: 8px;
   vertical-align: middle;
 }
 .no-toolpath-label {
-  font-size: 12px;
+  font-size: 15px;
   color: #374151;
   vertical-align: middle;
 }
@@ -224,7 +224,7 @@ input.ToolPicker {
   background-color: #e8eaf0;
   border-bottom: 1px solid #c0c4d0;
   padding: 5px 10px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
@@ -241,7 +241,7 @@ input.ToolPicker {
   float: left;
   width: 170px;
   padding-top: 8px;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: bold;
   color: #374151;
 }
@@ -265,7 +265,7 @@ input.ToolPicker {
 }
 .footer-ok-button {
   float: left;
-  width: 195px;
+  width: 155px;
   padding-top: 8px;
   text-align: center;
 }
@@ -276,10 +276,10 @@ input.ToolPicker {
 }
 .footer-options-col {
   float: left;
-  width: 195px;
+  width: 235px;
 }
 .footer-option-item {
-  font-size: 12px;
+  font-size: 15px;
   color: #374151;
   margin-bottom: 4px;
 }
@@ -288,7 +288,7 @@ input.ToolPicker {
 }
 .footer-cancel-button {
   float: left;
-  width: 195px;
+  width: 155px;
   padding-top: 8px;
   text-align: center;
 }
@@ -299,7 +299,7 @@ input.ToolPicker {
   color: #ffffff;
   border: 1px solid #166032;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: bold;
   padding: 7px 28px;
   cursor: pointer;
@@ -309,7 +309,7 @@ input.ToolPicker {
   color: #6b7280;
   border: 1px solid #c0c4d0;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   font-weight: bold;
   padding: 7px 20px;
   cursor: pointer;
