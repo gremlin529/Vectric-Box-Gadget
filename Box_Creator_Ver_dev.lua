@@ -1771,6 +1771,7 @@ function main(script_path)
 	options.make_side2 = true                 --- side 2 checkbox default     
 	options.make_end1 =  true                 --- end 1 checkbox default      
 	options.make_end2 = true                  --- end 2 checkbox default      
+  options.create_tabs_for_missing_faces = true  --- create tabs for missing faces (if false then dont create the tabs on edges for faces not selected)
 
 -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -1997,6 +1998,7 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
 	dialog:AddCheckBox("MakeSide2", options.make_side2)
 	dialog:AddCheckBox("MakeEnd1", options.make_end1)
 	dialog:AddCheckBox("MakeEnd2", options.make_end2)
+  dialog:AddCheckBox("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
   
 	-- Add Tool picker
 	-- Add toolpath name field
@@ -2271,6 +2273,10 @@ function OnLuaButton_MakeEnd2()
   return true
 end
 
+function OnLuaButton_CreateTabsForMissingFaces()
+  return true
+end
+
 function OnLuaButton_WarnDovetail()
   return true
 end
@@ -2331,6 +2337,7 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   options.make_side2    = dialog:GetCheckBox("MakeSide2")
   options.make_end1     = dialog:GetCheckBox("MakeEnd1")
   options.make_end2     = dialog:GetCheckBox("MakeEnd2")
+  options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
   
 
   -- sidedovetail.angle = dialog:GetDoubleField("DovetailAngleField")
@@ -2433,6 +2440,7 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetBool("MakeSide2", options.make_side2)
   registry:SetBool("MakeEnd1", options.make_end1)
   registry:SetBool("MakeEnd2", options.make_end2)
+  registry:SetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
 
 end
 
@@ -2470,4 +2478,6 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.make_side2 = registry:GetBool("MakeSide2", options.make_side2)
   options.make_end1 = registry:GetBool("MakeEnd1", options.make_end1)
   options.make_end2 = registry:GetBool("MakeEnd2", options.make_end2)
+  options.create_tabs_for_missing_faces = registry:GetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
+
 end
