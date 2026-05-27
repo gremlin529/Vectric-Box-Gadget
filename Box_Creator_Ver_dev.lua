@@ -532,7 +532,7 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 	local unit_y = Vector2D(0,1)
 
 	-- line to first blc -> brc (Side 1)
-  if (create_tabs_for_missing_faces or facesToMake.face1) then
+  if (create_tabs_for_missing_faces or facesToMake.side1) then
     LineToVector(contour, (thickness + tab_space_w)*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
     AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -592,7 +592,7 @@ end
 
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
-function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
+function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, facesToMake, create_tabs_for_missing_faces, is_side1, name)
 
 	local dovetail_markers = {}
 	local tablist = {}
@@ -618,34 +618,54 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
   local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)  
 	local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width)/ (num_flaps_side + 1)
 
+  -- When creating side 1 the left face is end 1, when creating side 2 its end 2
+  -- this is so that we can build the box with entirely one side of the wood up if desired
+  -- end2 is the right side for side1 and left for side 2
+  local makeTabsForLeftFace = create_tabs_for_missing_faces or (facesToMake.end1 and is_side1) or (facesToMake.end2 and not is_side1)
+  local makeTabsForRightFace = create_tabs_for_missing_faces or (facesToMake.end2 and is_side1) or (facesToMake.end1 and not is_side1)
+
 	-- Create the contour
 	local contour = Contour(0.0)
 	contour:AppendPoint(inner_start_point)
 
 	--  blc ->brc (tabs for bottom)
-	LineToVector(contour, tab_space_bottom*unit_x)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
-	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
-	end
-	contour:LineTo(inner_brc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+  if (create_tabs_for_missing_faces or facesToMake.bottom) then
+    LineToVector(contour, tab_space_bottom*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    if (with_tails) then
+      AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
+    else
+      AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+    end
+    contour:LineTo(inner_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, tab_space_bottom*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
-	-- -- brc -> trc (tabs for side 2, but this reverses for each one created)
-	LineToVector(contour, tab_space_side*unit_y)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if with_tails then
-		AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
-	else
-		AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
-	end
-	contour:LineTo(inner_trc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+	-- -- brc -> trc (tabs for right end)
+  if (makeTabsForRightFace) then
+    LineToVector(contour, tab_space_side*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    if with_tails then
+      AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
+    else
+      AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
+    end
+    contour:LineTo(inner_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, tab_space_side*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	-- trc -> tlc (top line so has flaps for lid)
-  if flat_lid then
+  if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.top)) then
     LineToVector(contour, 0.5*thickness*unit_y)
     LineToVector(contour, -inner_width*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
@@ -658,24 +678,30 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
     AddMiddleOfLastSpanToList(contour, tablist)
   end
 
-	-- tlc -> blc
-	LineToVector(contour, -tab_space_side*unit_y)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
-	else
-		AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
-	end
-
-	contour:LineTo(inner_blc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+	-- tlc -> blc this is the left end
+  if (makeTabsForLeftFace) then
+     LineToVector(contour, -tab_space_side*unit_y)
+     AddMiddleOfLastSpanToList(contour, tablist)
+     if (with_tails) then
+       AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
+     else
+       AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
+     end
+     contour:LineTo(inner_blc)
+     AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, -tab_space_side*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_blc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	return Face(contour, dovetail_markers, tablist, name)
 end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
-function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
+function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, facesToMake, create_tabs_for_missing_faces, is_end1, name)
 
 	local tablist = {}
 	local dovetail_markers = {}
@@ -700,29 +726,46 @@ function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottom
 	local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width) / (num_flaps_top + 1)
 	local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
 
+  local makeTabsForLeftEnd = create_tabs_for_missing_faces or (facesToMake.side1 and is_end1) or (facesToMake.side2 and not is_end1)
+  local makeTabsForRightEnd = create_tabs_for_missing_faces or (facesToMake.side2 and is_end1) or (facesToMake.side1 and not is_end1)
+
 	local contour = Contour(0.0)
 	contour:AppendPoint(inner_start_point)
 
-	-- blc --> brc
-	LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
-	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
-	end
-	contour:LineTo(inner_brc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+	-- blc --> brc (tabs for bottom)
+  if (create_tabs_for_missing_faces or facesToMake.bottom) then
+    LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    if (with_tails) then
+      AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
+    else
+      AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+    end
+    contour:LineTo(inner_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
-	-- brc --> trc
-	LineToVector(contour,  tab_space_side*unit_y)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
-	contour:LineTo(inner_trc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+	-- brc --> trc (tabs for right side)
+  if (makeTabsForRightEnd) then
+    LineToVector(contour,  tab_space_side*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+    contour:LineTo(inner_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour,  tab_space_side*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	-- if the lid is flat then we go up by half thickness and then across
-	if flat_lid then
+	if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.top)) then
 		LineToVector(contour, (0.5*thickness) * (unit_y));
 		LineToVector(contour, (width)*(-unit_x))
 		AddMiddleOfLastSpanToList(contour, tablist)
@@ -732,16 +775,22 @@ function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottom
 		LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
 		AddMiddleOfLastSpanToList(contour, tablist)
 		AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
-		-- AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_x, unit_y, contour, num_flaps_w, tab_space_w)
 		contour:LineTo(inner_tlc)
 		AddMiddleOfLastSpanToList(contour, tablist)
 	end
 
 	-- tlc -> brc
-	LineToVector(contour, (tab_space_side*-unit_y))
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
-	AddMiddleOfLastSpanToList(contour, tablist)
+  if (makeTabsForLeftEnd) then
+    LineToVector(contour, (tab_space_side*-unit_y))
+    AddMiddleOfLastSpanToList(contour, tablist)
+    AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, (tab_space_side*-unit_y))
+	  AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(inner_blc)
+	  AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	return Face(contour, dovetail_markers, tablist, name)
 end
@@ -1890,6 +1939,9 @@ function main(script_path)
                     topdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
+                    options.facesToMake,
+                    options.create_tabs_for_missing_faces,
+                    true,  -- is_side1
 									  "SideFace1")
 		faces[#faces + 1] = sideface1
 	end
@@ -1905,6 +1957,9 @@ function main(script_path)
                     topdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
+                    options.facesToMake,
+                    options.create_tabs_for_missing_faces,
+                    false,  -- is_side1 (so this is side2)
 									  "SideFace2")
 		faces[#faces + 1] = sideface2
 	end
@@ -1921,6 +1976,9 @@ function main(script_path)
                          topdovetail,
 											   options.cut_dovetails, 
 											   options.flat_lid,
+                        options.facesToMake,
+                        options.create_tabs_for_missing_faces,
+                        true,  -- is_end1
 											   "EndFace1")
 		faces[#faces + 1] = endface1
 	end
@@ -1928,15 +1986,18 @@ function main(script_path)
 	if options.facesToMake.end2 then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
 		local endface2 = MakeEndFace(options.depth, 
-											   options.height, 
-											   options.thickness,
-											   options.start_point, 
-											   sidedovetail,
-                         bottomdovetail,
-                         topdovetail,
-											   options.cut_dovetails, 
-											   options.flat_lid,
-											   "EndFace2")
+											  options.height, 
+											  options.thickness,
+											  options.start_point, 
+											  sidedovetail,
+                        bottomdovetail,
+                        topdovetail,
+											  options.cut_dovetails, 
+											  options.flat_lid,
+                        options.facesToMake,
+                        options.create_tabs_for_missing_faces,
+                        false,  -- is_end1 (so this is end2)
+											  "EndFace2")
 		faces[#faces + 1] = endface2
 	end
 
