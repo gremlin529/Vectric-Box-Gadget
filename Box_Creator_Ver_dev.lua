@@ -532,7 +532,7 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 	local unit_y = Vector2D(0,1)
 
 	-- line to first blc -> brc (Side 1)
-  if (create_tabs_for_missing_faces or facesToMake.SideFace1) then
+  if (create_tabs_for_missing_faces or facesToMake.face1) then
     LineToVector(contour, (thickness + tab_space_w)*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
     AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -545,27 +545,47 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
     AddMiddleOfLastSpanToList(contour, tablist)
   end
 
-
 	-- Create brc -> trc (end 1)
-	LineToVector(contour, (thickness + tab_space_h)*unit_y)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
-	contour:LineTo(outer_trc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+  if (create_tabs_for_missing_faces or facesToMake.end1) then
+    LineToVector(contour, (thickness + tab_space_h)*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+    contour:LineTo(outer_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, (thickness + tab_space_h)*unit_y)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(outer_trc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	-- Create trc -> tlc (side 2)
-	LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
-	contour:LineTo(outer_tlc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+  if (create_tabs_for_missing_faces or facesToMake.side2) then
+    LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
+	  AddMiddleOfLastSpanToList(contour, tablist)
+	  AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+	  contour:LineTo(outer_tlc)
+	  AddMiddleOfLastSpanToList(contour, tablist)
+  else
+	  LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
+	  AddMiddleOfLastSpanToList(contour, tablist)
+	  contour:LineTo(outer_tlc)
+	  AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	-- Create tlc -> blc (end 2)
-	LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
-	contour:LineTo(outer_blc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+  if (create_tabs_for_missing_faces or facesToMake.end2) then
+    LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
+    AddMiddleOfLastSpanToList(contour, tablist)
+    AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+    contour:LineTo(outer_blc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(outer_blc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 	return Face(contour, dovetail_markers, tablist, name)
 end
