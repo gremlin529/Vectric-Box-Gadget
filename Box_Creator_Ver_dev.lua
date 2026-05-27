@@ -665,7 +665,7 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
   end
 
 	-- trc -> tlc (top line so has flaps for lid)
-  if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.top)) then
+  if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.lid)) then
     LineToVector(contour, 0.5*thickness*unit_y)
     LineToVector(contour, -inner_width*unit_x)
     AddMiddleOfLastSpanToList(contour, tablist)
@@ -765,7 +765,7 @@ function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottom
   end
 
 	-- if the lid is flat then we go up by half thickness and then across
-	if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.top)) then
+	if (flat_lid or (not create_tabs_for_missing_faces and not facesToMake.lid)) then
 		LineToVector(contour, (0.5*thickness) * (unit_y));
 		LineToVector(contour, (width)*(-unit_x))
 		AddMiddleOfLastSpanToList(contour, tablist)
@@ -844,7 +844,7 @@ function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour)
 	LineToVector(contour, thickness*(-perp_vec))
 end
 
-function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, name)
+function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, facesToMake, create_tabs_for_missing_faces, name)
 
 	local tablist = {}
 	local unit_x = Vector2D(1,0)
@@ -876,33 +876,61 @@ function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, nam
 	if (not flat_lid) then
 		contour:AppendPoint(start_point)
 
-		--- blc -> brc
-		LineToVector(contour, (thickness + tab_space_w)*unit_x)
-		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
-		contour:LineTo(outer_brc)
-		AddMiddleOfLastSpanToList(contour, tablist)
+		--- blc -> brc side1
+    if (create_tabs_for_missing_faces or facesToMake.side1) then
+      LineToVector(contour, (thickness + tab_space_w)*unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+      contour:LineTo(outer_brc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    else
+      LineToVector(contour, (thickness + tab_space_w)*unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      contour:LineTo(outer_brc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    end
 
-		-- brc --> trc
-		LineToVector(contour, (thickness + tab_space_h) * unit_y)
-		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
-		contour:LineTo(outer_trc)
-		AddMiddleOfLastSpanToList(contour, tablist)
+		-- brc --> trc end1
+    if (create_tabs_for_missing_faces or facesToMake.end1) then
+      LineToVector(contour, (thickness + tab_space_h)*unit_y)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+      contour:LineTo(outer_trc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    else
+      LineToVector(contour, (thickness + tab_space_h) * unit_y)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      contour:LineTo(outer_trc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    end
 
-		-- trc --> tlc
-		LineToVector(contour, (thickness + tab_space_w)*-unit_x)
-		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
-		contour:LineTo(outer_tlc)
-		AddMiddleOfLastSpanToList(contour, tablist)
+		-- trc --> tlc side2
+    if (create_tabs_for_missing_faces or facesToMake.side2) then
+      LineToVector(contour, (thickness + tab_space_w)*-unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+      contour:LineTo(outer_tlc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    else
+      LineToVector(contour, (thickness + tab_space_w)*-unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      contour:LineTo(outer_tlc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    end
 
-		-- tlc --> trc
-		LineToVector(contour, (thickness + tab_space_h)* -unit_y)
-		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
-		contour:LineTo(outer_blc)
-		AddMiddleOfLastSpanToList(contour, tablist)
+		-- tlc --> trc end2
+    if (create_tabs_for_missing_faces or facesToMake.end2) then
+      LineToVector(contour, (thickness + tab_space_h)* -unit_y)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+      contour:LineTo(outer_blc)
+      AddMiddleOfLastSpanToList(contour, tablist)
+    else
+      LineToVector(contour, (thickness + tab_space_h)* -unit_y)
+		  AddMiddleOfLastSpanToList(contour, tablist)
+		  contour:LineTo(outer_blc)
+		  AddMiddleOfLastSpanToList(contour, tablist)
+    end
 
 	else -- No tabs so just create outer profile contour
 		contour:AppendPoint(start_point)
@@ -2009,6 +2037,8 @@ function main(script_path)
 												   topdovetail.min_width,
 												   options.start_point,
 												   options.flat_lid,
+                           options.facesToMake,
+                           options.create_tabs_for_missing_faces,
 												   "Lid"
 	                       )
 		faces[#faces + 1] = lid
