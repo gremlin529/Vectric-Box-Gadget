@@ -29,7 +29,11 @@
 ---------------------------- Gremlin is NOT The Origianl Owner/Writer of this Gadget 2/272026  --------------------------------------------
 -------------------------------------------------------------------------------------------------------------------------------------------
 
+-- remove this line before shipping it's to use the ZeroBrane studio debugger per https://www.jimandi.com/SDK/index.php/ZeroBrane_Studio_Setup
 -- require("mobdebug").start()
+-- want to turn this on but there's several bits of code that 
+-- need addressing first
+-- require("strict")
 
 g_version = "dev"                                                    -- Changed by Gremlin
 g_subVersion = "development"                                         -- Added by Gremlin
@@ -495,7 +499,7 @@ end
 |  Returns the contour for the profile and a list of dovetails
 |
 ]]
-function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, use_dovetails,name)
+function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, use_dovetails, facesToMake, create_tabs_for_missing_faces, name)
 
 	local dovetail_markers = {}
 	local tablist = {}
@@ -527,29 +531,36 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 	local unit_x = Vector2D(1,0)
 	local unit_y = Vector2D(0,1)
 
-	-- line to first
-	LineToVector(contour, (thickness + tab_space_w)*unit_x)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
-	contour:LineTo(outer_brc)
-	AddMiddleOfLastSpanToList(contour, tablist)
+	-- line to first blc -> brc (Side 1)
+  if (create_tabs_for_missing_faces or facesToMake.SideFace1) then
+    LineToVector(contour, (thickness + tab_space_w)*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+    contour:LineTo(outer_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  else
+    LineToVector(contour, (thickness + tab_space_w)*unit_x)
+    AddMiddleOfLastSpanToList(contour, tablist)
+    contour:LineTo(outer_brc)
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
 
 
-	-- Create brc -> trc
+	-- Create brc -> trc (end 1)
 	LineToVector(contour, (thickness + tab_space_h)*unit_y)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
 	contour:LineTo(outer_trc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
-	-- Create trc -> tlc
+	-- Create trc -> tlc (side 2)
 	LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
 	AddMiddleOfLastSpanToList(contour, tablist)
 	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
 	contour:LineTo(outer_tlc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
-	-- Create tlc -> blc
+	-- Create tlc -> blc (end 2)
 	LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
 	AddMiddleOfLastSpanToList(contour, tablist)
 	AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
@@ -591,7 +602,7 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
 	local contour = Contour(0.0)
 	contour:AppendPoint(inner_start_point)
 
-	--  blc ->brc
+	--  blc ->brc (tabs for bottom)
 	LineToVector(contour, tab_space_bottom*unit_x)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if (with_tails) then
@@ -602,7 +613,7 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
 	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
-	-- -- brc -> trc
+	-- -- brc -> trc (tabs for side 2, but this reverses for each one created)
 	LineToVector(contour, tab_space_side*unit_y)
 	AddMiddleOfLastSpanToList(contour, tablist)
 	if with_tails then
@@ -1734,7 +1745,7 @@ end
 function main(script_path)
 	local job = VectricJob()
 	local mtl_block = MaterialBlock()
-
+  
 	if not job.Exists then
        DisplayMessageBox("No job loaded.")
        return false
@@ -1765,12 +1776,14 @@ function main(script_path)
 	options.window_width = g_width
 	options.window_height = g_height
 
-	options.make_lid = true                   --- lid checkbox default       
-	options.make_bottom = true                --- bottom checkbox default     
-	options.make_side1 = true                 --- side 1 checkbox default    
-	options.make_side2 = true                 --- side 2 checkbox default     
-	options.make_end1 =  true                 --- end 1 checkbox default      
-	options.make_end2 = true                  --- end 2 checkbox default      
+  options.facesToMake = {}
+
+	options.facesToMake.lid = true                   --- lid checkbox default       
+	options.facesToMake.bottom = true                --- bottom checkbox default     
+	options.facesToMake.side1 = true                 --- side 1 checkbox default    
+	options.facesToMake.side2 = true                 --- side 2 checkbox default     
+	options.facesToMake.end1 =  true                 --- end 1 checkbox default      
+	options.facesToMake.end2 = true                  --- end 2 checkbox default      
   options.create_tabs_for_missing_faces = true  --- create tabs for missing faces (if false then dont create the tabs on edges for faces not selected)
 
 -----------------------------------------------------------------------------------------------------------------------------------------
@@ -1829,7 +1842,7 @@ function main(script_path)
 -- local dovetail_markers = {}
 	local faces = {}
 
-	if options.make_bottom then
+	if options.facesToMake.bottom then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
     -- the bottom face is only the bottom so we didn't need to add
     -- a separate value to it, just pass it the bottom value
@@ -1839,12 +1852,14 @@ function main(script_path)
 													options.start_point, 
 													bottomdovetail, 
 													options.cut_dovetails,  -- if true then create dovetails
+                          options.facesToMake,
+                          options.create_tabs_for_missing_faces,
 													"BottomFace" )
 		faces[#faces + 1] = bottom_face
 	end
 
 	-- -- -- Make sides
-	if options.make_side1 then
+	if options.facesToMake.side1 then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
 		local sideface1 = MakeSideFace(options.width,
 									  options.height, 
@@ -1859,7 +1874,7 @@ function main(script_path)
 		faces[#faces + 1] = sideface1
 	end
 
-	if options.make_side2 then
+	if options.facesToMake.side2 then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
 		local sideface2 = MakeSideFace(options.width,
 									  options.height, 
@@ -1875,7 +1890,7 @@ function main(script_path)
 	end
 
 	-- -- -- Make ends
-	if options.make_end1 then
+	if options.facesToMake.end1 then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
 		local endface1 = MakeEndFace(options.depth, 
 											   options.height, 
@@ -1890,7 +1905,7 @@ function main(script_path)
 		faces[#faces + 1] = endface1
 	end
 
-	if options.make_end2 then
+	if options.facesToMake.end2 then
     -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
 		local endface2 = MakeEndFace(options.depth, 
 											   options.height, 
@@ -1906,7 +1921,7 @@ function main(script_path)
 	end
 
 	-- Make lid
-	if options.make_lid then
+	if options.facesToMake.lid then
 		local lid = MakeLid(options.width,
 												   options.depth,
 												   options.thickness,
@@ -1945,7 +1960,7 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
-		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
+		if (not options.no_toolpath) and options.facesToMake.lid and options.flat_lid then
 		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
 	end
 
@@ -1992,12 +2007,12 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
 
 	-- dialog:AddDoubleField("DovetailAngleField", sidedovetail.angle)
   
-	dialog:AddCheckBox("MakeLid", options.make_lid)
-	dialog:AddCheckBox("MakeBottom", options.make_bottom)
-	dialog:AddCheckBox("MakeSide1", options.make_side1)
-	dialog:AddCheckBox("MakeSide2", options.make_side2)
-	dialog:AddCheckBox("MakeEnd1", options.make_end1)
-	dialog:AddCheckBox("MakeEnd2", options.make_end2)
+	dialog:AddCheckBox("MakeLid", options.facesToMake.lid)
+	dialog:AddCheckBox("MakeBottom", options.facesToMake.bottom)
+	dialog:AddCheckBox("MakeSide1", options.facesToMake.side1)
+	dialog:AddCheckBox("MakeSide2", options.facesToMake.side2)
+	dialog:AddCheckBox("MakeEnd1", options.facesToMake.end1)
+	dialog:AddCheckBox("MakeEnd2", options.facesToMake.end2)
   dialog:AddCheckBox("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
   
 	-- Add Tool picker
@@ -2061,8 +2076,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
   -- At least one face must be selected
   local at_least_one =
-    options.make_lid or options.make_bottom or options.make_side1 or
-    options.make_side2 or options.make_end1 or options.make_end2
+    options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
+    options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
   if not at_least_one then
     DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
     return false
@@ -2331,12 +2346,12 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
-  options.make_lid      = dialog:GetCheckBox("MakeLid")
-  options.make_bottom   = dialog:GetCheckBox("MakeBottom")
-  options.make_side1    = dialog:GetCheckBox("MakeSide1")
-  options.make_side2    = dialog:GetCheckBox("MakeSide2")
-  options.make_end1     = dialog:GetCheckBox("MakeEnd1")
-  options.make_end2     = dialog:GetCheckBox("MakeEnd2")
+  options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
+  options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
+  options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
+  options.facesToMake.side2    = dialog:GetCheckBox("MakeSide2")
+  options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
+  options.facesToMake.end2     = dialog:GetCheckBox("MakeEnd2")
   options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
   
 
@@ -2434,12 +2449,12 @@ function SaveDefaults(options, justwindowinfo)
 
   registry:SetBool("NoToolpath", options.no_toolpath)
 
-  registry:SetBool("MakeLid", options.make_lid)
-  registry:SetBool("MakeBottom", options.make_bottom)
-  registry:SetBool("MakeSide1", options.make_side1)
-  registry:SetBool("MakeSide2", options.make_side2)
-  registry:SetBool("MakeEnd1", options.make_end1)
-  registry:SetBool("MakeEnd2", options.make_end2)
+  registry:SetBool("MakeLid", options.facesToMake.lid)
+  registry:SetBool("MakeBottom", options.facesToMake.bottom)
+  registry:SetBool("MakeSide1", options.facesToMake.side1)
+  registry:SetBool("MakeSide2", options.facesToMake.side2)
+  registry:SetBool("MakeEnd1", options.facesToMake.end1)
+  registry:SetBool("MakeEnd2", options.facesToMake.end2)
   registry:SetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
 
 end
@@ -2472,12 +2487,12 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   
-  options.make_lid = registry:GetBool("MakeLid", options.make_lid)
-  options.make_bottom = registry:GetBool("MakeBottom", options.make_bottom)
-  options.make_side1 = registry:GetBool("MakeSide1", options.make_side1)
-  options.make_side2 = registry:GetBool("MakeSide2", options.make_side2)
-  options.make_end1 = registry:GetBool("MakeEnd1", options.make_end1)
-  options.make_end2 = registry:GetBool("MakeEnd2", options.make_end2)
+  options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
+  options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)
+  options.facesToMake.side1 = registry:GetBool("MakeSide1", options.facesToMake.side1)
+  options.facesToMake.side2 = registry:GetBool("MakeSide2", options.facesToMake.side2)
+  options.facesToMake.end1 = registry:GetBool("MakeEnd1", options.facesToMake.end1)
+  options.facesToMake.end2 = registry:GetBool("MakeEnd2", options.facesToMake.end2)
   options.create_tabs_for_missing_faces = registry:GetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
 
 end
