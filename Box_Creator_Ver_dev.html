@@ -53,19 +53,19 @@
           <div class="sub-panel-title">Joint Widths</div>
           <div class="checkbox-row">
             <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)" />
-            <label for="AllJointWidths">Show All Joint Widths</label>
+            <label for="AllJointWidths">Show all joint widths</label>
           </div>
           <div class="field-row">
-            <label for="SideTabWidthField">Side Joint Width:</label>
+            <label for="SideTabWidthField">Side joint width:</label>
             <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
           <div id="showHideTopBottomJoints" style="display:none;">
             <div class="field-row">
-              <label for="BottomTabWidthField">Bottom Joint Width:</label>
+              <label for="BottomTabWidthField">Bottom joint width:</label>
               <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
-              <label for="TopTabWidthField">Lid Joint Width:</label>
+              <label for="TopTabWidthField">Lid joint width:</label>
               <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
@@ -96,6 +96,7 @@
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
+        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create tabs for un-checked faces</label></div>
       </div>
 
     </div>
@@ -145,7 +146,7 @@
         <div class="type-panel-header">Lid Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat Lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat lid</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/flatlid.png" alt="Flat lid preview" />
@@ -153,7 +154,7 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed Lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed lid</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
@@ -180,7 +181,7 @@
       </div>
       <div class="footer-options-col">
         <div class="footer-option-item">
-          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label face names</label>
+          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
         </div>
       </div>
     </div>

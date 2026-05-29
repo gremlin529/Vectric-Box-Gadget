@@ -1,0 +1,3 @@
+function Alert(message)
+    DisplayMessageBox(message)
+end
