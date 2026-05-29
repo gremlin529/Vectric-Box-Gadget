@@ -28,9 +28,14 @@ else {
 }
 
 # Files to include in the release ZIP (relative or absolute paths)
+$moduleToCreate = "Simple_Box_Creator"
+$mainLuaFile = $moduleToCreate + "_dev.lua"
+$mainHTMLFile = $moduleToCreate + "_dev.html"
+
+# manually add extra files here, but it will automatically include the main lua and html file based on the module name and version, so no need to add those here
 $filesToRelease = @(
-    "box_creator_ver_dev.lua",
-    "box_creator_ver_dev.html",
+    $mainLuaFile,
+    $mainHTMLFile,
     "stylesheets",
     "images"
 )
@@ -82,7 +87,7 @@ try {
     # note inorder for the gadget file to have the correct folder structure when unzipped, 
     # the version directory needs to be created under the release directory and then the files 
     # copied there before creating the zip file
-    $releaseFileDirectory = "Box_Creator_Ver_" + $version + "\Box_Creator_Ver_" + $version
+    $releaseFileDirectory = $moduleToCreate + "_" + $version + "\" + $moduleToCreate + "_" + $version
     $versionDir = Join-Path $releaseDir $releaseFileDirectory
 
     Write-Host "Creating version directory at '$versionDir' and copying files..."
@@ -105,7 +110,7 @@ try {
     Write-Host ""
 
     # # now update the lua file in the release directory to have the correct version number
-    $luaFileInRelease = Join-Path $versionDir "Box_Creator_Ver_dev.lua"
+    $luaFileInRelease = Join-Path $versionDir $mainLuaFile
     Write-Host "Updating version in '$luaFileInRelease' file in release directory to '$version'..."
     if (Test-Path $luaFileInRelease) {  
         UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion
@@ -117,8 +122,8 @@ try {
 
     # now rename the lua and html file in the reslease directory with a version
 
-    $luaFile = Join-Path $versionDir "box_creator_ver_dev.lua"
-    $luaFileVersioned = Join-Path $versionDir ("Box_Creator_Ver_" + $version + ".lua")
+    $luaFile = Join-Path $versionDir $mainLuaFile
+    $luaFileVersioned = Join-Path $versionDir ($moduleToCreate + "_" + $version + ".lua")
 
     write-Host ""
 
@@ -126,21 +131,21 @@ try {
         if (Test-Path $luaFileVersioned) {  
             Remove-Item $luaFileVersioned -Force
         }
-        Write-Host "Renaming '$luaFile' to 'Box_Creator_Ver_$version.lua'..."
-        Rename-Item -Path $luaFile -NewName ("Box_Creator_Ver_" + $version + ".lua") -Force
+        Write-Host "Renaming '$luaFile' to '$moduleToCreate_$version.lua'..."
+        Rename-Item -Path $luaFile -NewName ($moduleToCreate + "_" + $version + ".lua") -Force
     }
     else {
         Write-Warning "File not found: $luaFile (skipping rename)"
     }
 
-    $htmlFile = Join-Path $versionDir "box_creator_ver_dev.html"    
-    $htmlFileVersioned = Join-Path $versionDir ("Box_Creator_Ver_" + $version + ".html")
+    $htmlFile = Join-Path $versionDir $mainHTMLFile    
+    $htmlFileVersioned = Join-Path $versionDir ($moduleToCreate + "_" + $version + ".html")
     if (Test-Path $htmlFile) {
         if (Test-Path $htmlFileVersioned) {  
             Remove-Item $htmlFileVersioned -Force
         }
-        Write-Host "Renaming '$htmlFile' to 'Box_Creator_Ver_$version.html'..."
-        Rename-Item -Path $htmlFile -NewName ("Box_Creator_Ver_" + $version + ".html") -Force
+        Write-Host "Renaming '$htmlFile' to '$moduleToCreate_$version.html'..."
+        Rename-Item -Path $htmlFile -NewName ($moduleToCreate + "_" + $version + ".html") -Force
     }
     else {
         Write-Warning "File not found: $htmlFile (skipping rename)"
@@ -148,7 +153,7 @@ try {
 
     # ZIP file path, this zip file will be renamed to .vgadget after creation, but needs to be created as a zip file 
     # first in order to create it
-    $zipPath = Join-Path $releaseDir ("\Box_Creator_Ver_" + $version + ".zip")
+    $zipPath = Join-Path $releaseDir ("\" + $moduleToCreate + "_Ver_" + $version + ".zip")
     Write-Debug "Preparing to create ZIP file at '$zipPath'..."
 
     # Remove old ZIP if exists
@@ -159,19 +164,19 @@ try {
     #Create a zip file from the version directory incluuding all files and subdirectories
     #Note the release path looks doubled, but it needs to otherwise the gadget file
     #will not have the correct folder structure when unzipped
-    $releaseTree = "Box_Creator_Ver_" + $version 
+    $releaseTree = $moduleToCreate + "_" + $version 
     $releasePath = Join-Path $releaseDir $releaseTree
     Write-Debug "Creating ZIP file from '$releasePath'..."
     Compress-Archive -Path (Join-Path $releasePath "*") -DestinationPath $zipPath -Force
 
     #Rename the zip file with a .vgadget extension
-    $vgadgetPath = Join-Path $releaseDir ("\Box_Creator_Ver_" + $version + ".vgadget")
+    $vgadgetPath = Join-Path $releaseDir ("\\" + $moduleToCreate + "_" + $version + ".vgadget")
     Write-Debug "Renaming ZIP file to '$vgadgetPath'..." 
     if (Test-Path $vgadgetPath) {
         Write-Host "Versioned gadget file already exists: $vgadgetPath. Removing old versioned gadget file..."
         Remove-Item $vgadgetPath -Force
     }
-    Rename-Item -Path $zipPath -NewName ("Box_Creator_Ver_" + $version + ".vgadget") -Force
+    Rename-Item -Path $zipPath -NewName ($moduleToCreate + "_" + $version + ".vgadget") -Force
 
     #remove the version directory after creating the zip
     Write-Host "Removing temporary version directory '$releasePath'..."  

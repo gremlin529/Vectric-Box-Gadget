@@ -37,10 +37,10 @@
 
 g_version = "dev"                                                    -- Changed by Gremlin
 g_subVersion = "development"                                         -- Added by Gremlin
-g_title = "Box Creator"
+g_title = "Simple Box"
 g_width = 845
 g_height = 1023                                                    -- Changed by Sharkcutup
-g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
+g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
 local function _is_pos(x) return type(x)=="number" and x>0 end
