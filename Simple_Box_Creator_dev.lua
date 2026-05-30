@@ -527,7 +527,7 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
         DisplayMessageBox("The selected tool will not fit between the side joints.")
         return false
       end 
-      if (options.allJointWidths) then
+      if (options.allJointWidths and not options.flat_lid and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
         if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
           DisplayMessageBox("The selected tool will not fit between the lid joints.")
           return false
