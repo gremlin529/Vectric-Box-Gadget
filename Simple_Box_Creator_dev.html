@@ -33,16 +33,16 @@
         <div class="sub-panel">
           <div class="sub-panel-title">Box Dimensions</div>
           <div class="field-row">
-            <label for="WidthField">Width:</label>
-            <input type="number" step="any" id="WidthField" placeholder="Width of Box" />
+            <label for="WidthField">Width:</label> 
+			<input title="Side to side width of the box outside" type="number" step="any" id="WidthField" placeholder="Width of Box" />
           </div>
           <div class="field-row">
             <label for="DepthField">Depth:</label>
-            <input type="text" id="DepthField" placeholder="Depth of Box" />
+            <input title="Front to back depth of the box outside" type="number" step="any" id="DepthField" placeholder="Depth of Box"/>
           </div>
           <div class="field-row">
             <label for="HeightField">Height:</label>
-            <input type="text" id="HeightField" placeholder="Height of Box" />
+            <input title="Top to bottom height of the box" type="number" step="any" id="HeightField" placeholder="Height of Box" />
           </div>
         </div>
       </div>
@@ -56,16 +56,16 @@
             <label for="AllJointWidths">Show all joint widths</label>
           </div>
           <div class="field-row">
-            <label for="SideTabWidthField">Side joint width:</label>
+            <label for="SideTabWidthField" id="SideJointLabel">Side joint:</label>
             <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
-          <div id="showHideTopBottomJoints" style="display:none;">
+          <div id="showHideTopBottomJoints" style="display: none;flex">
             <div class="field-row">
-              <label for="BottomTabWidthField">Bottom joint width:</label>
+              <label for="BottomTabWidthField">Bottom joint:</label>
               <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
-              <label for="TopTabWidthField">Lid joint width:</label>
+              <label for="TopTabWidthField">Lid joint:</label>
               <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
@@ -232,6 +232,8 @@
   function onShowAllWidthsChanged(checkbox) {
     var el = document.getElementById("showHideTopBottomJoints");
     if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
+	var elSideJoint = document.getElementById("SideJointLabel")
+	if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joint:":"All Joints:"}
   }
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
