@@ -33,15 +33,15 @@
         <div class="sub-panel">
           <div class="sub-panel-title">Box Dimensions</div>
           <div class="field-row">
-            <label for="WidthField">Width:</label> 
-			<input title="Side to side width of the box outside" type="number" step="any" id="WidthField" placeholder="Width of Box" />
+            <label for="WidthField">Width</label> 
+			      <input title="Side to side width of the box outside" type="number" step="any" id="WidthField" placeholder="Width of Box" />
           </div>
           <div class="field-row">
-            <label for="DepthField">Depth:</label>
+            <label for="DepthField">Depth</label>
             <input title="Front to back depth of the box outside" type="number" step="any" id="DepthField" placeholder="Depth of Box"/>
           </div>
           <div class="field-row">
-            <label for="HeightField">Height:</label>
+            <label for="HeightField">Height</label>
             <input title="Top to bottom height of the box" type="number" step="any" id="HeightField" placeholder="Height of Box" />
           </div>
         </div>
@@ -56,17 +56,17 @@
             <label for="AllJointWidths">Show all joint widths</label>
           </div>
           <div class="field-row">
-            <label for="SideTabWidthField" id="SideJointLabel">Side joint:</label>
-            <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
+            <label for="SideTabWidthField" id="SideJointLabel">Side joints</label>
+            <input title="width of the dovetail or tab to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" />
           </div>
-          <div id="showHideTopBottomJoints" style="display: none;flex">
+          <div id="showHideTopBottomJoints" style="display: none">
             <div class="field-row">
-              <label for="BottomTabWidthField">Bottom joint:</label>
-              <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
+              <label for="BottomTabWidthField">Bottom joints</label>
+              <input title="Width of the bottom tabs or dovetails" type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
             </div>
             <div class="field-row" id="showHideLidJointWidth">
-              <label for="TopTabWidthField">Lid joint:</label>
-              <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
+              <label for="TopTabWidthField">Lid joints</label>
+              <input title="Width of the lids tab or dovetail" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
             </div>
           </div>
         </div>
@@ -77,12 +77,12 @@
         <div class="sub-panel">
           <div class="sub-panel-title">Machining</div>
           <div class="field-row">
-            <label for="AllowanceField">Allowance:</label>
-            <input type="text" id="AllowanceField" placeholder="Allowance" />
+            <label for="AllowanceField">Allowance</label>
+            <input title="Additional material removed in joints for better fitment" type="text" id="AllowanceField" placeholder="Allowance" />
           </div>
           <div class="field-row">
-            <label for="EdgeField">Clamping Margin:</label>
-            <input type="text" id="EdgeField" placeholder="Clamping Margin" />
+            <label for="EdgeField">Clamping Margin</label>
+            <input title="Margin on the edge for clamping the workpiece" type="text" id="EdgeField" placeholder="Clamping Margin" />
           </div>
         </div>
       </div>
@@ -96,7 +96,7 @@
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create tabs for un-checked faces</label></div>
+        <div class="face-checkbox"><label title="If unchecked then tabs for faces which are not created will not be created"><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create tabs for un-checked faces</label></div>
       </div>
 
     </div>
@@ -233,7 +233,7 @@
     var el = document.getElementById("showHideTopBottomJoints");
     if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
 	var elSideJoint = document.getElementById("SideJointLabel")
-	if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joint:":"All Joints:"}
+	if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joints":"All Joints"}
   }
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
