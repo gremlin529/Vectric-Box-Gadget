@@ -17,9 +17,8 @@
       <img src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
-      <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
-      <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
-      <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved. <u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calc Warning</u> for <u>Better Productivity</u>.</p>
+      <p>This gadget creates two layers of vectors. The layer called box is the actual physical outlines, and the layer called cutout is the one the toolpath is created with.</p>
+      <p><u>Warning!</u> The Dovetail Toolpath is a gadget created toolpath which cannot be re-calculated so do not move the vectors</p>
     </div>
   </div>
 
@@ -116,7 +115,7 @@
     </div>
   </div>
 
-  <!-- ── Joint type + Lid type ──────────────────────────────────────── -->
+  <!-- ── Joint type + Lid type + Bottom type ───────────────────────── -->
   <div class="clearfix" style="margin-bottom:10px;">
 
     <div class="type-column">
@@ -124,7 +123,7 @@
         <div class="type-panel-header">Joint Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger Joint</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/tabs.png" alt="Finger joint preview" />
@@ -132,7 +131,7 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail Joint</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/dovetails.png" alt="Dovetail joint preview" />
@@ -141,12 +140,12 @@
       </div>
     </div>
 
-    <div class="type-column-last">
+    <div class="type-column">
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/flatlid.png" alt="Flat lid preview" />
@@ -154,10 +153,32 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="type-column-last">
+      <div class="type-panel">
+        <div class="type-panel-header">Bottom Type</div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio1" />Flat</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/FlatBottom.png" alt="Flat bottom preview" />
+          </div>
+        </div>
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio2" />Tabbed</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabbedbottom.png" alt="Tabbed bottom preview" />
           </div>
         </div>
       </div>

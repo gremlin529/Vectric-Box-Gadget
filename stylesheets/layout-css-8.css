@@ -119,8 +119,7 @@ body {
 }
 
 .field-row label {
-    display: inline-block;
-    *display: inline;   /* IE7 hack */
+    display: inline;   /* IE7 hack */
     zoom: 1;
 
     /* Allow label text to wrap inside its own box */
@@ -135,8 +134,7 @@ body {
 }
 
 .field-row input {
-    display: inline-block;
-    *display: inline;   /* IE7 hack */
+    display: inline;   /* IE7 hack */
     zoom: 1;
 
     width: 100px;
@@ -230,12 +228,12 @@ input.ToolPicker {
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 395px;
+  width: 260px;
   margin-right: 10px;
 }
 .type-column-last {
   float: left;
-  width: 395px;
+  width: 260px;
 }
 .type-panel {
   background-color: #ffffff;
@@ -260,7 +258,7 @@ input.ToolPicker {
 }
 .type-option-radio {
   float: left;
-  width: 170px;
+  width: 130px;
   padding-top: 8px;
   font-size: 15px;
   font-weight: bold;
@@ -268,12 +266,14 @@ input.ToolPicker {
 }
 .type-option-radio input {
   margin-right: 5px;
+  vertical-align: middle;
 }
 .type-option-preview {
   float: left;
+  vertical-align: middle;
 }
 .type-option-preview img {
-  height: 40px;
+  height: 22px;
   width: auto;
   display: block;
 }

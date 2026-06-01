@@ -75,6 +75,7 @@ function main(script_path)
   options.dark_mode     = true        --- default to dark mode on
   options.cut_dovetails = false
   options.flat_lid = true
+  options.flat_bottom = true          --- default to flat bottom
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.window_width = g_width
@@ -358,8 +359,14 @@ function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdo
   end
   dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
-
-  -- Add units label
+-- Bottom Type: 1 = Flat Bottom, 2 = Tabbed Bottom
+  local bottom_default_index
+  if options.flat_bottom then
+    bottom_default_index = 1
+  else
+    bottom_default_index = 2
+  end
+  dialog:AddRadioGroup("BottomTypeRadio", bottom_default_index)
   local units_string = "Inches"
   if options.tool.InMM then
     units_string = "MM"
@@ -582,6 +589,14 @@ function OnLuaButton_LidTypeRadio1()
   return true
 end
 
+function OnLuaButton_BottomTypeRadio1()
+  return true
+end
+
+function OnLuaButton_BottomTypeRadio2()
+  return true
+end
+
 function OnLuaButton_MakeLid()
   return true
 end
@@ -693,6 +708,13 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     options.flat_lid = false
   end
 
+  local bottom_index = dialog:GetRadioIndex("BottomTypeRadio")
+  if bottom_index == 1 then
+    options.flat_bottom = true
+  else
+    options.flat_bottom = false
+  end
+
   -- Get from tool picker
   options.tool = dialog:GetTool("ToolChooseButton")
 
@@ -761,6 +783,7 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetDouble("EdgeMargin", options.edge_margin)              -- Added by Sharkcutup
   registry:SetBool("CutDovetails", options.cut_dovetails)
   registry:SetBool("FlatLid", options.flat_lid)
+  registry:SetBool("FlatBottom", options.flat_bottom)
   if options.tool ~= nil then
     options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
@@ -798,6 +821,7 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   topdovetail.min_width = options.toptabwidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
+  options.flat_bottom = registry:GetBool("FlatBottom", options.flat_bottom)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
 
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
