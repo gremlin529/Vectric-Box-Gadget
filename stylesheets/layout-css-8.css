@@ -252,30 +252,36 @@ input.ToolPicker {
 .type-option {
   padding: 8px 10px;
   border-bottom: 1px solid #e8eaf0;
+  line-height: 26px;
 }
 .type-option-last {
   padding: 8px 10px;
+  line-height: 26px;
 }
 .type-option-radio {
   float: left;
   width: 130px;
-  padding-top: 8px;
   font-size: 15px;
   font-weight: bold;
   color: #374151;
+  vertical-align: middle;
 }
 .type-option-radio input {
   margin-right: 5px;
   vertical-align: middle;
 }
+.type-option-radio label {
+  vertical-align: middle;
+}
 .type-option-preview {
   float: left;
-  vertical-align: middle;
+  line-height: 0;
 }
 .type-option-preview img {
   height: 22px;
   width: auto;
-  display: block;
+  display: inline;
+  vertical-align: middle;
 }
 
 /* ── Footer bar ───────────────────────────────────────────────────── */
