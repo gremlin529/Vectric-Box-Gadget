@@ -42,6 +42,7 @@ g_title = "Simple Box"
 g_width = 845
 g_height = 1023                                                    -- Changed by Sharkcutup
 g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"             -- Changed by Gremlin
+
 local librayModule
 
 -- MotazA 16/9/2020 check if job Exists 
@@ -56,9 +57,9 @@ function main(script_path)
     return false
   end
 
-  ----------------------- Geometry Options Default Settings --------------------------------
-  
+  ----------------------- Gadget Options Default Settings --------------------------------
   local options = {}
+
   options.width = 18                        --- width  default               
   options.height = 12                       --- height default              
   options.depth = 14                        --- depth default   
@@ -70,13 +71,13 @@ function main(script_path)
   options.bottomTabWidth = 1.0              --- joint width for the bottom (as a separate value)   
   options.lidTabWidth = 1.0                 --- joint width for the top (as a separate value)
   options.cut_layer_name  = "CutOut"        --- layer name default
-  options.clampingAllowance = 0.0                   --- allowance default 
+  options.allowance = 0.0                   --- allowance default 
   options.clampingMargin = 0.75                 --- edge margin default
   options.warn_dovetail = true   -- show dovetail warning after create
   options.dark_mode     = true        --- default to dark mode on
   options.cut_dovetails = false
-  options.flat_lid = true
-  options.flat_bottom = true          --- default to flat bottom
+  options.lidType = LidBottomType.Inset -- default lid type is inset
+  options.bottomType = LidBottomType.Tabbed -- default bottom type is flat
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.window_width = g_width
@@ -93,6 +94,7 @@ function main(script_path)
   options.create_tabs_for_missing_faces = true  --- create tabs for missing faces (if false then dont create the tabs on edges for faces not selected)
 
 -----------------------------------------------------------------------------------------------------------------------------------------
+
 
   local dovetails = ContourGroup(true)
 
@@ -124,7 +126,7 @@ function main(script_path)
     options.sideOrAllTabWidth = truncate(options.sideOrAllTabWidth * multiplier, 2)
     options.bottomTabWidth = truncate(options.bottomTabWidth * multiplier, 2)
     options.lidTabWidth = truncate(options.lidTabWidth * multiplier, 2)
-    options.clampingAllowance = truncate(options.clampingAllowance * multiplier, 2)
+    options.allowance = truncate(options.allowance * multiplier, 2)
     options.clampingMargin = truncate(options.clampingMargin * multiplier, 2)
     options.InMM = job.InMM
   end
@@ -158,12 +160,33 @@ function main(script_path)
   lidDoveTail.start_depth = 0
   lidDoveTail.cut_z = mtl_block:CalcAbsoluteZFromDepth(options.thickness) 
 
+  -- based on options we need a local version of some of the options
+  -- if there's no lid or bottom made, we should make the face no
+  -- matter what the boxes says, nor should we machine the edges for it so count that
+  -- as flat
+  
+  -- need to shallow copy these as we're overwriting them
+  local computedFacesToMake = {}
+  computedFacesToMake.lid = options.facesToMake.lid
+  computedFacesToMake.bottom = options.facesToMake.bottom
+  computedFacesToMake.side1 = options.facesToMake.side1
+  computedFacesToMake.side2 = options.facesToMake.side2
+  computedFacesToMake.end1 = options.facesToMake.end1
+  computedFacesToMake.end2 = options.facesToMake.end2
+
+  if options.lidType == LidBottomType.None then
+    -- if we aren't making a lid then we shouldn't make tabs for the lid since there won't be a lid to fit them
+    computedFacesToMake.lid = false
+  end
+
+  local noLidTabs = (options.lidType == LidBottomType.Flat) or (options.lidType == LidBottomType.None) or (options.lidType == LidBottomType.Inset)
+
 -- Make the bottom face
   local cad_list = CadObjectList(true)
 -- local dovetail_markers = {}
   local faces = {}
 
-  if options.facesToMake.bottom then
+  if computedFacesToMake.bottom then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     -- the bottom face is only the bottom so we didn't need to add
     -- a separate value to it, just pass it the bottom value
@@ -173,14 +196,14 @@ function main(script_path)
       options.start_point, 
       bottomDoveTail, 
       options.cut_dovetails,  -- if true then create dovetails
-      options.facesToMake,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       "BottomFace" )
     faces[#faces + 1] = bottom_face
   end
 
   -- -- -- Make sides
-  if options.facesToMake.side1 then
+  if computedFacesToMake.side1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local sideface1 = MakeSideFace(options.width,
       options.height, 
@@ -190,15 +213,15 @@ function main(script_path)
       bottomDoveTail,
       lidDoveTail,
       options.cut_dovetails, 
-      options.flat_lid,
-      options.facesToMake,
+      options.lidType,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_side1
       "SideFace1")
     faces[#faces + 1] = sideface1
   end
 
-  if options.facesToMake.side2 then
+  if computedFacesToMake.side2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local sideface2 = MakeSideFace(options.width,
       options.height, 
@@ -208,8 +231,8 @@ function main(script_path)
       bottomDoveTail,
       lidDoveTail,
       options.cut_dovetails, 
-      options.flat_lid,
-      options.facesToMake,
+      options.lidType,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_side1 (so this is side2)
       "SideFace2")
@@ -217,7 +240,7 @@ function main(script_path)
   end
 
   -- -- -- Make ends
-  if options.facesToMake.end1 then
+  if computedFacesToMake.end1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local endface1 = MakeEndFace(options.depth, 
       options.height, 
@@ -227,15 +250,15 @@ function main(script_path)
       bottomDoveTail,
       lidDoveTail,
       options.cut_dovetails, 
-      options.flat_lid,
-      options.facesToMake,
+      options.lidType,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_end1
       "EndFace1")
     faces[#faces + 1] = endface1
   end
 
-  if options.facesToMake.end2 then
+  if computedFacesToMake.end2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local endface2 = MakeEndFace(options.depth, 
       options.height, 
@@ -245,8 +268,8 @@ function main(script_path)
       bottomDoveTail,
       lidDoveTail,
       options.cut_dovetails, 
-      options.flat_lid,
-      options.facesToMake,
+      options.lidType,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_end1 (so this is end2)
       "EndFace2")
@@ -254,14 +277,14 @@ function main(script_path)
   end
 
   -- Make lid
-  if options.facesToMake.lid then
+  if (computedFacesToMake.lid and options.lidType ~= LidBottomType.None) then
     local lid = MakeLid(options.width,
       options.depth,
       options.thickness,
       lidDoveTail.min_width,
       options.start_point,
-      options.flat_lid,
-      options.facesToMake,
+      noLidTabs,
+      computedFacesToMake,
       options.create_tabs_for_missing_faces,
       "Lid"
     )
@@ -283,7 +306,7 @@ function main(script_path)
   local vdcontours = GetAllProfileContours(faces)
   local cdcontours = GetAllProfileCadContours(faces)
 
-  local offset_radius = 0.5* converted_tool_diameter - options.clampingAllowance
+  local offset_radius = 0.5* converted_tool_diameter - options.allowance
   local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
   local dogboned_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
 
@@ -296,7 +319,7 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
-  if (not options.no_toolpath) and options.facesToMake.lid and options.flat_lid then
+  if (not options.no_toolpath) and computedFacesToMake.lid and options.lidType == LidBottomType.Inset then
     CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
   end
 
@@ -304,7 +327,7 @@ function main(script_path)
     -- if we are doing dovetails make toolpath for them
     local dovetail_markers = GetAllMarkers(faces)
     if options.cut_dovetails and (#dovetail_markers > 0) then
-      CreateDoveTailToolpath(dovetail_markers, sideDoveTail, options.tool, options.clampingAllowance, options.warn_dovetail)
+      CreateDoveTailToolpath(dovetail_markers, sideDoveTail, options.tool, options.allowance, options.warn_dovetail)
     end
 
     CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, options.cut_layer_name)
@@ -333,7 +356,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("BottomTabWidthField", options.bottomTabWidth)
   dialog:AddDoubleField("TopTabWidthField", options.lidTabWidth)
   dialog:AddCheckBox("AllJointWidths", options.useAllJointWidths)
-  dialog:AddDoubleField("AllowanceField", options.clampingAllowance)
+  dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("ClampingMargin", options.clampingMargin)
 
   dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
@@ -366,23 +389,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   end
   dialog:AddRadioGroup("TabTypeRadio", tab_default_index)
 
--- Lid Type: 1 = Flat Lid, 2 = Tabbed Lid
-  local lid_default_index
-  if options.flat_lid then
-    lid_default_index = 1  -- last time user chose flat lid
-  else
-    lid_default_index = 2  -- last time user chose tabbed lid
-  end
-  dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
+  dialog:AddRadioGroup("LidTypeRadio", options.lidType)
+  dialog:AddRadioGroup("BottomTypeRadio", options.bottomType)
 
--- Bottom Type: 1 = Flat Bottom, 2 = Tabbed Bottom
-  local bottom_default_index
-  if options.flat_bottom then
-    bottom_default_index = 1
-  else
-    bottom_default_index = 2
-  end
-  dialog:AddRadioGroup("BottomTypeRadio", bottom_default_index)
   local units_string = "Inches"
   if options.tool.InMM then
     units_string = "MM"
@@ -417,8 +426,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- At least one face must be selected
     local at_least_one =
-    options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
-    options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
+      options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
+      options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
     if not at_least_one then
       DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
       return false
@@ -463,8 +472,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local num_flaps_d_top = math.floor((0.5*inner_depth) / lidDoveTail.min_width)
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*lidDoveTail.min_width)
 
-    -- don't check top joint widths if we are doing a flat lid since those joints won't exist in that case  
-    if not options.flat_lid then    
+    -- check the joint widths only when making a tabbed lid
+    if (options.lidType == LidBottomType.Tabbed) then
       if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
         DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", lidDoveTail.min_width, inner_width))
         return false
@@ -491,8 +500,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     end
 
     local dia = converted_tool_diameter
-    if options.clampingAllowance > 0 then
-      dia = dia - 2 * options.clampingAllowance
+    if options.allowance > 0 then
+      dia = dia - 2 * options.allowance
     end
 
     local tab_space_w_bottom = total_tab_space_w_bottom / (num_flaps_w_bottom + 1)
@@ -519,7 +528,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         return false
       end
 
-      if (not options.flat_lid) then
+      if (options.lidType == LidBottomType.Tabbed) then
         if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
           DisplayMessageBox("The joint width is too small for the lid.")
           return false
@@ -530,7 +539,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if (tab_space_w_bottom <= bottom_min_space) or 
       (tab_space_d_bottom <= bottom_min_space) or 
       (tab_space_h <= min_space) or 
-      ((not options.flat_lid) and 
+      ((options.lidType == LidBottomType.Tabbed) and 
         ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
@@ -550,7 +559,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox("The selected tool will not fit between the side joints.")
         return false
       end 
-      if (options.useAllJointWidths and not options.flat_lid and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
+      if (options.useAllJointWidths and options.lidType == LidBottomType.Tabbed and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
         if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
           DisplayMessageBox("The selected tool will not fit between the lid joints.")
           return false
@@ -627,7 +636,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   bottomDoveTail.max_width = bottomDoveTail.min_width + (2* options.thickness/ math.tan(bottomDoveTail.angle))
   lidDoveTail.max_width = lidDoveTail.min_width + (2 * options.thickness / math.tan(lidDoveTail.angle))
 
-  options.clampingAllowance   = dialog:GetDoubleField("AllowanceField")
+  options.allowance   = dialog:GetDoubleField("AllowanceField")
   options.clampingMargin = dialog:GetDoubleField("ClampingMargin")
   if not options.clampingMargin or options.clampingMargin <= 0 then
     options.clampingMargin = 0.75
@@ -642,18 +651,11 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   end
 
   local lid_index = dialog:GetRadioIndex("LidTypeRadio")
-  if lid_index == 1 then
-    options.flat_lid = true
-  else
-    options.flat_lid = false
-  end
-
+  options.lidType = lid_index
+  
   local bottom_index = dialog:GetRadioIndex("BottomTypeRadio")
-  if bottom_index == 1 then
-    options.flat_bottom = true
-  else
-    options.flat_bottom = false
-  end
+  options.bottomType = bottom_index
+
 
   -- Get from tool picker
   options.tool = dialog:GetTool("ToolChooseButton")
@@ -668,8 +670,8 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
     -- Apply Allowance the same way as in your validator
     local effective_dia = raw_dia
-    if options.clampingAllowance and options.clampingAllowance > 0 then
-      effective_dia = effective_dia - 2 * options.clampingAllowance
+    if options.allowance and options.allowance > 0 then
+      effective_dia = effective_dia - 2 * options.allowance
       if effective_dia < 0 then
         effective_dia = 0
       end
@@ -720,11 +722,12 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomJointWidth", options.bottomTabWidth)     -- Added by Gremlin
   registry:SetDouble("TopJointWidth", options.lidTabWidth)         -- Added by Gremlin
   registry:SetBool("AllJointWidths", options.useAllJointWidths)           -- Added by Gremlin
-  registry:SetDouble("Allowance", options.clampingAllowance)                 -- Added by Sharkcutup
+  registry:SetDouble("Allowance", options.allowance)                 -- Added by Sharkcutup
   registry:SetDouble("EdgeMargin", options.clampingMargin)              -- Added by Sharkcutup
   registry:SetBool("CutDovetails", options.cut_dovetails)
-  registry:SetBool("FlatLid", options.flat_lid)
-  registry:SetBool("FlatBottom", options.flat_bottom)
+  registry:SetDouble("LidType", options.lidType)
+  registry:SetDouble("BottomType", options.bottomType)
+
   if options.tool ~= nil then
     options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
@@ -756,14 +759,14 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomTabWidth = registry:GetDouble("BottomJointWidth", options.sideOrAllTabWidth)  --Added by Gremlin
   options.lidTabWidth = registry:GetDouble("TopJointWidth", options.sideOrAllTabWidth)      --Added by Gremlin
   options.useAllJointWidths = registry:GetBool("AllJointWidths", options.useAllJointWidths)  -- Added by Gremlin
-  options.clampingAllowance = registry:GetDouble("Allowance", options.clampingAllowance)           -- Added by Sharkcutup
+  options.allowance = registry:GetDouble("Allowance", options.allowance)           -- Added by Sharkcutup
   options.clampingMargin = registry:GetDouble("EdgeMargin", options.clampingMargin)      -- Added by Sherkcutup
   -- sideDoveTail.min_width = options.sideOrAllTabWidth
   -- bottomDoveTail.min_width = options.bottomTabWidth -- Added by Gremlin
   -- lidDoveTail.min_width = options.lidTabWidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
-  options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
-  options.flat_bottom = registry:GetBool("FlatBottom", options.flat_bottom)
+  options.lidType = registry:GetDouble("LidType", options.lidType)
+  options.bottomType = registry:GetDouble("BottomType", options.bottomType)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
 
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
@@ -799,78 +802,10 @@ function truncate(num, decimals)
     end
 end
 
-function OnLuaButton_TabTypeRadio1()
-  return true
-end
-
-function OnLuaButton_TabTypeRadio2()
-  return true
-end
-
-function OnLuaButton_LidTypeRadio2()
-  return true
-end
-
-function OnLuaButton_LidTypeRadio1()
-  return true
-end
-
-function OnLuaButton_BottomTypeRadio1()
-  return true
-end
-
-function OnLuaButton_BottomTypeRadio2()
-  return true
-end
-
-function OnLuaButton_MakeLid()
-  return true
-end
-
-function OnLuaButton_MakeBottom()
-  return true
-end
-
-function OnLuaButton_MakeSide1()
-  return true
-end
-
-function OnLuaButton_MakeSide2()
-  return true
-end
-
-function OnLuaButton_MakeEnd1()
-  return true
-end
-
-function OnLuaButton_MakeEnd2()
-  return true
-end
-
-function OnLuaButton_CreateTabsForMissingFaces()
-  return true
-end
-
-function OnLuaButton_WarnDovetail()
-  return true
-end
-
-function OnLuaButton_AllJointWidths()  
+--- By putting this function in the script we don't need to create
+--- individual functions unless we need specific handling
+function OnLuaButton_XXXX()
   return true
 end
 
 
-function OnLuaButton_DarkMode()
-  return true
-end
-
-function OnLuaButton_LabelFaces()
-  return true
-end
-
--- HTML checkbox id="NoToolpath" is marked class="LuaButton".
--- Vectric's HTML dialog system expects a handler named OnLuaButton_<id>.
--- If it's missing, VCarve/Aspire shows: "No Button Handler found in the script".
-function OnLuaButton_NoToolpath()
-  return true
-end

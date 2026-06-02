@@ -89,8 +89,8 @@
       <!-- Faces to machine -->
       <div class="faces-panel">
         <div class="sub-panel-title">Faces To Machine</div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton" />Bottom</label></div>
+        <div class="face-checkbox" id="MakeLidCheckItem"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton" />Lid</label></div>
+        <div class="face-checkbox" id="MakeBottomCheckItem"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
@@ -145,18 +145,30 @@
         <div class="type-panel-header">Lid Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioInset" onclick="onLidTypeChanged(this)" />Inset</label>
           </div>
           <div class="type-option-preview">
-            <img src="Images/flatlid.png" alt="Flat lid preview" />
+            <img src="Images/InsetLid.png" alt="Inset lid preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioTabbed" onclick="onLidTypeChanged(this)" />Tabbed</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
+          </div>
+        </div><div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioFlat" onclick="onLidTypeChanged(this)" />Flat</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/FlatLid.png" alt="Flat lid preview" />
           </div>
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioNone" onclick="onLidTypeChanged(this)" />None</label>
           </div>
         </div>
       </div>
@@ -167,7 +179,23 @@
         <div class="type-panel-header">Bottom Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio1" />Flat</label>
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeInset" onclick="onBottomTypeChanged(this)"/>Flat</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/InsetBottom.png" alt="Flat bottom preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeTabbed" onclick="onBottomTypeChanged(this)" />Tabbed</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabbedbottom.png" alt="Tabbed bottom preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeFlat" onclick="onBottomTypeChanged(this)" />Flat</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/FlatBottom.png" alt="Flat bottom preview" />
@@ -175,10 +203,7 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio2" />Tabbed</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabbedbottom.png" alt="Tabbed bottom preview" />
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeNone" onclick="onBottomTypeChanged(this)" />None</label>
           </div>
         </div>
       </div>
@@ -232,6 +257,13 @@
     return "100%";
   }
 
+  function onKeyDownPreventNegative(event) {
+    // Prevent entering negative values in number fields (except for backspace and delete).
+    if (event.keyCode === 189 || event.keyCode === 109) {
+      event.preventDefault();
+    }
+  }
+
   // Applies or removes dark mode by toggling the dark-mode class on body.
   function onDarkModeChanged(checkbox) {
     if (checkbox.checked) {
@@ -245,16 +277,29 @@
   function onLidTypeChanged(radio) {
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) {
-      lidJointRow.style.display = document.getElementById("LidTypeRadio1").checked ? "none" : "block";
+      lidJointRow.style.display = document.getElementById("LidTypeRadioTabbed").checked ? "block" : "none";
     }
+    var noLid = document.getElementById("LidTypeRadioNone").checked;
+    var lidCheckItem = document.getElementById("MakeLidCheckItem");
+    if (lidCheckItem) { lidCheckItem.style.display = noLid ? "none" : "block"; }
+  }
+
+  function onBottomTypeChanged(radio) {
+    var bottomJointRow = document.getElementById("showHideBottomJoints");
+    if (bottomJointRow) {
+      bottomJointRow.style.display = document.getElementById("BottomTypeTabbed").checked ? "block" : "none";
+    }
+    var noBottom = document.getElementById("BottomTypeNone").checked;
+    var bottomCheckItem = document.getElementById("MakeBottomCheckItem");
+    if (bottomCheckItem) { bottomCheckItem.style.display = noBottom ? "none" : "block"; }
   }
 
   // Shows or hides the Bottom and Lid joint width fields.
   function onShowAllWidthsChanged(checkbox) {
     var el = document.getElementById("showHideTopBottomJoints");
     if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
-	var elSideJoint = document.getElementById("SideJointLabel")
-	if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joints":"All Joints"}
+	  var elSideJoint = document.getElementById("SideJointLabel")
+	  if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joints":"All Joints"}
   }
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
@@ -268,7 +313,7 @@
       onDarkModeChanged(darkMode);
     }
 
-    var lid1 = document.getElementById("LidTypeRadio1");
+    var lid1 = document.getElementById("LidTypeRadioInset");
     if (lid1) { onLidTypeChanged(lid1); }
 
     var allWidths = document.getElementById("AllJointWidths");
