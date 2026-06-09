@@ -565,14 +565,40 @@ function GetFriendlyFaceLabel(face)
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
   function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
-                        lidType, facesToMake, create_tabs_for_missing_faces, is_side1, name)
+      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name)
 
     local dovetail_markers = {}
     local tablist = {}
     local inner_start_point = start_point + Vector2D(thickness, thickness)
     local inner_width  = width - 2*thickness
-    local inner_height = height - 2*thickness
-    -- DisplayMessageBox("inner_width " .. inner_width)
+
+    -- inner height is the inside height of the box,
+    -- or the distance before the fingers
+    
+    local bottom_thickness = thickness
+    if (bottomType == LidBottomType.None) then
+      bottom_thickness = 0
+    elseif (bottomType == LidBottomType.Inset) then
+      bottom_thickness = 0.5*thickness
+    elseif (bottomType == LidBottomType.Flat) then
+      bottom_thickness = thickness
+    else
+      bottom_thickness = thickness
+    end
+
+    local top_thickness = thickness
+    if (lidType == LidBottomType.None) then
+      top_thickness = 0
+    elseif (lidType == LidBottomType.Inset) then
+      top_thickness = 0.5*thickness
+    elseif (lidType == LidBottomType.Flat) then
+      top_thickness = thickness
+    else
+      top_thickness = thickness
+    end
+
+    local inner_height = height - (bottom_thickness + top_thickness)
+
 
     local unit_x = Vector2D(1,0)
     local unit_y = Vector2D(0,1)
@@ -601,8 +627,29 @@ function GetFriendlyFaceLabel(face)
     local contour = Contour(0.0)
     contour:AppendPoint(inner_start_point)
 
-    --  blc ->brc (tabs for bottom)
-    if (create_tabs_for_missing_faces or facesToMake.bottom) then
+    -- blc -> brc is the bottom edge of the side face
+    if ((bottomType ~= LidBottomType.Tabbed) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==LidBottomType.Tabbed)) then
+      -- in this case the bottom edge has no tabs, and starts at 0,0
+      LineToVector(contour, -0.0*bottom_thickness*unit_y)
+      -- LineToVector(contour, -1.0*bottom_thickness*unit_y)
+      LineToVector(contour, inner_width*unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      contour:LineTo(inner_brc)
+    -- elseif (bottomType == LidBottomType.Inset) then
+    --   -- in this case the bottom edge has no tabs, but starts at thickness, thickness
+    --   LineToVector(contour, -0.5*thickness*unit_y)
+    --   LineToVector(contour, inner_width*unit_x)
+    --   AddMiddleOfLastSpanToList(contour, tablist)
+    --   contour:LineTo(inner_brc)
+    -- elseif (bottomType == LidBottomType.Flat) then
+    --   -- in this case the bottom edge has no tabs, but starts at thickness, 0
+    --   LineToVector(contour, -0.0*thickness*unit_y)
+    --   LineToVector(contour, inner_width*unit_x)
+    --   AddMiddleOfLastSpanToList(contour, tablist)
+    --   contour:LineTo(inner_brc)
+    else 
+      -- in this case the bottom edge has tabs and starts at thickness, thickness
       LineToVector(contour, tab_space_bottom*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (with_tails) then
@@ -610,11 +657,6 @@ function GetFriendlyFaceLabel(face)
       else
         AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
       end
-      contour:LineTo(inner_brc)
-      AddMiddleOfLastSpanToList(contour, tablist)
-    else
-      LineToVector(contour, tab_space_bottom*unit_x)
-      AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
@@ -638,30 +680,30 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- trc -> tlc (top line so has flaps for lid)
-    if ((lidType == LidBottomType.None) or 
-        (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
+    if ((lidType ~= LidBottomType.Tabbed) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
       -- this is for no lid
       -- so the box goes the whole-way up
       -- Also used for a dovetail/tabbed lid where we're not cutting tabs as it would also 
       -- be full height
-      LineToVector(contour, thickness*unit_y)
+      LineToVector(contour, 0*top_thickness*unit_y)
       LineToVector(contour, -inner_width*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_tlc)
-    elseif (lidType == LidBottomType.Inset) then
-      -- this is for an inset lid
-      -- the pocket is 0.5 thickness so it needs to be that much shorter
-      LineToVector(contour, 0.5*thickness*unit_y)
-      LineToVector(contour, -inner_width*unit_x)
-      AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_tlc)
-    elseif (lidType == LidBottomType.Flat) then
-      -- this is for an flat lid, need to make the box
-      -- the whole thickness shorter inside
-      LineToVector(contour, 0.0*unit_y)
-      LineToVector(contour, -inner_width*unit_x)
-      AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_tlc)
+    -- elseif (lidType == LidBottomType.Inset) then
+    --   -- this is for an inset lid
+    --   -- the pocket is 0.5 thickness so it needs to be that much shorter
+    --   LineToVector(contour, 0.5*thickness*unit_y)
+    --   LineToVector(contour, -inner_width*unit_x)
+    --   AddMiddleOfLastSpanToList(contour, tablist)
+    --   contour:LineTo(inner_tlc)
+    -- elseif (lidType == LidBottomType.Flat) then
+    --   -- this is for an flat lid, need to make the box
+    --   -- the whole thickness shorter inside
+    --   LineToVector(contour, 0.0*unit_y)
+    --   LineToVector(contour, -inner_width*unit_x)
+    --   AddMiddleOfLastSpanToList(contour, tablist)
+    --   contour:LineTo(inner_tlc)
     else 
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
@@ -695,16 +737,40 @@ function GetFriendlyFaceLabel(face)
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
   function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
-                       lidType, facesToMake, create_tabs_for_missing_faces, is_end1, name)
+      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name)
 
     local tablist = {}
     local dovetail_markers = {}
+
     local unit_x = Vector2D(1,0)
     local unit_y = Vector2D(0,1)
-    local inner_start_point = start_point + thickness*unit_y
-    local inner_width = width - 2*thickness;
-    local inner_height  = height - 2*thickness
 
+    local bottom_thickness = 0
+    if (bottomType == LidBottomType.None) then
+      bottom_thickness = 0
+    elseif (bottomType == LidBottomType.Inset) then
+      bottom_thickness = 0.5*thickness
+    elseif (bottomType == LidBottomType.Flat) then
+      bottom_thickness = 0  
+    else
+      bottom_thickness = thickness
+    end
+
+    local top_thickness = 0
+    if (lidType == LidBottomType.None) then
+      top_thickness = 0
+    elseif (lidType == LidBottomType.Inset) then
+      top_thickness = 0.5*thickness
+    elseif (lidType == LidBottomType.Flat) then
+      top_thickness = 0
+    else
+      top_thickness = thickness
+    end
+
+    local inner_start_point = start_point + bottom_thickness * unit_y
+
+    local inner_width = width - 2*thickness;
+    local inner_height  = height - (top_thickness + bottom_thickness)
 
     local inner_blc = inner_start_point
     local inner_brc = inner_start_point + width * unit_x
@@ -727,7 +793,10 @@ function GetFriendlyFaceLabel(face)
     contour:AppendPoint(inner_start_point)
 
     -- blc --> brc (tabs for bottom)
-    if (create_tabs_for_missing_faces or facesToMake.bottom) then
+    if ((bottomType ~= LidBottomType.Tabbed) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==LidBottomType.Tabbed)) then
+      contour:LineTo(inner_brc)
+    else
       LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (with_tails) then
@@ -736,17 +805,12 @@ function GetFriendlyFaceLabel(face)
         AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
       end
       contour:LineTo(inner_brc)
-      AddMiddleOfLastSpanToList(contour, tablist)
-    else
-      LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
-      AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_brc)
-      AddMiddleOfLastSpanToList(contour, tablist)
     end
+    AddMiddleOfLastSpanToList(contour, tablist)
 
     -- brc --> trc (tabs for right side)
     if (makeTabsForRightEnd) then
-      LineToVector(contour,  tab_space_side*unit_y)
+      LineToVector(contour,  (tab_space_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
       contour:LineTo(inner_trc)
@@ -760,26 +824,35 @@ function GetFriendlyFaceLabel(face)
 
     -- if the lid is flat then we go up by half thickness and then across
     -- trc -> tlc (top edge)
-    if ((lidType == LidBottomType.None) or 
-        (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
-      LineToVector(contour, (1.0*thickness) * (unit_y));
-      LineToVector(contour, (width)*(-unit_x))
-      AddMiddleOfLastSpanToList(contour, tablist)
+    if ((lidType ~= LidBottomType.Tabbed) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
       contour:LineTo(inner_tlc)
-    elseif (lidType == LidBottomType.Inset) then
-      LineToVector(contour, (0.5*thickness) * (unit_y));
-      LineToVector(contour, (width)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_tlc)
-    elseif (lidType == LidBottomType.Flat) then
-      LineToVector(contour, (0.0*thickness) * (unit_y));
-      LineToVector(contour, (width)*(-unit_x))
-      AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_tlc)    
     else
       LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+
+      if with_tails then
+        AddMaleDoveTailsAlongLine(thickness,
+          topdovetail,
+          -unit_x,
+          unit_y,
+          contour,
+          num_flaps_top,
+          tab_space_top
+        )
+      else
+        AddFlapsAlongLine(
+          thickness,
+          topdovetail.min_width,
+          tab_space_top,
+          -unit_x,
+          unit_y,
+          contour,
+          num_flaps_top
+        )
+      end
+
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     end

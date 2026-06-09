@@ -214,6 +214,7 @@ function main(script_path)
       lidDoveTail,
       options.cut_dovetails, 
       options.lidType,
+      options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_side1
@@ -232,6 +233,7 @@ function main(script_path)
       lidDoveTail,
       options.cut_dovetails, 
       options.lidType,
+      options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_side1 (so this is side2)
@@ -251,6 +253,7 @@ function main(script_path)
       lidDoveTail,
       options.cut_dovetails, 
       options.lidType,
+      options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_end1
@@ -269,6 +272,7 @@ function main(script_path)
       lidDoveTail,
       options.cut_dovetails, 
       options.lidType,
+      options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_end1 (so this is end2)
@@ -704,6 +708,7 @@ end
 function SaveDefaultsToRegistry(options, justwindowinfo)
   local registry = Registry("BoxCreator_" .. g_version)
 
+  -- UX defaults
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
   registry:SetBool("WarnDovetail", options.warn_dovetail)
@@ -714,6 +719,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
     return
   end
 
+  -- Box dimension settings
   registry:SetDouble("Width", options.width)
   registry:SetDouble("Height", options.height)
   registry:SetDouble("Depth", options.depth)
@@ -734,6 +740,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
 
   registry:SetBool("NoToolpath", options.no_toolpath)
 
+  -- Machining settings
   registry:SetBool("MakeLid", options.facesToMake.lid)
   registry:SetBool("MakeBottom", options.facesToMake.bottom)
   registry:SetBool("MakeSide1", options.facesToMake.side1)
