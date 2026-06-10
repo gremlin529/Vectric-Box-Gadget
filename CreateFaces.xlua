@@ -574,7 +574,7 @@ function GetFriendlyFaceLabel(face)
 
     -- inner height is the inside height of the box,
     -- or the distance before the fingers
-    
+
     local bottom_thickness = thickness
     if (bottomType == LidBottomType.None) then
       bottom_thickness = 0
@@ -631,23 +631,10 @@ function GetFriendlyFaceLabel(face)
     if ((bottomType ~= LidBottomType.Tabbed) or 
       (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==LidBottomType.Tabbed)) then
       -- in this case the bottom edge has no tabs, and starts at 0,0
-      LineToVector(contour, -0.0*bottom_thickness*unit_y)
-      -- LineToVector(contour, -1.0*bottom_thickness*unit_y)
+      LineToVector(contour, -0.0*unit_y)
       LineToVector(contour, inner_width*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_brc)
-    -- elseif (bottomType == LidBottomType.Inset) then
-    --   -- in this case the bottom edge has no tabs, but starts at thickness, thickness
-    --   LineToVector(contour, -0.5*thickness*unit_y)
-    --   LineToVector(contour, inner_width*unit_x)
-    --   AddMiddleOfLastSpanToList(contour, tablist)
-    --   contour:LineTo(inner_brc)
-    -- elseif (bottomType == LidBottomType.Flat) then
-    --   -- in this case the bottom edge has no tabs, but starts at thickness, 0
-    --   LineToVector(contour, -0.0*thickness*unit_y)
-    --   LineToVector(contour, inner_width*unit_x)
-    --   AddMiddleOfLastSpanToList(contour, tablist)
-    --   contour:LineTo(inner_brc)
     else 
       -- in this case the bottom edge has tabs and starts at thickness, thickness
       LineToVector(contour, tab_space_bottom*unit_x)
@@ -686,24 +673,10 @@ function GetFriendlyFaceLabel(face)
       -- so the box goes the whole-way up
       -- Also used for a dovetail/tabbed lid where we're not cutting tabs as it would also 
       -- be full height
-      LineToVector(contour, 0*top_thickness*unit_y)
+      LineToVector(contour, 0*unit_y)
       LineToVector(contour, -inner_width*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_tlc)
-    -- elseif (lidType == LidBottomType.Inset) then
-    --   -- this is for an inset lid
-    --   -- the pocket is 0.5 thickness so it needs to be that much shorter
-    --   LineToVector(contour, 0.5*thickness*unit_y)
-    --   LineToVector(contour, -inner_width*unit_x)
-    --   AddMiddleOfLastSpanToList(contour, tablist)
-    --   contour:LineTo(inner_tlc)
-    -- elseif (lidType == LidBottomType.Flat) then
-    --   -- this is for an flat lid, need to make the box
-    --   -- the whole thickness shorter inside
-    --   LineToVector(contour, 0.0*unit_y)
-    --   LineToVector(contour, -inner_width*unit_x)
-    --   AddMiddleOfLastSpanToList(contour, tablist)
-    --   contour:LineTo(inner_tlc)
     else 
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
@@ -751,7 +724,7 @@ function GetFriendlyFaceLabel(face)
     elseif (bottomType == LidBottomType.Inset) then
       bottom_thickness = 0.5*thickness
     elseif (bottomType == LidBottomType.Flat) then
-      bottom_thickness = 0  
+      bottom_thickness = thickness
     else
       bottom_thickness = thickness
     end
@@ -762,7 +735,7 @@ function GetFriendlyFaceLabel(face)
     elseif (lidType == LidBottomType.Inset) then
       top_thickness = 0.5*thickness
     elseif (lidType == LidBottomType.Flat) then
-      top_thickness = 0
+      top_thickness = thickness
     else
       top_thickness = thickness
     end
