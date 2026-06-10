@@ -471,7 +471,8 @@ function GetFriendlyFaceLabel(face)
 |  Returns the contour for the profile and a list of dovetails
 |
 ]]
-  function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, use_dovetails, facesToMake, create_tabs_for_missing_faces, name)
+  function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
+            use_dovetails, bottomType,facesToMake, create_tabs_for_missing_faces, name)
 
     local dovetail_markers = {}
     local tablist = {}
@@ -504,7 +505,7 @@ function GetFriendlyFaceLabel(face)
     local unit_y = Vector2D(0,1)
 
     -- line to first blc -> brc (Side 1)
-    if (create_tabs_for_missing_faces or facesToMake.side1) then
+    if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == LidBottomType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -518,7 +519,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create brc -> trc (end 1)
-    if (create_tabs_for_missing_faces or facesToMake.end1) then
+    if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == LidBottomType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
@@ -532,7 +533,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create trc -> tlc (side 2)
-    if (create_tabs_for_missing_faces or facesToMake.side2) then
+    if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == LidBottomType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -546,7 +547,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create tlc -> blc (end 2)
-    if (create_tabs_for_missing_faces or facesToMake.end2) then
+    if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == LidBottomType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)

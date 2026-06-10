@@ -196,6 +196,7 @@ function main(script_path)
       options.start_point, 
       bottomDoveTail, 
       options.cut_dovetails,  -- if true then create dovetails
+      options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       "BottomFace" )
