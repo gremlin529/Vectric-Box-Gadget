@@ -14,7 +14,6 @@ LidBottomType = {
   None = 4
 }
 
-
 -- ---------- VALIDATION HELPERS ----------
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
 
@@ -472,7 +471,7 @@ function GetFriendlyFaceLabel(face)
 |
 ]]
   function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
-            use_dovetails, bottomType,facesToMake, create_tabs_for_missing_faces, name)
+            use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name)
 
     local dovetail_markers = {}
     local tablist = {}
@@ -913,10 +912,38 @@ function GetFriendlyFaceLabel(face)
     local outer_tlc = start_point + height*unit_y
 
     -- Get the corners of the box offset by the thickness
-    local inner_blc = inner_start_point
-    local inner_brc = inner_start_point + inner_width*unit_x
-    local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
-    local inner_tlc = inner_start_point + inner_height*unit_y
+    -- these are used to do the pocket for an inset box, otherwise they
+    -- are not used. 
+    local inner_blc, inner_brc, inner_trc, inner_tlc
+
+    -- if side 1 is missing then don't cut a contour for it
+    if (facesToMake.side1 == false and not create_tabs_for_missing_faces) then
+      inner_blc = inner_start_point - Vector2D(0, thickness)
+    else
+      inner_blc = inner_start_point
+    end
+
+    -- end 1 is there or not
+    if (facesToMake.end1 == false and not create_tabs_for_missing_faces) then
+      inner_brc = Point2D(inner_start_point.x, inner_blc.y) + inner_width*unit_x + Vector2D(thickness, 0)
+    else
+      inner_brc = Point2D(inner_start_point.x, inner_blc.y)  + inner_width*unit_x
+    end
+
+    -- side 2 is there or not
+    if (facesToMake.side2 == false and not create_tabs_for_missing_faces) then
+      inner_trc = Point2D(inner_brc.x, inner_start_point.y) + inner_height*unit_y + Vector2D(0, thickness)
+    else
+      inner_trc = Point2D(inner_brc.x, inner_start_point.y) + inner_height*unit_y
+    end
+
+    if (facesToMake.end2 == false and not create_tabs_for_missing_faces) then
+      inner_tlc = Point2D(inner_start_point.x, inner_trc.y) - Vector2D(thickness,0 )
+      -- Also if end2 is not being drawn then the bottom left corner should be over
+      inner_blc = inner_blc - Vector2D(thickness, 0)
+    else
+      inner_tlc = Point2D(inner_start_point.x, inner_trc.y)
+    end
 
     local num_flaps_w = math.floor( (0.5*inner_width)/tab_width)
     local num_flaps_h = math.floor( (0.5*inner_height)/tab_width)
@@ -996,6 +1023,8 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
+    -- This is the contour that will be used to cut the pocket in the lid
+    -- when doing an inset, needs to accomodate missing faces machining though
     local inner_contour = Contour(0.0)
     inner_contour:AppendPoint(inner_blc)
     inner_contour:LineTo(inner_brc)
@@ -1006,50 +1035,51 @@ function GetFriendlyFaceLabel(face)
     return Lid(contour, inner_contour, {}, tablist, name)
   end
 
-  function MakeLidPocketContours(width, height, thickness, start_point)
--- local cad_object_list = CadObjectList(true)
+  -- TODO I think this function is never called
+--   function MakeLidPocketContours(width, height, thickness, start_point)
+-- -- local cad_object_list = CadObjectList(true)
 
-    local unit_x = Vector2D(1,0)
-    local unit_y = Vector2D(0,1)
+--     local unit_x = Vector2D(1,0)
+--     local unit_y = Vector2D(0,1)
 
-    local inner_width = width - 2*thickness
-    local inner_height = height - 2*thickness
-    local inner_start_point = start_point + Vector2D(thickness, thickness)
+--     local inner_width = width - 2*thickness
+--     local inner_height = height - 2*thickness
+--     local inner_start_point = start_point + Vector2D(thickness, thickness)
 
-    -- Get corners of box
-    local outer_blc = start_point
-    local outer_brc = start_point + width*unit_x
-    local outer_trc = start_point + width*unit_x + height* unit_y
-    local outer_tlc = start_point + height*unit_y
+--     -- Get corners of box
+--     local outer_blc = start_point
+--     local outer_brc = start_point + width*unit_x
+--     local outer_trc = start_point + width*unit_x + height* unit_y
+--     local outer_tlc = start_point + height*unit_y
 
-    -- Get the corners of the box offset by the thickness
-    local inner_blc = inner_start_point
-    local inner_brc = inner_start_point + inner_width*unit_x
-    local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
-    local inner_tlc = inner_start_point + inner_height*unit_y
+--     -- Get the corners of the box offset by the thickness
+--     local inner_blc = inner_start_point
+--     local inner_brc = inner_start_point + inner_width*unit_x
+--     local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
+--     local inner_tlc = inner_start_point + inner_height*unit_y
 
-    local cad_object_list = CadObjectList(true);
-    local outer_contour = Contour(0.0)
-    outer_contour:AppendPoint(outer_blc)
-    outer_contour:LineTo(outer_brc)
-    outer_contour:LineTo(outer_trc)
-    outer_contour:LineTo(outer_tlc)
-    outer_contour:LineTo(outer_blc)
+--     local cad_object_list = CadObjectList(true);
+--     local outer_contour = Contour(0.0)
+--     outer_contour:AppendPoint(outer_blc)
+--     outer_contour:LineTo(outer_brc)
+--     outer_contour:LineTo(outer_trc)
+--     outer_contour:LineTo(outer_tlc)
+--     outer_contour:LineTo(outer_blc)
 
-    local inner_contour = Contour(0.0)
-    inner_contour:AppendPoint(inner_blc)
-    inner_contour:LineTo(inner_brc)
-    inner_contour:LineTo(inner_trc)
-    inner_contour:LineTo(inner_tlc)
-    inner_contour:LineTo(inner_blc)
+--     local inner_contour = Contour(0.0)
+--     inner_contour:AppendPoint(inner_blc)
+--     inner_contour:LineTo(inner_brc)
+--     inner_contour:LineTo(inner_trc)
+--     inner_contour:LineTo(inner_tlc)
+--     inner_contour:LineTo(inner_blc)
 
-    local outer_cad_contour = CreateCadContour(outer_contour)
-    cad_object_list:AddTail(outer_cad_contour)
-    local inner_cad_contour = CreateCadContour(inner_contour)
-    cad_object_list:AddTail(inner_cad_contour)
+--     local outer_cad_contour = CreateCadContour(outer_contour)
+--     cad_object_list:AddTail(outer_cad_contour)
+--     local inner_cad_contour = CreateCadContour(inner_contour)
+--     cad_object_list:AddTail(inner_cad_contour)
 
-    return cad_object_list
-  end
+--     return cad_object_list
+--   end
 
 --[[  -------------- ArrangeContours --------------------------------------------------  
 |
