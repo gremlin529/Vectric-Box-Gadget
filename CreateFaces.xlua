@@ -7,12 +7,22 @@
 -- require("strict")
 
 -- Enums and constants
-LidBottomType = {
+FaceJointType = {
   Inset = 1,
   Tabbed = 2,
   Flat  = 3,
   None = 4
 }
+
+FaceType = {
+  Bottom = 1,
+  Lid = 2,
+  Side = 3,
+  End =4
+}
+
+local unit_x = Vector2D(1,0)
+local unit_y = Vector2D(0,1)
 
 -- ---------- VALIDATION HELPERS ----------
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
@@ -24,32 +34,24 @@ function _tool_ok(tool)
   return (dia or 0) > 0
 end
 
-function Face(contour, dovetails, tabs, name)
+function Face(outer_contour, inset_contour, dovetails, tabs, name, facetype, jointtype)
   local obj ={}
-  obj.contour = contour
-  obj.dovetail_list = dovetails
-  obj.name = name
-  obj.tabs = tabs
-  obj.is_lid = false
-  return obj
-end
-
-function Lid(outer_contour, inner_contour, dovetails, tabs, name)
-  local obj = {}
   obj.contour = outer_contour
-  obj.is_lid = true
-  obj.inner_contour = inner_contour
-  obj.tabs = tabs
-  obj.name = name
+  obj.inset_contour = inset_contour
   obj.dovetail_list = dovetails
+  obj.name = name
+  obj.tabs = tabs
+  -- obj.is_lid = false
+  obj.facetype = facetype
+  obj.jointtype = jointtype
   return obj
 end
 
 function TransformFace(face, xform)
   face.contour:Transform(xform)
 
-  if (face.is_lid) then
-    face.inner_contour:Transform(xform)
+  if (face.inset_contour ~= nil) then
+    face.inset_contour:Transform(xform)
   end
 
   -- Transform dovetail markers
@@ -71,10 +73,11 @@ function CloneFace(face)
   clone.contour = face.contour:Clone()
   clone.dovetail_list = face.dovetail_list
   clone.tabs = face.tabs
-  clone.is_lid = face.is_lid
   clone.name = face.name
-  if (clone.is_lid) then
-    clone.inner_contour = face.inner_contour:Clone()
+  clone.facetype = face.facetype
+  clone.jointtype = face.jointtype
+  if (face.inset_contour ~= nil) then
+    clone.inset_contour = face.inset_contour:Clone()
   end
   return clone
 end
@@ -108,7 +111,7 @@ function GetAllMarkers(faces)
   return markers;
 end
 
-function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
+function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
 
   if not _tool_ok(tool) then
     DisplayMessageBox("Pocket Toolpath: Please select a valid tool before continuing.")
@@ -119,8 +122,9 @@ function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
   local cad_object_list = CadObjectList(true)
   for i=1,#faces do
     local cur_face = faces[i]
-    if cur_face.is_lid then
-      local inner = CreateCadContour(cur_face.inner_contour)
+    if (cur_face.jointtype == FaceJointType.Inset) then
+    -- if cur_face.facetype == FaceType.Lid then
+      local inner = CreateCadContour(cur_face.inset_contour)
       local outer = CreateCadContour(cur_face.contour)
       cad_object_list:AddTail(inner)
       cad_object_list:AddTail(outer)
@@ -137,7 +141,10 @@ function CreateLidPocketToolpath(job, options, faces, tool, layer_name)
   local pocket_data = PocketParameterData()
   pocket_data.start_depth = 0
   pocket_data.CutDepth = 0.5*options.thickness
-  pocket_data.Allowance = -options.allowance
+  -- TODO need to really look at how to fix this, at the moment it can really
+  -- mess things up when the contours aren't total, so we're going to put zero in
+  -- pocket_data.Allowance = -options.allowance
+  pocket_data.Allowance = 0
   pocket_data.DoRaster = false
   pocket_data.DoRamping = true
   pocket_data.RampDistance = 0.3*options.height
@@ -500,11 +507,9 @@ function GetFriendlyFaceLabel(face)
     -- Create blc -> brc
     -- Create the internal flaps. 
 
-    local unit_x = Vector2D(1,0)
-    local unit_y = Vector2D(0,1)
 
     -- line to first blc -> brc (Side 1)
-    if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == LidBottomType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -518,7 +523,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create brc -> trc (end 1)
-    if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == LidBottomType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
@@ -532,7 +537,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create trc -> tlc (side 2)
-    if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == LidBottomType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
@@ -546,7 +551,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create tlc -> blc (end 2)
-    if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == LidBottomType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
@@ -559,7 +564,11 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, dovetail_markers, tablist, name)
+    -- This is the contour that will be used to cut the pocket for inset joint
+    local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
+                              create_tabs_for_missing_faces, name, inner_width, inner_height)
+
+    return Face(contour, inset_contour, dovetail_markers, tablist, name, FaceType.Bottom, bottomType)
   end
 
 -- Make the side faces
@@ -576,32 +585,28 @@ function GetFriendlyFaceLabel(face)
     -- or the distance before the fingers
 
     local bottom_thickness = thickness
-    if (bottomType == LidBottomType.None) then
+    if (bottomType == FaceJointType.None) then
       bottom_thickness = 0
-    elseif (bottomType == LidBottomType.Inset) then
+    elseif (bottomType == FaceJointType.Inset) then
       bottom_thickness = 0.5*thickness
-    elseif (bottomType == LidBottomType.Flat) then
+    elseif (bottomType == FaceJointType.Flat) then
       bottom_thickness = thickness
     else
       bottom_thickness = thickness
     end
 
     local top_thickness = thickness
-    if (lidType == LidBottomType.None) then
+    if (lidType == FaceJointType.None) then
       top_thickness = 0
-    elseif (lidType == LidBottomType.Inset) then
+    elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
-    elseif (lidType == LidBottomType.Flat) then
+    elseif (lidType == FaceJointType.Flat) then
       top_thickness = thickness
     else
       top_thickness = thickness
     end
 
     local inner_height = height - (bottom_thickness + top_thickness)
-
-
-    local unit_x = Vector2D(1,0)
-    local unit_y = Vector2D(0,1)
 
     local inner_blc = inner_start_point
     local inner_brc = inner_start_point + inner_width * unit_x
@@ -628,8 +633,8 @@ function GetFriendlyFaceLabel(face)
     contour:AppendPoint(inner_start_point)
 
     -- blc -> brc is the bottom edge of the side face
-    if ((bottomType ~= LidBottomType.Tabbed) or 
-      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==LidBottomType.Tabbed)) then
+    if ((bottomType ~= FaceJointType.Tabbed) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Tabbed)) then
       -- in this case the bottom edge has no tabs, and starts at 0,0
       LineToVector(contour, -0.0*unit_y)
       LineToVector(contour, inner_width*unit_x)
@@ -667,8 +672,8 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- trc -> tlc (top line so has flaps for lid)
-    if ((lidType ~= LidBottomType.Tabbed) or 
-      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
+    if ((lidType ~= FaceJointType.Tabbed) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Tabbed)) then
       -- this is for no lid
       -- so the box goes the whole-way up
       -- Also used for a dovetail/tabbed lid where we're not cutting tabs as it would also 
@@ -704,7 +709,7 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, dovetail_markers, tablist, name)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Tabbed)
   end
 
 -- Make an end face
@@ -715,26 +720,23 @@ function GetFriendlyFaceLabel(face)
     local tablist = {}
     local dovetail_markers = {}
 
-    local unit_x = Vector2D(1,0)
-    local unit_y = Vector2D(0,1)
-
     local bottom_thickness = 0
-    if (bottomType == LidBottomType.None) then
+    if (bottomType == FaceJointType.None) then
       bottom_thickness = 0
-    elseif (bottomType == LidBottomType.Inset) then
+    elseif (bottomType == FaceJointType.Inset) then
       bottom_thickness = 0.5*thickness
-    elseif (bottomType == LidBottomType.Flat) then
+    elseif (bottomType == FaceJointType.Flat) then
       bottom_thickness = thickness
     else
       bottom_thickness = thickness
     end
 
     local top_thickness = 0
-    if (lidType == LidBottomType.None) then
+    if (lidType == FaceJointType.None) then
       top_thickness = 0
-    elseif (lidType == LidBottomType.Inset) then
+    elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
-    elseif (lidType == LidBottomType.Flat) then
+    elseif (lidType == FaceJointType.Flat) then
       top_thickness = thickness
     else
       top_thickness = thickness
@@ -766,8 +768,8 @@ function GetFriendlyFaceLabel(face)
     contour:AppendPoint(inner_start_point)
 
     -- blc --> brc (tabs for bottom)
-    if ((bottomType ~= LidBottomType.Tabbed) or 
-      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==LidBottomType.Tabbed)) then
+    if ((bottomType ~= FaceJointType.Tabbed) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Tabbed)) then
       contour:LineTo(inner_brc)
     else
       LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
@@ -797,8 +799,8 @@ function GetFriendlyFaceLabel(face)
 
     -- if the lid is flat then we go up by half thickness and then across
     -- trc -> tlc (top edge)
-    if ((lidType ~= LidBottomType.Tabbed) or 
-      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==LidBottomType.Tabbed)) then
+    if ((lidType ~= FaceJointType.Tabbed) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Tabbed)) then
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -843,7 +845,7 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, dovetail_markers, tablist, name)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Tabbed)
   end
 
   function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers)
@@ -895,21 +897,10 @@ function GetFriendlyFaceLabel(face)
     LineToVector(contour, thickness*(-perp_vec))
   end
 
-  function MakeLid(width, height, thickness, tab_width, start_point, noLidTabs, facesToMake, create_tabs_for_missing_faces, name)
-
-    local tablist = {}
-    local unit_x = Vector2D(1,0)
-    local unit_y = Vector2D(0,1)
-    local inner_width = width - 2*thickness
-    local inner_height = height - 2*thickness
+  function MakeInsetContour(width, height, thickness, start_point, facesToMake, 
+                    create_tabs_for_missing_faces, name, inner_width, inner_height)
 
     local inner_start_point = start_point + Vector2D(thickness, thickness)
-
-    -- Get corners of box
-    local outer_blc = start_point
-    local outer_brc = start_point + width*unit_x
-    local outer_trc = start_point + width*unit_x + height* unit_y
-    local outer_tlc = start_point + height*unit_y
 
     -- Get the corners of the box offset by the thickness
     -- these are used to do the pocket for an inset box, otherwise they
@@ -944,6 +935,34 @@ function GetFriendlyFaceLabel(face)
     else
       inner_tlc = Point2D(inner_start_point.x, inner_trc.y)
     end
+
+    -- This is the contour that will be used to cut the pocket in the lid
+    -- when doing an inset, needs to accomodate missing faces machining though
+    local contour = Contour(0.0)
+    contour:AppendPoint(inner_blc)
+    contour:LineTo(inner_brc)
+    contour:LineTo(inner_trc)
+    contour:LineTo(inner_tlc)
+    contour:LineTo(inner_blc)
+
+    return contour
+  end
+
+  function MakeLid(width, height, thickness, tab_width, start_point, lidType, facesToMake, create_tabs_for_missing_faces, name)
+
+    local noLidTabs = (lidType == FaceJointType.Flat) or (lidType == FaceJointType.None) or (lidType == FaceJointType.Inset)
+
+    local tablist = {}
+    local inner_width = width - 2*thickness
+    local inner_height = height - 2*thickness
+
+    -- local inner_start_point = start_point + Vector2D(thickness, thickness)
+
+    -- Get corners of box
+    local outer_blc = start_point
+    local outer_brc = start_point + width*unit_x
+    local outer_trc = start_point + width*unit_x + height* unit_y
+    local outer_tlc = start_point + height*unit_y
 
     local num_flaps_w = math.floor( (0.5*inner_width)/tab_width)
     local num_flaps_h = math.floor( (0.5*inner_height)/tab_width)
@@ -1025,61 +1044,12 @@ function GetFriendlyFaceLabel(face)
 
     -- This is the contour that will be used to cut the pocket in the lid
     -- when doing an inset, needs to accomodate missing faces machining though
-    local inner_contour = Contour(0.0)
-    inner_contour:AppendPoint(inner_blc)
-    inner_contour:LineTo(inner_brc)
-    inner_contour:LineTo(inner_trc)
-    inner_contour:LineTo(inner_tlc)
-    inner_contour:LineTo(inner_blc)
+    local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
+                              create_tabs_for_missing_faces, name, inner_width, inner_height)
 
-    return Lid(contour, inner_contour, {}, tablist, name)
+    return Face(contour, inset_contour, {}, tablist, name, FaceType.Lid, lidType)
   end
 
-  -- TODO I think this function is never called
---   function MakeLidPocketContours(width, height, thickness, start_point)
--- -- local cad_object_list = CadObjectList(true)
-
---     local unit_x = Vector2D(1,0)
---     local unit_y = Vector2D(0,1)
-
---     local inner_width = width - 2*thickness
---     local inner_height = height - 2*thickness
---     local inner_start_point = start_point + Vector2D(thickness, thickness)
-
---     -- Get corners of box
---     local outer_blc = start_point
---     local outer_brc = start_point + width*unit_x
---     local outer_trc = start_point + width*unit_x + height* unit_y
---     local outer_tlc = start_point + height*unit_y
-
---     -- Get the corners of the box offset by the thickness
---     local inner_blc = inner_start_point
---     local inner_brc = inner_start_point + inner_width*unit_x
---     local inner_trc = inner_start_point + inner_height*unit_y + inner_width*unit_x
---     local inner_tlc = inner_start_point + inner_height*unit_y
-
---     local cad_object_list = CadObjectList(true);
---     local outer_contour = Contour(0.0)
---     outer_contour:AppendPoint(outer_blc)
---     outer_contour:LineTo(outer_brc)
---     outer_contour:LineTo(outer_trc)
---     outer_contour:LineTo(outer_tlc)
---     outer_contour:LineTo(outer_blc)
-
---     local inner_contour = Contour(0.0)
---     inner_contour:AppendPoint(inner_blc)
---     inner_contour:LineTo(inner_brc)
---     inner_contour:LineTo(inner_trc)
---     inner_contour:LineTo(inner_tlc)
---     inner_contour:LineTo(inner_blc)
-
---     local outer_cad_contour = CreateCadContour(outer_contour)
---     cad_object_list:AddTail(outer_cad_contour)
---     local inner_cad_contour = CreateCadContour(inner_contour)
---     cad_object_list:AddTail(inner_cad_contour)
-
---     return cad_object_list
---   end
 
 --[[  -------------- ArrangeContours --------------------------------------------------  
 |

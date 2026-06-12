@@ -76,8 +76,8 @@ function main(script_path)
   options.warn_dovetail = true   -- show dovetail warning after create
   options.dark_mode     = true        --- default to dark mode on
   options.cut_dovetails = false
-  options.lidType = LidBottomType.Inset -- default lid type is inset
-  options.bottomType = LidBottomType.Tabbed -- default bottom type is flat
+  options.lidType = FaceJointType.Inset -- default lid type is inset
+  options.bottomType = FaceJointType.Tabbed -- default bottom type is flat
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.window_width = g_width
@@ -174,12 +174,12 @@ function main(script_path)
   computedFacesToMake.end1 = options.facesToMake.end1
   computedFacesToMake.end2 = options.facesToMake.end2
 
-  if options.lidType == LidBottomType.None then
+  if options.lidType == FaceJointType.None then
     -- if we aren't making a lid then we shouldn't make tabs for the lid since there won't be a lid to fit them
     computedFacesToMake.lid = false
   end
 
-  local noLidTabs = (options.lidType == LidBottomType.Flat) or (options.lidType == LidBottomType.None) or (options.lidType == LidBottomType.Inset)
+  local noLidTabs = (options.lidType == FaceJointType.Flat) or (options.lidType == FaceJointType.None) or (options.lidType == FaceJointType.Inset)
 
 -- Make the bottom face
   local cad_list = CadObjectList(true)
@@ -282,13 +282,13 @@ function main(script_path)
   end
 
   -- Make lid
-  if (computedFacesToMake.lid and options.lidType ~= LidBottomType.None) then
+  if (computedFacesToMake.lid and options.lidType ~= FaceJointType.None) then
     local lid = MakeLid(options.width,
       options.depth,
       options.thickness,
       lidDoveTail.min_width,
       options.start_point,
-      noLidTabs,
+      options.lidType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       "Lid"
@@ -324,8 +324,8 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
-  if (not options.no_toolpath) and computedFacesToMake.lid and options.lidType == LidBottomType.Inset then
-    CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
+  if (not options.no_toolpath) and computedFacesToMake.lid and options.lidType == FaceJointType.Inset then
+    CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
   end
 
   if not options.no_toolpath then
@@ -478,7 +478,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*lidDoveTail.min_width)
 
     -- check the joint widths only when making a tabbed lid
-    if (options.lidType == LidBottomType.Tabbed) then
+    if (options.lidType == FaceJointType.Tabbed) then
       if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
         DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", lidDoveTail.min_width, inner_width))
         return false
@@ -533,7 +533,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         return false
       end
 
-      if (options.lidType == LidBottomType.Tabbed) then
+      if (options.lidType == FaceJointType.Tabbed) then
         if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
           DisplayMessageBox("The joint width is too small for the lid.")
           return false
@@ -544,7 +544,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if (tab_space_w_bottom <= bottom_min_space) or 
       (tab_space_d_bottom <= bottom_min_space) or 
       (tab_space_h <= min_space) or 
-      ((options.lidType == LidBottomType.Tabbed) and 
+      ((options.lidType == FaceJointType.Tabbed) and 
         ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
@@ -564,7 +564,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox("The selected tool will not fit between the side joints.")
         return false
       end 
-      if (options.useAllJointWidths and options.lidType == LidBottomType.Tabbed and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
+      if (options.useAllJointWidths and options.lidType == FaceJointType.Tabbed and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
         if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
           DisplayMessageBox("The selected tool will not fit between the lid joints.")
           return false
