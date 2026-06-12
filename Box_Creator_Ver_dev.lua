@@ -20,6 +20,8 @@
 -- Changed Warning Messaage when not enough Material for Parts.                                         -- by Sharkcutup 11/14/2025
 -- Changed up the User Interface a bit by colorizing and defining lines of images                       -- by Sharkcutup 11/23/2025
 -- Added a separate field for the width of the bottom tabs vs side tabs                                 -- by Gremlin 2/27/2026
+-- fixed the vectors created with dovetails and finger Joints when NO bottom Selected                   -- by Sharkcutup 5/12/2026
+-- Gadget supports small CNC Machine workflow, replacement part generation.                             -- sharkcutup 5/22/2026
 -------------------------------------------------------------------------------------------------------------------------------------------
 -- It is provided 'as-is' with changes made, without any express or implied warranty, and you make use of them entirely at your own risk.
 -- In no event will "Sharkcutup" be held liable for any damages arising from this gadgets use.
@@ -31,11 +33,11 @@
 
 -- require("mobdebug").start()
 
-g_version = "dev"                                                    -- Changed by Gremlin
-g_subVersion = "development"                                         -- Added by Gremlin
+g_version="8.5"                                                    -- Changed by Gremlin
+g_subVersion="rc1"                                                 -- Added by Gremlin
 g_title = "Box Creator"
-g_width = 1020
-g_height = 900                                                    -- Changed by Sharkcutup
+g_width = 1100
+g_height = 1023                                                    -- Changed by Sharkcutup
 g_html_file = "Box_Creator_Ver_" .. g_version .. ".html"             -- Changed by Gremlin
 
 -- ---------- VALIDATION HELPERS ----------
@@ -63,6 +65,7 @@ function Lid(outer_contour, inner_contour, dovetails, tabs, name)
   local obj = {}
   obj.contour = outer_contour
   obj.is_lid = true
+  obj.pocket_recess = false
   obj.inner_contour = inner_contour
   obj.tabs = tabs
   obj.name = name
@@ -144,7 +147,7 @@ end
 	local cad_object_list = CadObjectList(true)
 	for i=1,#faces do
 		local cur_face = faces[i]
-		if cur_face.is_lid then
+		if cur_face.pocket_recess and cur_face.inner_contour then
 			local inner = CreateCadContour(cur_face.inner_contour)
 			local outer = CreateCadContour(cur_face.contour)
 			cad_object_list:AddTail(inner)
@@ -239,7 +242,9 @@ function AddCadListToJob(vectric_job, cad_list, layer_name)
 		layer:AddObject(obj:Clone(), true)
 	end
 end
-
+-- ===============================================================================================
+--  Face Labeling of Parts --
+-- ===============================================================================================
 function GetFriendlyFaceLabel(face)
    local lookup = { BottomFace = "BOTTOM", SideFace1 = "SIDE 1", SideFace2 = "SIDE 2", EndFace1 = "END 1", EndFace2 = "END 2", Lid = "LID" }
   if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
@@ -430,7 +435,7 @@ function DrawWriter(what, where, size, lay, ang)
       return pH0
     end
   end
-
+--  =================================================================================================
   local function AddGroupToJob_Local(job, group2, layer_name)
     local cad_object = CreateCadGroup(group2)
     local layer = job.LayerManager:GetLayerWithName(layer_name)
@@ -559,15 +564,83 @@ function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
 	return Face(contour, dovetail_markers, tablist, name)
 end
 
+-- Make a plain rectangular bottom panel with no joint configuration.
+function MakePlainBottomFaceContour(width, height, start_point, name)
+
+	local tablist = {}
+	local dovetail_markers = {}
+	local unit_x = Vector2D(1,0)
+	local unit_y = Vector2D(0,1)
+
+	local contour = Contour(0.0)
+	contour:AppendPoint(start_point)
+	LineToVector(contour, width * unit_x)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	LineToVector(contour, height * unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	LineToVector(contour, -width * unit_x)
+	AddMiddleOfLastSpanToList(contour, tablist)
+	LineToVector(contour, -height * unit_y)
+	AddMiddleOfLastSpanToList(contour, tablist)
+
+	return Face(contour, dovetail_markers, tablist, name)
+end
+
+-- Make a recessed rectangular bottom panel with pocket boundary.
+function MakeRecessBottomFaceContour(width, height, thickness, start_point, name)
+
+  local tablist = {}
+  local dovetail_markers = {}
+  local unit_x = Vector2D(1,0)
+  local unit_y = Vector2D(0,1)
+
+  local outer_contour = Contour(0.0)
+  outer_contour:AppendPoint(start_point)
+  LineToVector(outer_contour, width * unit_x)
+  AddMiddleOfLastSpanToList(outer_contour, tablist)
+  LineToVector(outer_contour, height * unit_y)
+  AddMiddleOfLastSpanToList(outer_contour, tablist)
+  LineToVector(outer_contour, -width * unit_x)
+  AddMiddleOfLastSpanToList(outer_contour, tablist)
+  LineToVector(outer_contour, -height * unit_y)
+  AddMiddleOfLastSpanToList(outer_contour, tablist)
+
+  local inner_start_point = start_point + Vector2D(thickness, thickness)
+  local inner_width = width - 2 * thickness
+  local inner_height = height - 2 * thickness
+
+  local inner_contour = Contour(0.0)
+  inner_contour:AppendPoint(inner_start_point)
+  LineToVector(inner_contour, inner_width * unit_x)
+  LineToVector(inner_contour, inner_height * unit_y)
+  LineToVector(inner_contour, -inner_width * unit_x)
+  LineToVector(inner_contour, -inner_height * unit_y)
+
+  local bottom_obj = Lid(outer_contour, inner_contour, dovetail_markers, tablist, name)
+   bottom_obj.pocket_recess = true
+  return bottom_obj
+end
+
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
-function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
+function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, bottom_type, has_lid, name)
 
 	local dovetail_markers = {}
 	local tablist = {}
-	local inner_start_point = start_point + Vector2D(thickness, thickness)
-	local inner_width  = width - 2*thickness
-	local inner_height = height - 2*thickness
+	-- Version 8.0 Bottom Type:
+	-- Face checkboxes control which parts are generated now.
+	-- Bottom Type controls the bottom edge configuration on side/end parts.
+	--   jointed = create bottom mating joints and reserve bottom thickness
+	--   plain   = plain bottom edge and reserve bottom thickness
+	--   none    = plain bottom edge with no bottom thickness allowance
+  
+	local bottom_is_jointed = (bottom_type == "jointed")
+	local bottom_allowance = (bottom_type == "none") and 0.0 or thickness
+  local top_allowance = has_lid and thickness or 0.0
+
+  local inner_start_point = start_point + Vector2D(thickness, bottom_allowance)
+  local inner_width  = width - 2*thickness
+  local inner_height = height
 	-- DisplayMessageBox("inner_width " .. inner_width)
 
 	local unit_x = Vector2D(1,0)
@@ -591,15 +664,21 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
 	local contour = Contour(0.0)
 	contour:AppendPoint(inner_start_point)
 
-	--  blc ->brc
-	LineToVector(contour, tab_space_bottom*unit_x)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
+	--  blc -> brc
+	--  Bottom Type controls this edge:
+	--  jointed = mating joints; plain/none = straight edge.
+	if bottom_is_jointed then
+		LineToVector(contour, tab_space_bottom*unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		if (with_tails) then
+			AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
+		else
+			AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+		end
+		contour:LineTo(inner_brc)
 	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+		contour:LineTo(inner_brc)
 	end
-	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
 	-- -- brc -> trc
@@ -613,19 +692,50 @@ function MakeSideFace(width, height, thickness, start_point, sidedovetail, botto
 	contour:LineTo(inner_trc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
-	-- trc -> tlc (top line so has flaps for lid)
-  if flat_lid then
-    LineToVector(contour, 0.5*thickness*unit_y)
-    LineToVector(contour, -inner_width*unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    contour:LineTo(inner_tlc)
-  else 
-    LineToVector(contour, -tab_space_top*unit_x)
-    AddMiddleOfLastSpanToList(contour, tablist)
-    AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
-    contour:LineTo(inner_tlc)
-    AddMiddleOfLastSpanToList(contour, tablist)
+	-- trc -> tlc (top edge)
+
+if not has_lid then
+
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+elseif flat_lid then
+
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+else
+
+  -- tabbed lid edge
+  LineToVector(contour, -tab_space_top*unit_x)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+  if with_tails then
+    AddMaleDoveTailsAlongLine(
+        thickness,
+        topdovetail,
+        -unit_x,
+        unit_y,
+        contour,
+        num_flaps_top,
+        tab_space_top
+    )
+  else
+    AddFlapsAlongLine(
+        thickness,
+        topdovetail.min_width,
+        tab_space_top,
+        -unit_x,
+        unit_y,
+        contour,
+        num_flaps_top
+    )
   end
+
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+end
 
 	-- tlc -> blc
 	LineToVector(contour, -tab_space_side*unit_y)
@@ -644,21 +754,32 @@ end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
-function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, name)
+function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, flat_lid, bottom_type, has_lid, name)
 
 	local tablist = {}
 	local dovetail_markers = {}
 	local unit_x = Vector2D(1,0)
 	local unit_y = Vector2D(0,1)
-	local inner_start_point = start_point + thickness*unit_y
-	local inner_width = width - 2*thickness;
-	local inner_height  = height - 2*thickness
+	-- Version 8.0 Bottom Type:
+	-- Face checkboxes control which parts are generated now.
+	-- Bottom Type controls the bottom edge configuration on side/end parts.
+	--   jointed = create bottom mating joints and reserve bottom thickness
+	--   plain   = plain bottom edge and reserve bottom thickness
+	--   none    = plain bottom edge with no bottom thickness allowance
+  
+	local bottom_is_jointed = (bottom_type == "jointed")
+	local bottom_allowance = (bottom_type == "none") and 0.0 or thickness
+  local top_allowance    = has_lid and thickness or 0.0
+  
+  local inner_start_point = start_point + bottom_allowance * unit_y
+  local inner_width = width - 2*thickness
+  local inner_height = height
 
 
 	local inner_blc = inner_start_point
-	local inner_brc = inner_start_point + width * unit_x
-	local inner_trc = inner_brc + inner_height*unit_y
-	local inner_tlc = inner_blc + inner_height*unit_y
+  local inner_brc = inner_start_point + width * unit_x
+  local inner_trc = inner_brc + inner_height * unit_y
+  local inner_tlc = inner_blc + inner_height * unit_y
 
   -- Gremlin added doevtail seperation for different sizes
 	local num_flaps_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
@@ -673,14 +794,20 @@ function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottom
 	contour:AppendPoint(inner_start_point)
 
 	-- blc --> brc
-	LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
-	AddMiddleOfLastSpanToList(contour, tablist)
-	if (with_tails) then
-		AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
+	-- Bottom Type controls this edge:
+	-- jointed = mating joints; plain/none = straight edge.
+	if bottom_is_jointed then
+		LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
+		AddMiddleOfLastSpanToList(contour, tablist)
+		if (with_tails) then
+			AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
+		else
+			AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+		end
+		contour:LineTo(inner_brc)
 	else
-		AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+		contour:LineTo(inner_brc)
 	end
-	contour:LineTo(inner_brc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
 	-- brc --> trc
@@ -690,21 +817,52 @@ function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottom
 	contour:LineTo(inner_trc)
 	AddMiddleOfLastSpanToList(contour, tablist)
 
-	-- if the lid is flat then we go up by half thickness and then across
-	if flat_lid then
-		LineToVector(contour, (0.5*thickness) * (unit_y));
-		LineToVector(contour, (width)*(-unit_x))
-		AddMiddleOfLastSpanToList(contour, tablist)
-		contour:LineTo(inner_tlc)
-	else
-		-- trc -> tlc (top line so has flaps for lid)
-		LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
-		AddMiddleOfLastSpanToList(contour, tablist)
-		AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
-		-- AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_x, unit_y, contour, num_flaps_w, tab_space_w)
-		contour:LineTo(inner_tlc)
-		AddMiddleOfLastSpanToList(contour, tablist)
-	end
+	-- top edge
+
+if not has_lid then
+
+  -- plain top edge
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+elseif flat_lid then
+
+  -- flat lid: plain top edge
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+else
+
+  -- tabbed lid edge
+  LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+  if with_tails then
+    AddMaleDoveTailsAlongLine(
+        thickness,
+        topdovetail,
+        -unit_x,
+        unit_y,
+        contour,
+        num_flaps_top,
+        tab_space_top
+    )
+  else
+    AddFlapsAlongLine(
+        thickness,
+        topdovetail.min_width,
+        tab_space_top,
+        -unit_x,
+        unit_y,
+        contour,
+        num_flaps_top
+    )
+  end
+
+  contour:LineTo(inner_tlc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+end
 
 	-- tlc -> brc
 	LineToVector(contour, (tab_space_side*-unit_y))
@@ -842,8 +1000,11 @@ function MakeLid(width, height, thickness, tab_width, start_point, flat_lid, nam
 	inner_contour:LineTo(inner_trc)
 	inner_contour:LineTo(inner_tlc)
 	inner_contour:LineTo(inner_blc)
+  
+  local lid_obj = Lid(contour, inner_contour, {}, tablist, name)
+   lid_obj.pocket_recess = flat_lid
+  return lid_obj
 
-	return Lid(contour, inner_contour, {}, tablist, name)
 end
 
 function MakeLidPocketContours(width, height, thickness, start_point)
@@ -1274,6 +1435,7 @@ end
 -- Transfer tabs from one cad contour to another
 -- Only want to do this if for example have offset
 -- one cad contour from another
+
 function TransferTabs(cad_contour_a, cad_contour_b)
   -- clone because problem with constness on tabs
 
@@ -1326,6 +1488,7 @@ end
 -- Create tabbed versions of the vdcontours by creating 
 -- a cad contour version of each contour and transferring all
 -- tabs
+
 function CreateTabbedCadContours(vdcontours, cadcontours)
 	local cad_obj_list = CadObjectList(true)
 	local pos, vdctr, cdctr
@@ -1764,9 +1927,13 @@ function main(script_path)
   options.no_toolpath = false
 	options.window_width = g_width
 	options.window_height = g_height
+  
+  options.ui_scale = 100
 
 	options.make_lid = true                   --- lid checkbox default       
 	options.make_bottom = true                --- bottom checkbox default     
+	options.bottom_type_index = 1 -- 1=Jointed Bottom, 2=Bottom Panel, 3=Recess Bottom, 4=No Bottom
+  options.bottom_type = "jointed" -- jointed/plain/recess/none
 	options.make_side1 = true                 --- side 1 checkbox default    
 	options.make_side2 = true                 --- side 2 checkbox default     
 	options.make_end1 =  true                 --- end 1 checkbox default      
@@ -1806,6 +1973,19 @@ function main(script_path)
 		return false
 	end
 
+  -- Safety check: at least one face must be selected
+  if not (
+      options.make_lid or
+      (options.make_bottom and options.bottom_type ~= "none") or
+      options.make_side1 or
+      options.make_side2 or
+      options.make_end1 or
+      options.make_end2
+    ) then
+    DisplayMessageBox("Please select at least one box face to machine.")
+    return false
+  end
+
   -- Gremlin added extra dovetail parameters for bottom and top which are the same as the side dovetail except for 
   -- the depth which is just the thickness of the material since we are only cutting one face for those
 	sidedovetail.depth = options.thickness
@@ -1828,10 +2008,8 @@ function main(script_path)
 -- local dovetail_markers = {}
 	local faces = {}
 
-	if options.make_bottom then
-    -- Gremlin added bottomdovetail seperation from side which is just sidedovetail
-    -- the bottom face is only the bottom so we didn't need to add
-    -- a separate value to it, just pass it the bottom value
+	if options.make_bottom and options.bottom_type == "jointed" then
+    -- Jointed Bottom: create the original four-sided mating joint bottom.
 		local bottom_face = MakeBottomFaceContour(options.width, 
 													options.depth, 
 													options.thickness, 
@@ -1840,6 +2018,26 @@ function main(script_path)
 													options.cut_dovetails,  -- if true then create dovetails
 													"BottomFace" )
 		faces[#faces + 1] = bottom_face
+	elseif options.make_bottom and options.bottom_type == "plain" then
+    -- Bottom Panel: create a simple flat rectangular bottom with no joint configuration.
+		local bottom_face = MakePlainBottomFaceContour(options.width,
+													options.depth,
+													options.start_point,
+													"BottomFace" )
+		faces[#faces + 1] = bottom_face
+  
+  elseif options.make_bottom and options.bottom_type == "recess" then
+  -- Recess Bottom: create a simple rectangular bottom panel
+  -- with an inner pocket boundary.
+  local bottom_face = MakeRecessBottomFaceContour(
+    options.width,
+    options.depth,
+    options.thickness,
+    options.start_point,
+    "BottomFace"
+  )
+  faces[#faces + 1] = bottom_face
+  
 	end
 
 	-- -- -- Make sides
@@ -1854,6 +2052,8 @@ function main(script_path)
                     topdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
+									  options.bottom_type,
+                    true,
 									  "SideFace1")
 		faces[#faces + 1] = sideface1
 	end
@@ -1869,6 +2069,8 @@ function main(script_path)
                     topdovetail,
 									  options.cut_dovetails, 
 									  options.flat_lid,
+									  options.bottom_type,
+                    true,
 									  "SideFace2")
 		faces[#faces + 1] = sideface2
 	end
@@ -1885,6 +2087,8 @@ function main(script_path)
                          topdovetail,
 											   options.cut_dovetails, 
 											   options.flat_lid,
+											   options.bottom_type,
+                         true,
 											   "EndFace1")
 		faces[#faces + 1] = endface1
 	end
@@ -1900,6 +2104,8 @@ function main(script_path)
                          topdovetail,
 											   options.cut_dovetails, 
 											   options.flat_lid,
+											   options.bottom_type,
+                         true,
 											   "EndFace2")
 		faces[#faces + 1] = endface2
 	end
@@ -1944,9 +2150,12 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
-		if (not options.no_toolpath) and options.make_lid and options.flat_lid then
-		CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
-	end
+	if (not options.no_toolpath) and (
+     (options.make_lid and options.flat_lid) or
+     (options.make_bottom and options.bottom_type == "recess")
+     ) then
+     CreateLidPocketToolpath(job, options, faces, options.tool, "Pockets")
+  end
 
   if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
@@ -1967,9 +2176,18 @@ end
 -- Gremlin added bottomdovetail seperation from side which is just sidedovetail 
 function DisplayDialog(script_path, options, sidedovetail, bottomdovetail, topdovetail)
 	local html_path = "file:" .. script_path .. "\\" .. g_html_file
-	local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
-  
+  -- Apply UI Scale to dialog size
+  local scale = (options.ui_scale or 100) / 100
 
+  local dialog_width  = math.floor(g_width  * scale)
+  local dialog_height = math.floor(g_height * scale)
+
+  -- Prevent ridiculously small sizes
+  dialog_width  = math.max(dialog_width,  g_width)
+  dialog_height = math.max(dialog_height, g_height)
+	local dialog = HTML_Dialog(false, html_path, dialog_width, dialog_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
+  
+  dialog:AddTextField("UiScale", tostring(options.ui_scale))
 	dialog:AddLabelField("GadgetTitle", g_title)
 	dialog:AddLabelField("GadgetVersion", g_version)
 
@@ -2023,6 +2241,9 @@ else
 end
 dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
+-- Bottom Type: 1 = Jointed Bottom, 2 = Bottom Panel, 3 = Recess Bottom, 4 = No Bottom
+dialog:AddRadioGroup("BottomTypeRadio", options.bottom_type_index or 1)
+
 
 	-- Add units label
 	local units_string = "Inches"
@@ -2059,8 +2280,8 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
 
   -- At least one face must be selected
   local at_least_one =
-    options.make_lid or options.make_bottom or options.make_side1 or
-    options.make_side2 or options.make_end1 or options.make_end2
+    options.make_lid or (options.make_bottom and options.bottom_type ~= "none") or
+    options.make_side1 or options.make_side2 or options.make_end1 or options.make_end2
   if not at_least_one then
     DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
     return false
@@ -2082,22 +2303,24 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
     local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomdovetail.min_width)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomdovetail.min_width)
 
-    if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-      if (not options.allJointWidths) then
-        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomdovetail.min_width, inner_width))
-      else
-        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+    if options.make_bottom and options.bottom_type == "jointed" then
+      if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
+        if (not options.allJointWidths) then
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomdovetail.min_width, inner_width))
+        else
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomdovetail.min_width, inner_width))
+        end
+        return false
       end
-      return false
-    end
 
-    if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-      if (not options.allJointWidths) then
-        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
-      else
-        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+      if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
+        if (not options.allJointWidths) then
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+        else
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomdovetail.min_width, inner_depth))
+        end
+        return false
       end
-      return false
     end
 
     local num_flaps_w_top = math.floor((0.5*inner_width) / topdovetail.min_width)
@@ -2151,7 +2374,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       local top_min_space = topdovetail.max_width - topdovetail.min_width
 
       -- make sure dovetails don't overlap
-      if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) then
+      if options.bottom_type == "jointed" and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
         DisplayMessageBox("The joint width is too small for the bottom.")
         return false
       end      
@@ -2160,14 +2383,20 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
         DisplayMessageBox("The joint width is too small for the side.")
         return false
       end
-
-      if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
-        DisplayMessageBox("The joint width is too small for the lid.")
-        return false
+    
+      if (not options.flat_lid) then
+        if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
+          DisplayMessageBox("The joint width is too small for the lid.")
+          return false
+        end
       end
 
       min_space = min_space + dia
-      if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) or (tab_space_h <= min_space) or (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then        
+      if (options.bottom_type == "jointed" and ((tab_space_w_bottom <= bottom_min_space) or 
+         (tab_space_d_bottom <= bottom_min_space))) or 
+         (tab_space_h <= min_space) or 
+         ((not options.flat_lid) and 
+          ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
       end  
@@ -2178,7 +2407,7 @@ dialog:AddRadioGroup("LidTypeRadio", lid_default_index)
       tab_space_w_top = math.min(tab_space_w_top, topdovetail.min_width)
       tab_space_d_top = math.min(tab_space_d_top, topdovetail.min_width)
       tab_space_h = math.min(tab_space_h, sidedovetail.min_width)
-      if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then        
+      if options.bottom_type == "jointed" and ((tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia)) then        
         DisplayMessageBox("The selected tool will not fit between the bottom joints.")
         return false
       end
@@ -2238,6 +2467,22 @@ function OnLuaButton_LidTypeRadio2()
 end
 
 function OnLuaButton_LidTypeRadio1()
+  return true
+end
+
+function OnLuaButton_BottomTypeRadio1()
+  return true
+end
+
+function OnLuaButton_BottomTypeRadio2()
+  return true
+end
+
+function OnLuaButton_BottomTypeRadio3()
+  return true
+end
+
+function OnLuaButton_BottomTypeRadio4()
   return true
 end
 
@@ -2326,6 +2571,7 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
   options.make_end1     = dialog:GetCheckBox("MakeEnd1")
   options.make_end2     = dialog:GetCheckBox("MakeEnd2")
   
+  options.ui_scale = tonumber(dialog:GetTextField("UiScale")) or 100
 
   -- sidedovetail.angle = dialog:GetDoubleField("DovetailAngleField")
   sidedovetail.max_width = sidedovetail.min_width + (2 * options.thickness / math.tan(sidedovetail.angle))
@@ -2347,6 +2593,30 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     options.flat_lid = false
   end
 
+  local bottom_index = dialog:GetRadioIndex("BottomTypeRadio")
+options.bottom_type_index = bottom_index
+
+  if bottom_index == 1 then
+    options.bottom_type = "jointed"
+  elseif bottom_index == 2 then
+    options.bottom_type = "plain"
+  elseif bottom_index == 3 then
+    options.bottom_type = "recess"
+  else
+    options.bottom_type = "none"
+  end
+  
+    -- Safety clamp for greyed-out Lid / Bottom Type options.
+  -- If the face checkbox is off, ignore any saved or inactive type choice.
+  if not options.make_lid then
+    options.flat_lid = true
+  end
+
+  if not options.make_bottom then
+  options.bottom_type = "none"
+  options.bottom_type_index = 4
+end
+  
   -- Get from tool picker
   options.tool = dialog:GetTool("ToolChooseButton")
 
@@ -2371,12 +2641,12 @@ function ReadOptions(dialog, options, sidedovetail, bottomdovetail, topdovetail)
     local calculated_min = effective_dia
 
     if calculated_min and calculated_min > 0 then
-      local current_width = options.sidetabwidth or dovetail.min_width
+      local current_width = options.sidetabwidth or sidedovetail.min_width
       local new_width     = math.max(current_width, calculated_min)
 
       if new_width ~= current_width then
         options.sidetabwidth   = new_width
-        dovetail.min_width = new_width
+        sidedovetail.min_width = new_width
 
         -- Push it back into the dialog so user sees the update
         if dialog.SetDoubleField ~= nil then
@@ -2393,13 +2663,14 @@ end
 
 function SaveDefaults(options, justwindowinfo)
   local registry = Registry("BoxCreator_" .. g_version)
-
+  
+  registry:SetDouble("UiScale", options.ui_scale)
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
   registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("LabelFaces", options.label_faces)
-
+  
   if justwindowinfo then
     return
   end
@@ -2415,6 +2686,7 @@ function SaveDefaults(options, justwindowinfo)
   registry:SetDouble("EdgeMargin", options.edge_margin)              -- Added by Sharkcutup
   registry:SetBool("CutDovetails", options.cut_dovetails)
   registry:SetBool("FlatLid", options.flat_lid)
+  registry:SetDouble("BottomTypeIndex", options.bottom_type_index or 1)
   if options.tool ~= nil then
    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
   end
@@ -2433,7 +2705,9 @@ end
 -- Gremlin added bottomdovetail separation from side which is just dovetail
 function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   local registry =  Registry("BoxCreator_" .. g_version)
-
+  
+  options.ui_scale = registry:GetDouble("UiScale", options.ui_scale or 100)
+  
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
 
@@ -2451,6 +2725,18 @@ function LoadDefaults(options, sidedovetail, bottomdovetail, topdovetail)
   topdovetail.min_width = options.toptabwidth -- Added by Gremlin
   options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
   options.flat_lid = registry:GetBool("FlatLid", options.flat_lid)
+  options.bottom_type_index = math.floor(registry:GetDouble("BottomTypeIndex", options.bottom_type_index or 1))
+  
+  if options.bottom_type_index == 1 then
+    options.bottom_type = "jointed"
+  elseif options.bottom_type_index == 2 then
+    options.bottom_type = "plain"
+  elseif options.bottom_type_index == 3 then
+    options.bottom_type = "recess"
+  else
+    options.bottom_type = "none"
+  end
+  
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
   
   options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
