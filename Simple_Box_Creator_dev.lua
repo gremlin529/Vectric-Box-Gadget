@@ -36,12 +36,12 @@
 -- need addressing first
 -- require("strict")
 
-g_version = "dev"                                                    -- Changed by Gremlin
-g_subVersion = "development"                                         -- Added by Gremlin
+g_version = "dev"                                                 
+g_subVersion = "development"                                      
 g_title = "Simple Box"
-g_width = 845
-g_height = 1023                                                    -- Changed by Sharkcutup
-g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"             -- Changed by Gremlin
+g_width = 890
+g_height = 865                                                    
+g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"       
 
 local librayModule
 
@@ -348,7 +348,6 @@ end
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   local html_path = "file:" .. script_path .. "\\" .. g_html_file
   local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
-
 
   dialog:AddLabelField("GadgetTitle", g_title)
   dialog:AddLabelField("GadgetVersion", g_version)
