@@ -324,7 +324,9 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
-  if (not options.no_toolpath) and computedFacesToMake.lid and options.lidType == FaceJointType.Inset then
+  if (not options.no_toolpath) and 
+     ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
+      (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
     CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
   end
 
@@ -453,22 +455,24 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomDoveTail.min_width)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomDoveTail.min_width)
 
-    if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-      if (not options.useAllJointWidths) then
-        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomDoveTail.min_width, inner_width))
-      else
-        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomDoveTail.min_width, inner_width))
+    if (options.bottomType == FaceJointType.Tabbed) then
+      if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
+        if (not options.useAllJointWidths) then
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomDoveTail.min_width, inner_width))
+        else
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomDoveTail.min_width, inner_width))
+        end
+        return false
       end
-      return false
-    end
 
-    if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-      if (not options.useAllJointWidths) then
-        DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
-      else
-        DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
+      if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
+        if (not options.useAllJointWidths) then
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
+        else
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
+        end
+        return false
       end
-      return false
     end
 
     local num_flaps_w_top = math.floor((0.5*inner_width) / lidDoveTail.min_width)

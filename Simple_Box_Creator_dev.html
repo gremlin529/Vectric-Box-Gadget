@@ -59,7 +59,7 @@
             <input title="width of the dovetail or tab to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div id="showHideTopBottomJoints" style="display: none">
-            <div class="field-row">
+            <div class="field-row" id="showHideBottomJointWidth">
               <label for="BottomTabWidthField">Bottom joints</label>
               <input title="Width of the bottom tabs or dovetails" type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
@@ -179,7 +179,7 @@
         <div class="type-panel-header">Bottom Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeInset" onclick="onBottomTypeChanged(this)"/>Inset</label>
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadioInset" onclick="onBottomTypeChanged(this)"/>Inset</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/InsetBottom.png" alt="Flat bottom preview" />
@@ -285,7 +285,7 @@
   }
 
   function onBottomTypeChanged(radio) {
-    var bottomJointRow = document.getElementById("showHideBottomJoints");
+    var bottomJointRow = document.getElementById("showHideBottomJointWidth");
     if (bottomJointRow) {
       bottomJointRow.style.display = document.getElementById("BottomTypeTabbed").checked ? "block" : "none";
     }
@@ -315,6 +315,9 @@
 
     var lid1 = document.getElementById("LidTypeRadioInset");
     if (lid1) { onLidTypeChanged(lid1); }
+
+    var bottom1 = document.getElementById("BottomTypeRadioInset")
+    if (bottom1) { onBottomTypeChanged(bottom1)}
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

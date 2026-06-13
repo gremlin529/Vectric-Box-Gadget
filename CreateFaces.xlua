@@ -34,10 +34,10 @@ function _tool_ok(tool)
   return (dia or 0) > 0
 end
 
-function Face(outer_contour, inset_contour, dovetails, tabs, name, facetype, jointtype)
+function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype)
   local obj ={}
   obj.contour = outer_contour
-  obj.inset_contour = inset_contour
+  obj.inset_contours = inset_contours
   obj.dovetail_list = dovetails
   obj.name = name
   obj.tabs = tabs
@@ -50,8 +50,8 @@ end
 function TransformFace(face, xform)
   face.contour:Transform(xform)
 
-  if (face.inset_contour ~= nil) then
-    face.inset_contour:Transform(xform)
+  if (face.inset_contours ~= nil) then
+    face.inset_contours:Transform(xform)
   end
 
   -- Transform dovetail markers
@@ -76,8 +76,8 @@ function CloneFace(face)
   clone.name = face.name
   clone.facetype = face.facetype
   clone.jointtype = face.jointtype
-  if (face.inset_contour ~= nil) then
-    clone.inset_contour = face.inset_contour:Clone()
+  if (face.inset_contours ~= nil) then
+    clone.inset_contours = face.inset_contours:Clone()
   end
   return clone
 end
@@ -123,11 +123,13 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
   for i=1,#faces do
     local cur_face = faces[i]
     if (cur_face.jointtype == FaceJointType.Inset) then
-    -- if cur_face.facetype == FaceType.Lid then
-      local inner = CreateCadContour(cur_face.inset_contour)
-      local outer = CreateCadContour(cur_face.contour)
-      cad_object_list:AddTail(inner)
-      cad_object_list:AddTail(outer)
+      local pos = cur_face.inset_contours:GetHeadPosition()
+      while pos ~= nil do
+        contour, pos = cur_face.inset_contours:GetNext(pos)
+        cad_contour = CreateCadContour(contour)
+        cad_object_list:AddTail(cad_contour)
+      end
+
     end
   end
 
@@ -141,10 +143,7 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
   local pocket_data = PocketParameterData()
   pocket_data.start_depth = 0
   pocket_data.CutDepth = 0.5*options.thickness
-  -- TODO need to really look at how to fix this, at the moment it can really
-  -- mess things up when the contours aren't total, so we're going to put zero in
-  -- pocket_data.Allowance = -options.allowance
-  pocket_data.Allowance = 0
+  pocket_data.Allowance = -options.allowance
   pocket_data.DoRaster = false
   pocket_data.DoRamping = true
   pocket_data.RampDistance = 0.3*options.height
@@ -171,7 +170,6 @@ end
 |
 ]]
 function AddGroupToJob(vectric_job, group, layer_name, create_group)
-
   --  create a CadObject to represent the  group 
   local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
   if create_group then
@@ -197,7 +195,6 @@ end
 |
 ]]
 function AddCadContourToJob(vectric_job, cad_contour, layer_name)
-
   --  create a CadObject to represent the group
   local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
   if cad_contour and layer then
@@ -478,7 +475,7 @@ function GetFriendlyFaceLabel(face)
 |
 ]]
   function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
-            use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name)
+      use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name)
 
     local dovetail_markers = {}
     local tablist = {}
@@ -565,10 +562,11 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- This is the contour that will be used to cut the pocket for inset joint
-    local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
-                              create_tabs_for_missing_faces, name, inner_width, inner_height)
+    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake, 
+      create_tabs_for_missing_faces, name, FaceType.Bottom, 
+      inner_width, inner_height)
 
-    return Face(contour, inset_contour, dovetail_markers, tablist, name, FaceType.Bottom, bottomType)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType)
   end
 
 -- Make the side faces
@@ -897,55 +895,116 @@ function GetFriendlyFaceLabel(face)
     LineToVector(contour, thickness*(-perp_vec))
   end
 
-  function MakeInsetContour(width, height, thickness, start_point, facesToMake, 
-                    create_tabs_for_missing_faces, name, inner_width, inner_height)
+  -- MakeInsetCountours will return a contour group of up to four rectangles
+  -- that are the pockets neede for an inset lid/bottom
+  function MakeInsetContours(width, height, thickness, start_point, facesToMake, 
+      create_tabs_for_missing_faces, name, facetype,
+      inner_width, inner_height)
 
-    local inner_start_point = start_point + Vector2D(thickness, thickness)
+    -- compute the possible corners of the rectangles
+    local outer_blc = start_point
+    local inner_blc = start_point + Vector2D(thickness,thickness)
+    local outer_brc = outer_blc + width * unit_x
+    local inner_brc = inner_blc + inner_width * unit_x 
+    local outer_trc = outer_brc + height * unit_y
+    local inner_trc = inner_brc + inner_height * unit_y
+    local outer_tlc = outer_blc + height * unit_y
+    local inner_tlc = inner_blc + inner_height * unit_y
 
-    -- Get the corners of the box offset by the thickness
-    -- these are used to do the pocket for an inset box, otherwise they
-    -- are not used. 
-    local inner_blc, inner_brc, inner_trc, inner_tlc
+    -- take note of if we've created the corners
+    local made_blc = false
+    local made_brc = false
+    local made_trc = false
+    local made_tlc = false
 
-    -- if side 1 is missing then don't cut a contour for it
-    if (facesToMake.side1 == false and not create_tabs_for_missing_faces) then
-      inner_blc = inner_start_point - Vector2D(0, thickness)
-    else
-      inner_blc = inner_start_point
+    local inset_group = ContourGroup(true)
+
+    -- the sides and ends have to swap for the top and bottom!
+    if (facesToMake.side1 == true and facetype == FaceType.Bottom) or
+    (facesToMake.side2 == true and facetype == FaceType.Lid) or
+    (create_tabs_for_missing_faces == true) then
+      local contour_side1 = Contour(0.0)
+      contour_side1:AppendPoint(outer_blc)
+      contour_side1:LineTo(outer_brc)
+      contour_side1:LineTo(Point2D(outer_brc.x, inner_brc.y))
+      contour_side1:LineTo(Point2D(outer_blc.x, inner_blc.y))
+      contour_side1:LineTo(outer_blc)
+      inset_group:AddTail(contour_side1)
+      made_blc = true
+      made_brc = true
     end
 
-    -- end 1 is there or not
-    if (facesToMake.end1 == false and not create_tabs_for_missing_faces) then
-      inner_brc = Point2D(inner_start_point.x, inner_blc.y) + inner_width*unit_x + Vector2D(thickness, 0)
-    else
-      inner_brc = Point2D(inner_start_point.x, inner_blc.y)  + inner_width*unit_x
+    if (facesToMake.side2 == true and facetype == FaceType.Bottom) or
+    (facesToMake.side1 == true and facetype == FaceType.Lid) or
+    (create_tabs_for_missing_faces == true) then
+      local contour_side2 = Contour(0.0)
+      contour_side2:AppendPoint(outer_tlc)
+      contour_side2:LineTo(outer_trc)
+      contour_side2:LineTo(Point2D(outer_trc.x, inner_trc.y))
+      contour_side2:LineTo(Point2D(outer_tlc.x, inner_tlc.y))
+      contour_side2:LineTo(outer_tlc)
+      inset_group:AddTail(contour_side2)
+      made_tlc = true
+      made_trc = true
     end
 
-    -- side 2 is there or not
-    if (facesToMake.side2 == false and not create_tabs_for_missing_faces) then
-      inner_trc = Point2D(inner_brc.x, inner_start_point.y) + inner_height*unit_y + Vector2D(0, thickness)
-    else
-      inner_trc = Point2D(inner_brc.x, inner_start_point.y) + inner_height*unit_y
+    if (facesToMake.end1 == true or create_tabs_for_missing_faces == true) then
+      local e1_blc, e1_brc, e1_tlc, e1_trc
+
+      if (made_brc) then
+        e1_blc = inner_brc
+        e1_brc = Point2D(outer_brc.x, inner_brc.y)
+      else
+        e1_blc = Point2D(inner_brc.x, outer_brc.y)
+        e1_brc = outer_brc
+      end
+
+      if (made_trc) then
+        e1_trc = Point2D(outer_trc.x, inner_trc.y)
+        e1_tlc = inner_trc
+      else
+        e1_trc = outer_trc
+        e1_tlc = Point2D(inner_trc.x, outer_trc.y)
+      end
+
+      local contour_end1 = Contour(0.0)
+      contour_end1:AppendPoint(e1_blc)
+      contour_end1:LineTo(e1_brc)
+      contour_end1:LineTo(e1_trc)
+      contour_end1:LineTo(e1_tlc)
+      contour_end1:LineTo(e1_blc)
+      inset_group:AddTail(contour_end1)
     end
 
-    if (facesToMake.end2 == false and not create_tabs_for_missing_faces) then
-      inner_tlc = Point2D(inner_start_point.x, inner_trc.y) - Vector2D(thickness,0 )
-      -- Also if end2 is not being drawn then the bottom left corner should be over
-      inner_blc = inner_blc - Vector2D(thickness, 0)
-    else
-      inner_tlc = Point2D(inner_start_point.x, inner_trc.y)
+    if (facesToMake.end2 == true or create_tabs_for_missing_faces == true) then
+
+      if (made_blc) then
+        e2_blc = Point2D(outer_blc.x, inner_blc.y)
+        e2_brc = inner_blc
+      else
+        e2_blc = outer_blc
+        e2_brc = Point2D(inner_blc.x, outer_blc.y)
+      end
+
+      if (made_tlc) then
+        e2_trc = inner_tlc
+        e2_tlc = Point2D(outer_tlc.x, inner_tlc.y)
+      else
+        e2_trc = Point2D(inner_tlc.x, outer_tlc.y)
+        e2_tlc = outer_tlc
+      end
+
+      local contour_end2 = Contour(0.0)
+      contour_end2:AppendPoint(e2_blc)
+      contour_end2:LineTo(e2_brc)
+      contour_end2:LineTo(e2_trc)
+      contour_end2:LineTo(e2_tlc)
+      contour_end2:LineTo(e2_blc)
+      inset_group:AddTail(contour_end2)
     end
 
-    -- This is the contour that will be used to cut the pocket in the lid
-    -- when doing an inset, needs to accomodate missing faces machining though
-    local contour = Contour(0.0)
-    contour:AppendPoint(inner_blc)
-    contour:LineTo(inner_brc)
-    contour:LineTo(inner_trc)
-    contour:LineTo(inner_tlc)
-    contour:LineTo(inner_blc)
+    return inset_group
 
-    return contour
   end
 
   function MakeLid(width, height, thickness, tab_width, start_point, lidType, facesToMake, create_tabs_for_missing_faces, name)
@@ -1044,10 +1103,14 @@ function GetFriendlyFaceLabel(face)
 
     -- This is the contour that will be used to cut the pocket in the lid
     -- when doing an inset, needs to accomodate missing faces machining though
-    local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
-                              create_tabs_for_missing_faces, name, inner_width, inner_height)
+    -- local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
+    --                           create_tabs_for_missing_faces, name, inner_width, inner_height)
 
-    return Face(contour, inset_contour, {}, tablist, name, FaceType.Lid, lidType)
+    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake, 
+      create_tabs_for_missing_faces, name, FaceType.Lid,
+      inner_width, inner_height)
+
+    return Face(contour, inset_contours, {}, tablist, name, FaceType.Lid, lidType)
   end
 
 
