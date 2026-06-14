@@ -14,9 +14,9 @@ body {
 }
 
 #page-wrapper {
-  width: 800px;
+  width: 53.333em;
   margin: 0 auto;
-  padding: 10px;
+  padding: 0.667em;
 }
 
 /* IE7 clearfix: zoom triggers hasLayout, :after clears floats in other browsers */
@@ -27,61 +27,61 @@ body {
 .section-header {
   background-color: #2255aa;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 1em;
   font-weight: bold;
-  letter-spacing: 1px;
+  letter-spacing: 0.067em;
   text-transform: uppercase;
-  padding: 5px 10px;
+  padding: 0.333em 0.667em;
 }
 
 /* ── White card container ─────────────────────────────────────────── */
 .card {
   background-color: #ffffff;
   border: 1px solid #c0c4d0;
-  margin-bottom: 10px;
+  margin-bottom: 0.667em;
 }
 .card-body {
-  padding: 10px;
+  padding: 0.667em;
 }
 
 /* ── Light-gray sub-panel ─────────────────────────────────────────── */
 .sub-panel {
   background-color: #f2f4f8;
   border: 1px solid #d0d4de;
-  padding: 8px 10px;
+  padding: 0.533em 0.667em;
 }
 .sub-panel-title {
-  font-size: 15px;
+  font-size: 1em;
   font-weight: bold;
-  letter-spacing: 1px;
+  letter-spacing: 0.067em;
   text-transform: uppercase;
   color: #2255aa;
-  margin-bottom: 7px;
+  margin-bottom: 0.467em;
 }
 
 /* ── Header banner ────────────────────────────────────────────────── */
 .header-image {
   float: left;
-  width: 170px;
+  width: 11.333em;
   background-color: #f2f4f8;
   border-right: 1px solid #d0d4de;
-  padding: 10px;
+  padding: 0.667em;
   text-align: center;
 }
 .header-image img {
-  max-width: 170px;
+  max-width: 11.333em;
   height: auto;
 }
 .header-text {
   float: left;
-  width: 558px;
-  padding: 10px 14px;
+  width: 37.2em;
+  padding: 0.667em 0.933em;
 }
 .header-text p {
-  font-size: 15px;
+  font-size: 1em;
   color: #6b7280;
   line-height: 1.6;
-  margin-bottom: 5px;
+  margin-bottom: 0.333em;
 }
 .header-text p:last-child {
   margin-bottom: 0;
@@ -100,19 +100,19 @@ body {
 /* Hidden tooltip box */
 .geometry-column {
   float: left;
-  width: 245px;
-  margin-right: 10px;
-  margin-bottom: 10px;
+  width: 16.333em;
+  margin-right: 0.667em;
+  margin-bottom: 0.667em;
 }
 .geometry-column-last {
   float: left;
-  width: 245px;
-  margin-bottom: 10px;
+  width: 16.333em;
+  margin-bottom: 0.667em;
 }
 
 /* ── Label + input field row ──────────────────────────────────────── */
 .field-row {
-    margin-bottom: 6px;
+    margin-bottom: 0.4em;
 
     /* Keep label + input together on one line */
     white-space: nowrap;
@@ -125,76 +125,76 @@ body {
     /* Allow label text to wrap inside its own box */
     white-space: normal;
 
-    width: 100px;       /* wrapping box */
+    width: 6.667em;       /* wrapping box */
     font-weight: bold;
 
     vertical-align: middle;
-    line-height: 18px;  /* prevents descender clipping */
-    font-size: 15px;
+    line-height: 1.2em;  /* prevents descender clipping */
+    font-size: 1em;
 }
 
 .field-row input {
     display: inline;   /* IE7 hack */
     zoom: 1;
 
-    width: 100px;
-    margin-left: 10px;
+    width: 6.667em;
+    margin-left: 0.667em;
 
     vertical-align: middle;
-    font-size: 15px;
+    font-size: 1em;
 }
 
 
 /* ── Checkbox + label row ─────────────────────────────────────────── */
 .checkbox-row {
-  margin-bottom: 7px;
-  font-size: 15px;
+  margin-bottom: 0.467em;
+  font-size: 1em;
   font-weight: bold;
   color: #374151;
 }
 .checkbox-row input {
-  margin-right: 4px;
+  margin-right: 0.267em;
 }
 
 /* ── Faces to machine ─────────────────────────────────────────────── */
 .faces-panel {
   background-color: #f2f4f8;
   border: 1px solid #d0d4de;
-  padding: 8px 10px;
-  margin-top: 12px;
+  padding: 0.533em 0.667em;
+  margin-top: 0.8em;
   clear: both;
   overflow: hidden;
 }
 .face-checkbox {
   float: left;
-  margin-right: 10px;
-  margin-bottom: 4px;
-  font-size: 15px;
+  margin-right: 0.667em;
+  margin-bottom: 0.267em;
+  font-size: 1em;
   font-weight: bold;
   color: #374151;
   white-space: nowrap;
 }
 .face-checkbox input {
-  margin-right: 3px;
+  margin-right: 0.2em;
 }
 
 /* ── Tool picker bar ──────────────────────────────────────────────── */
 .tool-bar {
   background-color: #ffffff;
   border: 1px solid #c0c4d0;
-  padding: 8px 10px;
-  margin-bottom: 10px;
+  padding: 0.533em 0.667em;
+  margin-bottom: 0.667em;
 }
 .tool-bar-left {
   float: left;
-  width: 490px;
-  line-height: 26px;
+  width: 32.667em;
+  line-height: 1.733em;
 }
 .tool-bar-right {
   float: left;
-  width: 225px;
-  line-height: 26px;
-  font-size: 15px;
+  width: 15em;
+  line-height: 1.733em;
+  font-size: 1em;
   color: #6b7280;
 }
 input.ToolPicker {
@@ -202,38 +202,38 @@ input.ToolPicker {
   color: #2255aa;
   border: 1px solid #2255aa;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 1em;
   font-weight: bold;
-  padding: 4px 12px;
+  padding: 0.267em 0.8em;
   cursor: pointer;
   vertical-align: middle;
 }
 #ToolNameField {
-  font-size: 15px;
+  font-size: 1em;
   color: #374151;
   font-style: italic;
-  margin-left: 8px;
+  margin-left: 0.533em;
   vertical-align: middle;
 }
 .no-toolpath-label {
-  font-size: 15px;
+  font-size: 1em;
   color: #374151;
   vertical-align: middle;
 }
 .no-toolpath-label input {
-  margin-right: 4px;
+  margin-right: 0.267em;
   vertical-align: middle;
 }
 
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 260px;
-  margin-right: 10px;
+  width: 17.333em;
+  margin-right: 0.667em;
 }
 .type-column-last {
   float: left;
-  width: 260px;
+  width: 17.333em;
 }
 .type-panel {
   background-color: #ffffff;
@@ -242,32 +242,32 @@ input.ToolPicker {
 .type-panel-header {
   background-color: #e8eaf0;
   border-bottom: 1px solid #c0c4d0;
-  padding: 5px 10px;
-  font-size: 15px;
+  padding: 0.333em 0.667em;
+  font-size: 1em;
   font-weight: bold;
-  letter-spacing: 1px;
+  letter-spacing: 0.067em;
   text-transform: uppercase;
   color: #6b7280;
 }
 .type-option {
-  padding: 8px 10px;
+  padding: 0.533em 0.667em;
   border-bottom: 1px solid #e8eaf0;
-  line-height: 26px;
+  line-height: 1.733em;
 }
 .type-option-last {
-  padding: 8px 10px;
-  line-height: 26px;
+  padding: 0.533em 0.667em;
+  line-height: 1.733em;
 }
 .type-option-radio {
   float: left;
-  width: 130px;
-  font-size: 15px;
+  width: 8.667em;
+  font-size: 1em;
   font-weight: bold;
   color: #374151;
   vertical-align: middle;
 }
 .type-option-radio input {
-  margin-right: 5px;
+  margin-right: 0.333em;
   vertical-align: middle;
 }
 .type-option-radio label {
@@ -278,7 +278,7 @@ input.ToolPicker {
   line-height: 0;
 }
 .type-option-preview img {
-  height: 22px;
+  height: 1.467em;
   width: auto;
   display: inline;
   vertical-align: middle;
@@ -288,35 +288,35 @@ input.ToolPicker {
 .footer-bar {
   background-color: #ffffff;
   border: 1px solid #c0c4d0;
-  padding: 10px 12px;
+  padding: 0.667em 0.8em;
 }
 .footer-ok-button {
   float: left;
-  width: 155px;
-  padding-top: 8px;
+  width: 10.333em;
+  padding-top: 0.533em;
   text-align: center;
 }
 .footer-options {
   float: left;
-  padding-top: 4px;
-  width: 390px;
+  padding-top: 0.267em;
+  width: 26em;
 }
 .footer-options-col {
   float: left;
-  width: 235px;
+  width: 15.667em;
 }
 .footer-option-item {
-  font-size: 15px;
+  font-size: 1em;
   color: #374151;
-  margin-bottom: 4px;
+  margin-bottom: 0.267em;
 }
 .footer-option-item input {
-  margin-right: 4px;
+  margin-right: 0.267em;
 }
 .footer-cancel-button {
   float: left;
-  width: 155px;
-  padding-top: 8px;
+  width: 10.333em;
+  padding-top: 0.533em;
   text-align: center;
 }
 
@@ -326,9 +326,9 @@ input.ToolPicker {
   color: #ffffff;
   border: 1px solid #166032;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 1em;
   font-weight: bold;
-  padding: 7px 28px;
+  padding: 0.467em 1.867em;
   cursor: pointer;
 }
 #ButtonCancel {
@@ -336,9 +336,9 @@ input.ToolPicker {
   color: #6b7280;
   border: 1px solid #c0c4d0;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 1em;
   font-weight: bold;
-  padding: 7px 20px;
+  padding: 0.467em 1.333em;
   cursor: pointer;
 }
 

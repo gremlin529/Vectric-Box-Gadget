@@ -304,7 +304,7 @@
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
   setTimeout(function() {
-    document.body.style.zoom = dpiToZoom();
+    // document.body.style.zoom = dpiToZoom();
 
     // Dark mode: Lua registry restores the checkbox state. If it has never been
     // saved (first run), the checkbox will be unchecked - we default to dark on.
