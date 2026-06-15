@@ -36,6 +36,7 @@ $mainHTMLFile = $moduleToCreate + "_dev.html"
 $filesToRelease = @(
     $mainLuaFile,
     $mainHTMLFile,
+    "CreateFaces.xlua",
     "stylesheets",
     "images"
 )

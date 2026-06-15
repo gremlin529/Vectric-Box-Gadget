@@ -17,9 +17,8 @@
       <img src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
-      <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
-      <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
-      <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved. <u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calc Warning</u> for <u>Better Productivity</u>.</p>
+      <p>This gadget creates two layers of vectors. The layer called box is the actual physical outlines, and the layer called cutout is the one the toolpath is created with.</p>
+      <p><u>Warning!</u> The Dovetail Toolpath is a gadget created toolpath which cannot be re-calculated so do not move the vectors</p>
     </div>
   </div>
 
@@ -33,16 +32,16 @@
         <div class="sub-panel">
           <div class="sub-panel-title">Box Dimensions</div>
           <div class="field-row">
-            <label for="WidthField">Width:</label>
-            <input type="number" step="any" id="WidthField" placeholder="Width of Box" />
+            <label for="WidthField">Width</label> 
+			      <input title="Side to side width of the box outside" type="number" step="any" id="WidthField" placeholder="Width of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div class="field-row">
-            <label for="DepthField">Depth:</label>
-            <input type="text" id="DepthField" placeholder="Depth of Box" />
+            <label for="DepthField">Depth</label>
+            <input title="Front to back depth of the box outside" type="number" step="any" id="DepthField" placeholder="Depth of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div class="field-row">
-            <label for="HeightField">Height:</label>
-            <input type="text" id="HeightField" placeholder="Height of Box" />
+            <label for="HeightField">Height</label>
+            <input title="Top to bottom height of the box" type="number" step="any" id="HeightField" placeholder="Height of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
         </div>
       </div>
@@ -56,17 +55,17 @@
             <label for="AllJointWidths">Show all joint widths</label>
           </div>
           <div class="field-row">
-            <label for="SideTabWidthField">Side joint width:</label>
-            <input type="text" id="SideTabWidthField" placeholder="Width of Joint" />
+            <label for="SideTabWidthField" id="SideJointLabel">Side joints</label>
+            <input title="width of the dovetail or tab to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
-          <div id="showHideTopBottomJoints" style="display:none;">
-            <div class="field-row">
-              <label for="BottomTabWidthField">Bottom joint width:</label>
-              <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" />
+          <div id="showHideTopBottomJoints" style="display: none">
+            <div class="field-row" id="showHideBottomJointWidth">
+              <label for="BottomTabWidthField">Bottom joints</label>
+              <input title="Width of the bottom tabs or dovetails" type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
             <div class="field-row" id="showHideLidJointWidth">
-              <label for="TopTabWidthField">Lid joint width:</label>
-              <input type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" />
+              <label for="TopTabWidthField">Lid joints</label>
+              <input title="Width of the lids tab or dovetail" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
           </div>
         </div>
@@ -77,12 +76,12 @@
         <div class="sub-panel">
           <div class="sub-panel-title">Machining</div>
           <div class="field-row">
-            <label for="AllowanceField">Allowance:</label>
-            <input type="text" id="AllowanceField" placeholder="Allowance" />
+            <label for="AllowanceField">Allowance</label>
+            <input title="Additional material removed in joints for better fitment" type="text" id="AllowanceField" placeholder="Allowance" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div class="field-row">
-            <label for="EdgeField">Clamping Margin:</label>
-            <input type="text" id="EdgeField" placeholder="Clamping Margin" />
+            <label for="ClampingMargin">Clamping Margin</label>
+            <input title="Margin on the edge for clamping the workpiece" type="text" id="ClampingMargin" placeholder="Clamping Margin" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
         </div>
       </div>
@@ -90,13 +89,13 @@
       <!-- Faces to machine -->
       <div class="faces-panel">
         <div class="sub-panel-title">Faces To Machine</div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeLid"    value="1" class="LuaButton" />Lid</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeBottom" value="2" class="LuaButton" />Bottom</label></div>
+        <div class="face-checkbox" id="MakeLidCheckItem"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton" />Lid</label></div>
+        <div class="face-checkbox" id="MakeBottomCheckItem"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
         <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create tabs for un-checked faces</label></div>
+        <div class="face-checkbox"><label title="If unchecked then fingers to connect to faces which are not created will not be created"><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
       </div>
 
     </div>
@@ -116,7 +115,7 @@
     </div>
   </div>
 
-  <!-- ── Joint type + Lid type ──────────────────────────────────────── -->
+  <!-- ── Joint type + Lid type + Bottom type ───────────────────────── -->
   <div class="clearfix" style="margin-bottom:10px;">
 
     <div class="type-column">
@@ -124,7 +123,7 @@
         <div class="type-panel-header">Joint Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger Joint</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Finger</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/tabs.png" alt="Finger joint preview" />
@@ -132,7 +131,7 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail Joint</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/dovetails.png" alt="Dovetail joint preview" />
@@ -141,23 +140,70 @@
       </div>
     </div>
 
-    <div class="type-column-last">
+    <div class="type-column">
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)" />Flat lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioInset" onclick="onLidTypeChanged(this)" />Inset</label>
           </div>
           <div class="type-option-preview">
-            <img src="Images/flatlid.png" alt="Flat lid preview" />
+            <img src="Images/InsetLid.png" alt="Inset lid preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioTabbed" onclick="onLidTypeChanged(this)" />Fingers</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
+          </div>
+        </div><div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioFlat" onclick="onLidTypeChanged(this)" />Flat</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/FlatLid.png" alt="Flat lid preview" />
           </div>
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)" />Tabbed lid</label>
+            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioNone" onclick="onLidTypeChanged(this)" />None</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="type-column-last">
+      <div class="type-panel">
+        <div class="type-panel-header">Bottom Type</div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadioInset" onclick="onBottomTypeChanged(this)"/>Inset</label>
           </div>
           <div class="type-option-preview">
-            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
+            <img src="Images/InsetBottom.png" alt="Flat bottom preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeTabbed" onclick="onBottomTypeChanged(this)" />Fingers</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabbedbottom.png" alt="Tabbed bottom preview" />
+          </div>
+        </div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeFlat" onclick="onBottomTypeChanged(this)" />Flat</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/FlatBottom.png" alt="Flat bottom preview" />
+          </div>
+        </div>
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeNone" onclick="onBottomTypeChanged(this)" />None</label>
           </div>
         </div>
       </div>
@@ -211,6 +257,13 @@
     return "100%";
   }
 
+  function onKeyDownPreventNegative(event) {
+    // Prevent entering negative values in number fields (except for backspace and delete).
+    if (event.keyCode === 189 || event.keyCode === 109) {
+      event.preventDefault();
+    }
+  }
+
   // Applies or removes dark mode by toggling the dark-mode class on body.
   function onDarkModeChanged(checkbox) {
     if (checkbox.checked) {
@@ -224,14 +277,29 @@
   function onLidTypeChanged(radio) {
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) {
-      lidJointRow.style.display = document.getElementById("LidTypeRadio1").checked ? "none" : "block";
+      lidJointRow.style.display = document.getElementById("LidTypeRadioTabbed").checked ? "block" : "none";
     }
+    var noLid = document.getElementById("LidTypeRadioNone").checked;
+    var lidCheckItem = document.getElementById("MakeLidCheckItem");
+    if (lidCheckItem) { lidCheckItem.style.display = noLid ? "none" : "block"; }
+  }
+
+  function onBottomTypeChanged(radio) {
+    var bottomJointRow = document.getElementById("showHideBottomJointWidth");
+    if (bottomJointRow) {
+      bottomJointRow.style.display = document.getElementById("BottomTypeTabbed").checked ? "block" : "none";
+    }
+    var noBottom = document.getElementById("BottomTypeNone").checked;
+    var bottomCheckItem = document.getElementById("MakeBottomCheckItem");
+    if (bottomCheckItem) { bottomCheckItem.style.display = noBottom ? "none" : "block"; }
   }
 
   // Shows or hides the Bottom and Lid joint width fields.
   function onShowAllWidthsChanged(checkbox) {
     var el = document.getElementById("showHideTopBottomJoints");
     if (el) { el.style.display = checkbox.checked ? "block" : "none"; }
+	  var elSideJoint = document.getElementById("SideJointLabel")
+	  if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joints":"All Joints"}
   }
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
@@ -245,8 +313,11 @@
       onDarkModeChanged(darkMode);
     }
 
-    var lid1 = document.getElementById("LidTypeRadio1");
+    var lid1 = document.getElementById("LidTypeRadioInset");
     if (lid1) { onLidTypeChanged(lid1); }
+
+    var bottom1 = document.getElementById("BottomTypeRadioInset")
+    if (bottom1) { onBottomTypeChanged(bottom1)}
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

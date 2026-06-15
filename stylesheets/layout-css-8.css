@@ -93,6 +93,11 @@ body {
 }
 
 /* ── Geometry columns ─────────────────────────────────────────────── */
+.has-tip {
+    position: relative;
+}
+
+/* Hidden tooltip box */
 .geometry-column {
   float: left;
   width: 245px;
@@ -107,24 +112,38 @@ body {
 
 /* ── Label + input field row ──────────────────────────────────────── */
 .field-row {
-  margin-bottom: 6px;
+    margin-bottom: 6px;
+
+    /* Keep label + input together on one line */
+    white-space: nowrap;
 }
+
 .field-row label {
-  display: block;
-  font-size: 15px;
-  font-weight: bold;
-  color: #374151;
-  margin-bottom: 2px;
+    display: inline;   /* IE7 hack */
+    zoom: 1;
+
+    /* Allow label text to wrap inside its own box */
+    white-space: normal;
+
+    width: 100px;       /* wrapping box */
+    font-weight: bold;
+
+    vertical-align: middle;
+    line-height: 18px;  /* prevents descender clipping */
+    font-size: 15px;
 }
+
 .field-row input {
-  width: 100%;
-  font-family: Courier New, monospace;
-  font-size: 15px;
-  border: 1px solid #b0b8cc;
-  background-color: #ffffff;
-  color: #1a1f2e;
-  padding: 3px 5px;
+    display: inline;   /* IE7 hack */
+    zoom: 1;
+
+    width: 100px;
+    margin-left: 10px;
+
+    vertical-align: middle;
+    font-size: 15px;
 }
+
 
 /* ── Checkbox + label row ─────────────────────────────────────────── */
 .checkbox-row {
@@ -209,12 +228,12 @@ input.ToolPicker {
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
 .type-column {
   float: left;
-  width: 395px;
+  width: 260px;
   margin-right: 10px;
 }
 .type-column-last {
   float: left;
-  width: 395px;
+  width: 260px;
 }
 .type-panel {
   background-color: #ffffff;
@@ -233,28 +252,36 @@ input.ToolPicker {
 .type-option {
   padding: 8px 10px;
   border-bottom: 1px solid #e8eaf0;
+  line-height: 26px;
 }
 .type-option-last {
   padding: 8px 10px;
+  line-height: 26px;
 }
 .type-option-radio {
   float: left;
-  width: 170px;
-  padding-top: 8px;
+  width: 130px;
   font-size: 15px;
   font-weight: bold;
   color: #374151;
+  vertical-align: middle;
 }
 .type-option-radio input {
   margin-right: 5px;
+  vertical-align: middle;
+}
+.type-option-radio label {
+  vertical-align: middle;
 }
 .type-option-preview {
   float: left;
+  line-height: 0;
 }
 .type-option-preview img {
-  height: 40px;
+  height: 22px;
   width: auto;
-  display: block;
+  display: inline;
+  vertical-align: middle;
 }
 
 /* ── Footer bar ───────────────────────────────────────────────────── */
