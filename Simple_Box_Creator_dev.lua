@@ -73,12 +73,13 @@ function main(script_path)
   options.cut_layer_name  = "CutOut"        --- layer name default
   options.allowance = 0.0                   --- allowance default 
   options.clampingMargin = 0.75                 --- edge margin default
-  options.warn_dovetail = true   -- show dovetail warning after create
+  -- options.warn_dovetail = true   -- show dovetail warning after create
   options.dark_mode     = true        --- default to dark mode on
   options.cut_dovetails = false
   options.lidType = FaceJointType.Inset -- default lid type is inset
   options.bottomType = FaceJointType.Tabbed -- default bottom type is flat
   options.label_faces   = true        --- default to labelling face vectors
+  options.ZoomLevel = "Auto"
   options.no_toolpath = false
   options.window_width = g_width
   options.window_height = g_height
@@ -286,11 +287,12 @@ function main(script_path)
     local lid = MakeLid(options.width,
       options.depth,
       options.thickness,
-      lidDoveTail.min_width,
+      lidDoveTail,
       options.start_point,
       options.lidType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
+      options.cut_dovetails,
       "Lid"
     )
     faces[#faces + 1] = lid
@@ -324,6 +326,10 @@ function main(script_path)
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
+  if options.cut_dovetails then
+    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME)
+  end
+
   if (not options.no_toolpath) and 
      ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
       (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
@@ -332,9 +338,20 @@ function main(script_path)
 
   if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
-    local dovetail_markers = GetAllMarkers(faces)
-    if options.cut_dovetails and (#dovetail_markers > 0) then
-      CreateDoveTailToolpath(dovetail_markers, sideDoveTail, options.tool, options.allowance, options.warn_dovetail)
+    -- local dovetail_markers = GetAllMarkers(faces)
+    -- if options.cut_dovetails and (#dovetail_markers > 0) then
+    --   CreateDoveTailToolpath(dovetail_markers, sideDoveTail, options.tool, options.allowance, options.warn_dovetail)
+    -- end
+
+    if options.cut_dovetails then
+      local flute_layer = job.LayerManager:FindLayerWithName(FLUTE_LAYER_NAME)
+      if flute_layer then
+        local selection = job.Selection
+        selection:Clear()
+        SelectVectorsOnLayer(flute_layer, selection, false, true, false)
+        local tool_stepdown = ConvertUnitsFrom(options.tool.Stepdown, options.tool, mtl_block)
+        CreateFlutingToolpath("Fluting Dovetails", 0.0, options.thickness, tool_stepdown, mtl_block.InMM)
+      end
     end
 
     CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, options.cut_layer_name)
@@ -365,11 +382,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("ClampingMargin", options.clampingMargin)
 
-  dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
+  -- dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
   dialog:AddCheckBox("DarkMode", options.dark_mode)
   dialog:AddCheckBox("LabelFaces", options.label_faces)
 
   -- dialog:AddDoubleField("DovetailAngleField", sideDoveTail.angle)
+
+  dialog:AddDropDownList("ZoomLevel", options.ZoomLevel)
 
   dialog:AddCheckBox("MakeLid", options.facesToMake.lid)
   dialog:AddCheckBox("MakeBottom", options.facesToMake.bottom)
@@ -618,9 +637,11 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.useAllJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomTabWidth = dialog:GetDoubleField("BottomTabWidthField")
   options.lidTabWidth = dialog:GetDoubleField("TopTabWidthField")
-  options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
+  -- options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.label_faces   = dialog:GetCheckBox("LabelFaces")
+  options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
+
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
@@ -630,6 +651,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.facesToMake.end2     = dialog:GetCheckBox("MakeEnd2")
   options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
 
+  
   -- Set up the dovetail widths based on if we're using separate widths for each piece
   -- or not, use sidedovetail size for everything if not.
   if not options.useAllJointWidths then
@@ -715,9 +737,10 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   -- UX defaults
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
-  registry:SetBool("WarnDovetail", options.warn_dovetail)
+  -- registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("LabelFaces", options.label_faces)
+  registry:SetString("ZoomLevel", options.ZoomLevel)
 
   if justwindowinfo then
     return
@@ -780,9 +803,10 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
 
-  options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
+  -- options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
+  options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)

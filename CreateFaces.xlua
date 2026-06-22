@@ -34,7 +34,7 @@ function _tool_ok(tool)
   return (dia or 0) > 0
 end
 
-function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype)
+function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets)
   local obj ={}
   obj.contour = outer_contour
   obj.inset_contours = inset_contours
@@ -44,6 +44,7 @@ function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jo
   -- obj.is_lid = false
   obj.facetype = facetype
   obj.jointtype = jointtype
+  obj.flute_sockets = flute_sockets or {}
   return obj
 end
 
@@ -66,6 +67,19 @@ function TransformFace(face, xform)
   for i=1,#tabs do
     face.tabs[i] =  xform * face.tabs[i]
   end
+
+    if face.flute_sockets then
+      for i = 1, #face.flute_sockets do
+        local socket = face.flute_sockets[i]
+
+    -- Recalculate along from transformed points.
+      socket.along = socket.end_pt - socket.start_pt
+      socket.along:Normalize()
+
+  -- Do NOT recalculate socket.out here.
+  -- ArrangeContours uses translation only, so original socket.out remains valid.
+      end
+    end
 end
 
 function CloneFace(face)
@@ -76,6 +90,7 @@ function CloneFace(face)
   clone.name = face.name
   clone.facetype = face.facetype
   clone.jointtype = face.jointtype
+  clone.flute_sockets = face.flute_sockets
   if (face.inset_contours ~= nil) then
     clone.inset_contours = face.inset_contours:Clone()
   end
@@ -474,10 +489,11 @@ function GetFriendlyFaceLabel(face)
 |  Returns the contour for the profile and a list of dovetails
 |
 ]]
-  function MakeBottomFaceContour(width, height, thickness, start_point, dovetail, 
+  function MakeBottomFaceContour(width, height, thickness, start_point, dovetail,
       use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name)
 
     local dovetail_markers = {}
+    local flute_sockets = {}
     local tablist = {}
     local outer_blc = start_point
     local outer_brc = start_point  + width*Vector2D(1,0)
@@ -509,7 +525,7 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
       contour:LineTo(outer_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -523,7 +539,7 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
       contour:LineTo(outer_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -537,7 +553,7 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
       contour:LineTo(outer_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -551,7 +567,7 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Tabbed) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
       contour:LineTo(outer_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -562,11 +578,11 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- This is the contour that will be used to cut the pocket for inset joint
-    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake, 
-      create_tabs_for_missing_faces, name, FaceType.Bottom, 
+    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake,
+      create_tabs_for_missing_faces, name, FaceType.Bottom,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets)
   end
 
 -- Make the side faces
@@ -717,6 +733,7 @@ function GetFriendlyFaceLabel(face)
 
     local tablist = {}
     local dovetail_markers = {}
+    local flute_sockets = {}
 
     local bottom_thickness = 0
     if (bottomType == FaceJointType.None) then
@@ -785,7 +802,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForRightEnd) then
       LineToVector(contour,  (tab_space_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -834,7 +851,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForLeftEnd) then
       LineToVector(contour, (tab_space_side*-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
       LineToVector(contour, (tab_space_side*-unit_y))
@@ -843,15 +860,25 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Tabbed)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Tabbed, flute_sockets)
   end
 
-  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers)
+  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers, flute_sockets)
     for i=1,num_tails do
       local start_pos = contour.EndPoint2D
       AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
       if (markers) then
-        markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D) 
+        markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D)
+      end
+      if flute_sockets then
+        flute_sockets[#flute_sockets + 1] = {
+          start_pt  = start_pos,
+          end_pt    = contour.EndPoint2D,
+          along     = along,
+          out       = out,
+          thickness = thickness,
+          angle     = dovetail.angle
+        }
       end
       LineToVector(contour, space_dist*along)
     end
@@ -1052,11 +1079,14 @@ end
 
   end
 
-  function MakeLid(width, height, thickness, tab_width, start_point, lidType, facesToMake, create_tabs_for_missing_faces, name)
+  function MakeLid(width, height, thickness, dovetail, start_point, lidType, facesToMake, create_tabs_for_missing_faces, use_dovetails, name)
 
     local noLidTabs = (lidType == FaceJointType.Flat) or (lidType == FaceJointType.None) or (lidType == FaceJointType.Inset)
 
     local tablist = {}
+    local dovetail_markers = {}
+    local flute_sockets = {}
+    local tab_width = dovetail.min_width
     local inner_width = width - 2*thickness
     local inner_height = height - 2*thickness
 
@@ -1082,7 +1112,11 @@ end
       if (create_tabs_for_missing_faces or facesToMake.side1) then
         LineToVector(contour, (thickness + tab_space_w)*unit_x)
         AddMiddleOfLastSpanToList(contour, tablist)
-        AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+        if use_dovetails then
+          AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+        else
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+        end
         contour:LineTo(outer_brc)
         AddMiddleOfLastSpanToList(contour, tablist)
       else
@@ -1096,7 +1130,11 @@ end
       if (create_tabs_for_missing_faces or facesToMake.end1) then
         LineToVector(contour, (thickness + tab_space_h)*unit_y)
         AddMiddleOfLastSpanToList(contour, tablist)
-        AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+        if use_dovetails then
+          AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+        else
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+        end
         contour:LineTo(outer_trc)
         AddMiddleOfLastSpanToList(contour, tablist)
       else
@@ -1110,7 +1148,11 @@ end
       if (create_tabs_for_missing_faces or facesToMake.side2) then
         LineToVector(contour, (thickness + tab_space_w)*-unit_x)
         AddMiddleOfLastSpanToList(contour, tablist)
-        AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+        if use_dovetails then
+          AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+        else
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+        end
         contour:LineTo(outer_tlc)
         AddMiddleOfLastSpanToList(contour, tablist)
       else
@@ -1124,7 +1166,11 @@ end
       if (create_tabs_for_missing_faces or facesToMake.end2) then
         LineToVector(contour, (thickness + tab_space_h)* -unit_y)
         AddMiddleOfLastSpanToList(contour, tablist)
-        AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+        if use_dovetails then
+          AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+        else
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+        end
         contour:LineTo(outer_blc)
         AddMiddleOfLastSpanToList(contour, tablist)
       else
@@ -1151,11 +1197,11 @@ end
     -- local inset_contour = MakeInsetContour(width, height, thickness, start_point, facesToMake, 
     --                           create_tabs_for_missing_faces, name, inner_width, inner_height)
 
-    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake, 
+    local inset_contours = MakeInsetContours(width, height, thickness, start_point, facesToMake,
       create_tabs_for_missing_faces, name, FaceType.Lid,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, {}, tablist, name, FaceType.Lid, lidType)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets)
   end
 
 
@@ -1392,7 +1438,103 @@ end
     return contour
   end
 
---[[  -------------- OffsetOutIn --------------------------------------------------  
+--[[  -------------- Fluting Vectors --------------------------------------------------
+|
+|  Generate the open-line vectors that guide a V-bit to cut the dovetail flutes.
+|  Each "socket" entry in face.flute_sockets represents one female dovetail slot.
+|  AddFlutingVectorsForSocket() draws two lines per height step along that slot
+|  so the operator can use them as a "trace" toolpath drive.
+|
+]]
+
+FLUTE_LAYER_NAME = "Fluting Vectors"
+
+function CreateOpenLine(layer, x1, y1, x2, y2)
+  local contour = Contour(0.0)
+  contour:AppendPoint(Point2D(x1, y1))
+  contour:LineTo(Point2D(x2, y2))
+  local cad = CreateCadContour(contour)
+  layer:AddObject(cad, true)
+  return cad
+end
+
+function AddFlutingVectorsForSocket(layer, socket)
+  local thickness      = socket.thickness
+  local angle          = socket.angle
+  local flute_length   = thickness / math.tan(angle) + 0.02
+  local flute_fit_offset = 0.1
+  local flute_spacing  = 0.125
+
+  local along = socket.along
+  local out   = socket.out
+  along:Normalize()
+  out:Normalize()
+
+  local t = 0.0
+  while t <= thickness + 0.0001 do
+    local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
+    local left_start = left_wall - (flute_length * along)
+    CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
+
+    local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
+    local right_start = right_wall + (flute_length * along)
+    CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
+
+    t = t + flute_spacing
+  end
+end
+
+function AddFlutingVectorsForFaces(job, faces, layer_name)
+  local layer = job.LayerManager:GetLayerWithName(layer_name)
+  for i = 1, #faces do
+    local face = faces[i]
+    if face.flute_sockets then
+      for j = 1, #face.flute_sockets do
+        AddFlutingVectorsForSocket(layer, face.flute_sockets[j])
+      end
+    end
+  end
+end
+
+function CreateFlutingToolpath(name, start_depth, cut_depth, tool_stepdown, tool_in_mm)
+  local tool = Tool("END_MILL", Tool.END_MILL)
+  tool.InMM = tool_in_mm
+  tool.ToolDia = tool_in_mm and 3.969 or 0.15625  -- 5/32" bit
+  tool.Stepdown = tool_stepdown
+  tool.Stepover = tool.ToolDia * 0.125
+  tool.RateUnits = Tool.INCHES_MIN
+  tool.FeedRate = 60
+  tool.PlungeRate = 30
+  tool.SpindleSpeed = 10000
+  tool.ToolNumber = 1
+  tool.VBitAngle = 90.0
+  tool.ClearStepover = tool.ToolDia * 0.5
+
+  local pos_data = ToolpathPosData()
+
+  local fluting_data = FlutingParameterData()
+  fluting_data.StartDepth = start_depth
+  fluting_data.CutDepth = cut_depth
+  fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
+  fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
+  fluting_data.UseRampRatio = false
+  fluting_data.RampRatio = 0.2
+  fluting_data.RampLength = 15
+  fluting_data.ProjectToolpath = false
+
+  local geometry_selector = GeometrySelector()
+  local toolpath_manager = ToolpathManager()
+  local toolpath_id = toolpath_manager:CreateFlutingToolpath(
+    name, tool, fluting_data, pos_data, geometry_selector, true, true)
+
+  if toolpath_id == nil then
+    DisplayMessageBox("Error creating fluting toolpath.")
+    return false
+  end
+  return true
+end
+
+--[[  -------------- OffsetOutIn --------------------------------------------------
 |
 | Return the result of offsetting the contour group out and then back in again
 |
