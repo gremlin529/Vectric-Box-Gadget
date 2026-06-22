@@ -75,7 +75,7 @@ function main(script_path)
   options.lidTabWidth = 1.0                 --- joint width for the top (as a separate value)
   options.allowance = 0.0                   --- allowance default 
   options.clampingMargin = 0.75                 --- edge margin default
-  
+
   options.cut_layer_name  = "CutOut"        --- layer name default
   options.cut_dovetails = false
   options.lidType = FaceJointType.Inset -- default lid type is inset
@@ -85,8 +85,8 @@ function main(script_path)
 
   options.ZoomLevel = "Auto"
   options.dark_mode     = true        --- default to dark mode on
-  
-  
+
+
   options.window_width = g_width
   options.window_height = g_height
 
@@ -170,7 +170,7 @@ function main(script_path)
   -- if there's no lid or bottom made, we should make the face no
   -- matter what the boxes says, nor should we machine the edges for it so count that
   -- as flat
-  
+
   -- need to shallow copy these as we're overwriting them
   local computedFacesToMake = {}
   computedFacesToMake.lid = options.facesToMake.lid
@@ -336,8 +336,8 @@ function main(script_path)
   end
 
   if (not options.no_toolpath) and 
-     ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
-      (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
+  ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
+    (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
     CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
   end
 
@@ -449,8 +449,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- At least one face must be selected
     local at_least_one =
-      options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
-      options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
+    options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
+    options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
     if not at_least_one then
       DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
       return false
@@ -648,7 +648,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.facesToMake.end2     = dialog:GetCheckBox("MakeEnd2")
   options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
 
-  
+
   -- Set up the dovetail widths based on if we're using separate widths for each piece
   -- or not, use sidedovetail size for everything if not.
   if not options.useAllJointWidths then
@@ -679,7 +679,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   local lid_index = dialog:GetRadioIndex("LidTypeRadio")
   options.lidType = lid_index
-  
+
   local bottom_index = dialog:GetRadioIndex("BottomTypeRadio")
   options.bottomType = bottom_index
 
@@ -815,21 +815,21 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
 end
 
 function truncate(num, decimals)
-    if type(num) ~= "number" or type(decimals) ~= "number" then
-        error("Both arguments must be numbers")
-    end
-    if decimals < 0 then
-        error("Decimal places must be non-negative")
-    end
-    
-    local factor = 10 ^ decimals
-    -- math.floor for truncating toward negative infinity
-    -- For truncating toward zero, use conditional logic
-    if num >= 0 then
-        return math.floor(num * factor) / factor
-    else
-        return math.ceil(num * factor) / factor
-    end
+  if type(num) ~= "number" or type(decimals) ~= "number" then
+    error("Both arguments must be numbers")
+  end
+  if decimals < 0 then
+    error("Decimal places must be non-negative")
+  end
+
+  local factor = 10 ^ decimals
+  -- math.floor for truncating toward negative infinity
+  -- For truncating toward zero, use conditional logic
+  if num >= 0 then
+    return math.floor(num * factor) / factor
+  else
+    return math.ceil(num * factor) / factor
+  end
 end
 
 --- By putting this function in the script we don't need to create

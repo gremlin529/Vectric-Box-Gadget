@@ -68,18 +68,18 @@ function TransformFace(face, xform)
     face.tabs[i] =  xform * face.tabs[i]
   end
 
-    if face.flute_sockets then
-      for i = 1, #face.flute_sockets do
-        local socket = face.flute_sockets[i]
+  if face.flute_sockets then
+    for i = 1, #face.flute_sockets do
+      local socket = face.flute_sockets[i]
 
-    -- Recalculate along from transformed points.
+      -- Recalculate along from transformed points.
       socket.along = socket.end_pt - socket.start_pt
       socket.along:Normalize()
 
-  -- Do NOT recalculate socket.out here.
-  -- ArrangeContours uses translation only, so original socket.out remains valid.
-      end
+      -- Do NOT recalculate socket.out here.
+      -- ArrangeContours uses translation only, so original socket.out remains valid.
     end
+  end
 end
 
 function CloneFace(face)
@@ -929,10 +929,10 @@ function GetFriendlyFaceLabel(face)
 -- Split a comma‑separated string into a numeric array.
 -- Includes validation, trimming, and safe conversion.
 
-local function splitToNumbers(input)
+  local function splitToNumbers(input)
     -- Validate that input is a string
     if type(input) ~= "string" then
-        return nil, "Input must be a string"
+      return nil, "Input must be a string"
     end
 
     local result = {}
@@ -940,21 +940,21 @@ local function splitToNumbers(input)
     -- Pattern explanation:
     -- "([^,]+)" captures sequences that are not commas.
     for part in input:gmatch("([^,]+)") do
-        -- Trim whitespace around each part
-        local trimmed = part:match("^%s*(.-)%s*$")
+      -- Trim whitespace around each part
+      local trimmed = part:match("^%s*(.-)%s*$")
 
-        -- Convert to number safely
-        local num = tonumber(trimmed)
+      -- Convert to number safely
+      local num = tonumber(trimmed)
 
-        if not num then
-            return nil, "Invalid number found: " .. trimmed
-        end
+      if not num then
+        return nil, "Invalid number found: " .. trimmed
+      end
 
-        table.insert(result, num)
+      table.insert(result, num)
     end
 
     return result
-end
+  end
 
   -- MakeInsetCountours will return a contour group of up to four rectangles
   -- that are the pockets neede for an inset lid/bottom
@@ -1064,7 +1064,7 @@ end
     -- grab the path for this inset
 
     local path = paths[indexOfPath]
-     
+
     local inset_group = ContourGroup(true)
 
     -- the path could create more than one object so iterate each one
@@ -1078,7 +1078,7 @@ end
       end
       inset_group:AddTail( contour )
     end
-    
+
     return inset_group
 
   end
@@ -1451,54 +1451,54 @@ end
 |
 ]]
 
-FLUTE_LAYER_NAME = "Fluting Vectors"
+  FLUTE_LAYER_NAME = "Fluting Vectors"
 
-function CreateOpenLine(layer, x1, y1, x2, y2)
-  local contour = Contour(0.0)
-  contour:AppendPoint(Point2D(x1, y1))
-  contour:LineTo(Point2D(x2, y2))
-  local cad = CreateCadContour(contour)
-  layer:AddObject(cad, true)
-  return cad
-end
-
-function AddFlutingVectorsForSocket(layer, socket, toolDiameter)
-  local thickness      = socket.thickness
-  local angle          = socket.angle
-  local flute_length   = thickness / math.tan(angle) + 0.02
-  local flute_fit_offset = 0.1
-  local flute_spacing  = toolDiameter / 2 -- I think this should be 1/2 the bit size...
-
-  local along = socket.along
-  local out   = socket.out
-  along:Normalize()
-  out:Normalize()
-
-  local t = 0.0
-  while t <= thickness + 0.0001 do
-    local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
-    local left_start = left_wall - (flute_length * along)
-    CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
-
-    local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
-    local right_start = right_wall + (flute_length * along)
-    CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
-
-    t = t + flute_spacing
+  function CreateOpenLine(layer, x1, y1, x2, y2)
+    local contour = Contour(0.0)
+    contour:AppendPoint(Point2D(x1, y1))
+    contour:LineTo(Point2D(x2, y2))
+    local cad = CreateCadContour(contour)
+    layer:AddObject(cad, true)
+    return cad
   end
-end
 
-function AddFlutingVectorsForFaces(job, faces, layer_name, toolDiameter)
-  local layer = job.LayerManager:GetLayerWithName(layer_name)
-  for i = 1, #faces do
-    local face = faces[i]
-    if face.flute_sockets then
-      for j = 1, #face.flute_sockets do
-        AddFlutingVectorsForSocket(layer, face.flute_sockets[j], toolDiameter)
+  function AddFlutingVectorsForSocket(layer, socket, toolDiameter)
+    local thickness      = socket.thickness
+    local angle          = socket.angle
+    local flute_length   = thickness / math.tan(angle) + 0.02
+    local flute_fit_offset = 0.1
+    local flute_spacing  = toolDiameter / 2 -- I think this should be 1/2 the bit size...
+
+    local along = socket.along
+    local out   = socket.out
+    along:Normalize()
+    out:Normalize()
+
+    local t = 0.0
+    while t <= thickness + 0.0001 do
+      local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
+      local left_start = left_wall - (flute_length * along)
+      CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
+
+      local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
+      local right_start = right_wall + (flute_length * along)
+      CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
+
+      t = t + flute_spacing
+    end
+  end
+
+  function AddFlutingVectorsForFaces(job, faces, layer_name, toolDiameter)
+    local layer = job.LayerManager:GetLayerWithName(layer_name)
+    for i = 1, #faces do
+      local face = faces[i]
+      if face.flute_sockets then
+        for j = 1, #face.flute_sockets do
+          AddFlutingVectorsForSocket(layer, face.flute_sockets[j], toolDiameter)
+        end
       end
     end
   end
-end
 
 --[[  ----------------- CreateFlutingToolpath -----------------  
 |
@@ -1517,69 +1517,69 @@ end
 ]]
 
 
-function CreateFlutingToolpath( name , start_depth, cut_depth, tool, tool_dia)
+  function CreateFlutingToolpath( name , start_depth, cut_depth, tool, tool_dia)
 
-   -- Create object used to set home position and safez gap above material surface
-   local pos_data = ToolpathPosData()
-   
- --  pos_data:SetHomePosition(0, 0, 5.0)
- --  pos_data.SafeZGap = 5.0
-  
-   -- Create  object used to pass fluting options
-   local fluting_data = FlutingParameterData()
-      -- start depth for toolpath
-      fluting_data.StartDepth = start_depth
-      
-      -- cut depth for toolpath this is depth below start depth
-      fluting_data.CutDepth = cut_depth
-      
-      -- type of fluting FULL_LENGTH, RAMP_START or RAMP_START_END
-      fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
-   
-      -- type of ramping RAMP_LINEAR, RAMP_SMOOTH
-      fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
-      
-      -- if true use ratio field for controling ramp length else absolute length value
-      fluting_data.UseRampRatio = false
-      
-	  -- length of ramp as ratio of flute length(range 0 - 1.0) (for start and end - ratio is of half length)
-      fluting_data.RampRatio = 0.2
+    -- Create object used to set home position and safez gap above material surface
+    local pos_data = ToolpathPosData()
 
-	  -- length to ramp over - if UseRampRatio == false
-      fluting_data.RampLength = 15
-      
-	  -- if true in Aspire, project toolpath onto composite model
-      fluting_data.ProjectToolpath = false
-      
-   -- Create object which can used to automatically select geometry on layers etc
-   local geometry_selector = GeometrySelector() 
-   
-   -- if this is true we create 2d toolpaths previews in 2d view, if false we dont
-   local create_2d_previews = true
-   
-   -- if this is true we will display errors and warning to the user
-   local display_warnings = true
-   
-   -- Create our toolpath
+    --  pos_data:SetHomePosition(0, 0, 5.0)
+    --  pos_data.SafeZGap = 5.0
 
-   local toolpath_manager = ToolpathManager()
- 
-   local toolpath_id = toolpath_manager:CreateFlutingToolpath(
-                                              name,
-                                              tool,
-                                              fluting_data,
-                                              pos_data,
-											  geometry_selector,
-                                              create_2d_previews,
-                                              display_warnings
-                                              )
-   
-   if toolpath_id  == nil  then
+    -- Create  object used to pass fluting options
+    local fluting_data = FlutingParameterData()
+    -- start depth for toolpath
+    fluting_data.StartDepth = start_depth
+
+    -- cut depth for toolpath this is depth below start depth
+    fluting_data.CutDepth = cut_depth
+
+    -- type of fluting FULL_LENGTH, RAMP_START or RAMP_START_END
+    fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
+
+    -- type of ramping RAMP_LINEAR, RAMP_SMOOTH
+    fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
+
+    -- if true use ratio field for controling ramp length else absolute length value
+    fluting_data.UseRampRatio = false
+
+    -- length of ramp as ratio of flute length(range 0 - 1.0) (for start and end - ratio is of half length)
+    fluting_data.RampRatio = 0.2
+
+    -- length to ramp over - if UseRampRatio == false
+    fluting_data.RampLength = 15
+
+    -- if true in Aspire, project toolpath onto composite model
+    fluting_data.ProjectToolpath = false
+
+    -- Create object which can used to automatically select geometry on layers etc
+    local geometry_selector = GeometrySelector() 
+
+    -- if this is true we create 2d toolpaths previews in 2d view, if false we dont
+    local create_2d_previews = true
+
+    -- if this is true we will display errors and warning to the user
+    local display_warnings = true
+
+    -- Create our toolpath
+
+    local toolpath_manager = ToolpathManager()
+
+    local toolpath_id = toolpath_manager:CreateFlutingToolpath(
+      name,
+      tool,
+      fluting_data,
+      pos_data,
+      geometry_selector,
+      create_2d_previews,
+      display_warnings
+    )
+
+    if toolpath_id  == nil  then
       DisplayMessageBox("Error creating toolpath")
       return false
-   end                                                    
+    end                                                    
 
-   return true  
+    return true  
 
   end
 
