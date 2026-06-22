@@ -1462,12 +1462,12 @@ function CreateOpenLine(layer, x1, y1, x2, y2)
   return cad
 end
 
-function AddFlutingVectorsForSocket(layer, socket)
+function AddFlutingVectorsForSocket(layer, socket, toolDiameter)
   local thickness      = socket.thickness
   local angle          = socket.angle
   local flute_length   = thickness / math.tan(angle) + 0.02
   local flute_fit_offset = 0.1
-  local flute_spacing  = 0.125
+  local flute_spacing  = toolDiameter / 2 -- I think this should be 1/2 the bit size...
 
   local along = socket.along
   local out   = socket.out
@@ -1488,55 +1488,100 @@ function AddFlutingVectorsForSocket(layer, socket)
   end
 end
 
-function AddFlutingVectorsForFaces(job, faces, layer_name)
+function AddFlutingVectorsForFaces(job, faces, layer_name, toolDiameter)
   local layer = job.LayerManager:GetLayerWithName(layer_name)
   for i = 1, #faces do
     local face = faces[i]
     if face.flute_sockets then
       for j = 1, #face.flute_sockets do
-        AddFlutingVectorsForSocket(layer, face.flute_sockets[j])
+        AddFlutingVectorsForSocket(layer, face.flute_sockets[j], toolDiameter)
       end
     end
   end
 end
 
-function CreateFlutingToolpath(name, start_depth, cut_depth, tool_stepdown, tool_in_mm)
-  local tool = Tool("END_MILL", Tool.END_MILL)
-  tool.InMM = tool_in_mm
-  tool.ToolDia = tool_in_mm and 3.969 or 0.15625  -- 5/32" bit
-  tool.Stepdown = tool_stepdown
-  tool.Stepover = tool.ToolDia * 0.125
-  tool.RateUnits = Tool.INCHES_MIN
-  tool.FeedRate = 60
-  tool.PlungeRate = 30
-  tool.SpindleSpeed = 10000
-  tool.ToolNumber = 1
-  tool.VBitAngle = 90.0
-  tool.ClearStepover = tool.ToolDia * 0.5
+--[[  ----------------- CreateFlutingToolpath -----------------  
+|
+|   Create a drilling toolpath within the program for the currently selected vectors
+|  Parameters:
+|    name,               -- Name for toolpath
+|    start_depth         -- Start depth for toolpath below surface of material
+|    cut_depth           -- cut depth for toolpath
+|    tool_dia            -- diameter of tool to use
+|    tool_stepdown       -- stepdown for tool
+|    tool_in_mm          -- true if tool size and stepdown are in mm
+|
+|  Return Values:
+|     true if toolpath created OK else false
+|
+]]
 
-  local pos_data = ToolpathPosData()
 
-  local fluting_data = FlutingParameterData()
-  fluting_data.StartDepth = start_depth
-  fluting_data.CutDepth = cut_depth
-  fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
-  fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
-  fluting_data.UseRampRatio = false
-  fluting_data.RampRatio = 0.2
-  fluting_data.RampLength = 15
-  fluting_data.ProjectToolpath = false
+function CreateFlutingToolpath( name , start_depth, cut_depth, tool, tool_dia)
 
-  local geometry_selector = GeometrySelector()
-  local toolpath_manager = ToolpathManager()
-  local toolpath_id = toolpath_manager:CreateFlutingToolpath(
-    name, tool, fluting_data, pos_data, geometry_selector, true, true)
+   -- Create object used to set home position and safez gap above material surface
+   local pos_data = ToolpathPosData()
+   
+ --  pos_data:SetHomePosition(0, 0, 5.0)
+ --  pos_data.SafeZGap = 5.0
+  
+   -- Create  object used to pass fluting options
+   local fluting_data = FlutingParameterData()
+      -- start depth for toolpath
+      fluting_data.StartDepth = start_depth
+      
+      -- cut depth for toolpath this is depth below start depth
+      fluting_data.CutDepth = cut_depth
+      
+      -- type of fluting FULL_LENGTH, RAMP_START or RAMP_START_END
+      fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
+   
+      -- type of ramping RAMP_LINEAR, RAMP_SMOOTH
+      fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
+      
+      -- if true use ratio field for controling ramp length else absolute length value
+      fluting_data.UseRampRatio = false
+      
+	  -- length of ramp as ratio of flute length(range 0 - 1.0) (for start and end - ratio is of half length)
+      fluting_data.RampRatio = 0.2
 
-  if toolpath_id == nil then
-    DisplayMessageBox("Error creating fluting toolpath.")
-    return false
+	  -- length to ramp over - if UseRampRatio == false
+      fluting_data.RampLength = 15
+      
+	  -- if true in Aspire, project toolpath onto composite model
+      fluting_data.ProjectToolpath = false
+      
+   -- Create object which can used to automatically select geometry on layers etc
+   local geometry_selector = GeometrySelector() 
+   
+   -- if this is true we create 2d toolpaths previews in 2d view, if false we dont
+   local create_2d_previews = true
+   
+   -- if this is true we will display errors and warning to the user
+   local display_warnings = true
+   
+   -- Create our toolpath
+
+   local toolpath_manager = ToolpathManager()
+ 
+   local toolpath_id = toolpath_manager:CreateFlutingToolpath(
+                                              name,
+                                              tool,
+                                              fluting_data,
+                                              pos_data,
+											  geometry_selector,
+                                              create_2d_previews,
+                                              display_warnings
+                                              )
+   
+   if toolpath_id  == nil  then
+      DisplayMessageBox("Error creating toolpath")
+      return false
+   end                                                    
+
+   return true  
+
   end
-  return true
-end
 
 --[[  -------------- OffsetOutIn --------------------------------------------------
 |

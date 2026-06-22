@@ -20,7 +20,8 @@
 -- Changed Warning Messaage when not enough Material for Parts.                                         -- by Sharkcutup 11/14/2025
 -- Changed up the User Interface a bit by colorizing and defining lines of images                       -- by Sharkcutup 11/23/2025
 -- Added a separate field for the width of the bottom tabs vs side tabs                                 -- by Gremlin 2/27/2026
--- Renamed the Gadget and stopping the upkeep of these comments as we're in GitHub now and the history is preserved there.    2/27/2026                                                              -- by Gremlin 2/27/2026
+-- Renamed the Gadget and stopping the upkeep of these comments as we're in GitHub now and the history is preserved there.    2/27/2026     
+-- June 21st, just to give proper credit Gremlin ported Sharkcutup's amazing fluting dovetail code to the project, per github history
 -------------------------------------------------------------------------------------------------------------------------------------------
 -- It is provided 'as-is' with changes made, without any express or implied warranty, and you make use of them entirely at your own risk.
 -- In no event will "Sharkcutup" be held liable for any damages arising from this gadgets use.
@@ -64,23 +65,28 @@ function main(script_path)
   options.height = 12                       --- height default              
   options.depth = 14                        --- depth default   
   options.InMM = false                      --- These are in mm or inches
+
   options.start_point = Point2D(0,0)
   options.thickness = mtl_block.Thickness;
+
   options.useAllJointWidths = false         --- show all joint width options (if false then only show one joint width option and use it for all joints)
   options.sideOrAllTabWidth = 0.3                --- all or side widths depending on the above
   options.bottomTabWidth = 1.0              --- joint width for the bottom (as a separate value)   
   options.lidTabWidth = 1.0                 --- joint width for the top (as a separate value)
-  options.cut_layer_name  = "CutOut"        --- layer name default
   options.allowance = 0.0                   --- allowance default 
   options.clampingMargin = 0.75                 --- edge margin default
-  -- options.warn_dovetail = true   -- show dovetail warning after create
-  options.dark_mode     = true        --- default to dark mode on
+  
+  options.cut_layer_name  = "CutOut"        --- layer name default
   options.cut_dovetails = false
   options.lidType = FaceJointType.Inset -- default lid type is inset
-  options.bottomType = FaceJointType.Tabbed -- default bottom type is flat
+  options.bottomType = FaceJointType.Tabbed -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
-  options.ZoomLevel = "Auto"
   options.no_toolpath = false
+
+  options.ZoomLevel = "Auto"
+  options.dark_mode     = true        --- default to dark mode on
+  
+  
   options.window_width = g_width
   options.window_height = g_height
 
@@ -95,7 +101,6 @@ function main(script_path)
   options.create_tabs_for_missing_faces = true  --- create tabs for missing faces (if false then dont create the tabs on edges for faces not selected)
 
 -----------------------------------------------------------------------------------------------------------------------------------------
-
 
   local dovetails = ContourGroup(true)
 
@@ -327,7 +332,7 @@ function main(script_path)
   end
 
   if options.cut_dovetails then
-    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME)
+    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME, options.tool.ToolDia)
   end
 
   if (not options.no_toolpath) and 
@@ -338,19 +343,13 @@ function main(script_path)
 
   if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
-    -- local dovetail_markers = GetAllMarkers(faces)
-    -- if options.cut_dovetails and (#dovetail_markers > 0) then
-    --   CreateDoveTailToolpath(dovetail_markers, sideDoveTail, options.tool, options.allowance, options.warn_dovetail)
-    -- end
-
     if options.cut_dovetails then
       local flute_layer = job.LayerManager:FindLayerWithName(FLUTE_LAYER_NAME)
       if flute_layer then
         local selection = job.Selection
         selection:Clear()
         SelectVectorsOnLayer(flute_layer, selection, false, true, false)
-        local tool_stepdown = ConvertUnitsFrom(options.tool.Stepdown, options.tool, mtl_block)
-        CreateFlutingToolpath("Fluting Dovetails", 0.0, options.thickness, tool_stepdown, mtl_block.InMM)
+        CreateFlutingToolpath("Fluting Dovetails", 0.0, options.thickness, options.tool)
       end
     end
 
@@ -382,7 +381,6 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("AllowanceField", options.allowance)
   dialog:AddDoubleField("ClampingMargin", options.clampingMargin)
 
-  -- dialog:AddCheckBox("WarnDovetail", options.warn_dovetail)
   dialog:AddCheckBox("DarkMode", options.dark_mode)
   dialog:AddCheckBox("LabelFaces", options.label_faces)
 
@@ -637,7 +635,6 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.useAllJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomTabWidth = dialog:GetDoubleField("BottomTabWidthField")
   options.lidTabWidth = dialog:GetDoubleField("TopTabWidthField")
-  -- options.warn_dovetail = dialog:GetCheckBox("WarnDovetail")
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
@@ -737,7 +734,6 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   -- UX defaults
   registry:SetDouble("WindowWidth", options.window_width)
   registry:SetDouble("WindowHeight", options.window_height)
-  -- registry:SetBool("WarnDovetail", options.warn_dovetail)
   registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("LabelFaces", options.label_faces)
   registry:SetString("ZoomLevel", options.ZoomLevel)
@@ -803,7 +799,6 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
 
-  -- options.warn_dovetail = registry:GetBool("WarnDovetail", true) -- default ON
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
