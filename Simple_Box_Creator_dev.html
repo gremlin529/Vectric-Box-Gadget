@@ -18,7 +18,7 @@
     </div>
     <div class="header-text">
       <p>This gadget creates two layers of vectors. The layer called box is the actual physical outlines, and the layer called cutout is the one the toolpath is created with.</p>
-      <p><u>Warning!</u> The Dovetail Toolpath is a gadget created toolpath which cannot be re-calculated so do not move the vectors</p>
+      <p>The measurements specifies the external dimensions of the box.</p>
     </div>
   </div>
 
@@ -143,33 +143,22 @@
     <div class="type-column">
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioInset" onclick="onLidTypeChanged(this)" />Inset</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/InsetLid.png" alt="Inset lid preview" />
-          </div>
-        </div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioTabbed" onclick="onLidTypeChanged(this)" />Fingers</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabbedlid.png" alt="Tabbed lid preview" />
-          </div>
-        </div><div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioFlat" onclick="onLidTypeChanged(this)" />Flat</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/FlatLid.png" alt="Flat lid preview" />
+        <div class="type-dropdown-content">
+          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
+            <option value="Inset">Inset</option>
+            <option value="Fingers">Fingers</option>
+            <option value="Flat">Flat</option>
+            <option value="None">None</option>
+          </select>
+          <div class="type-dropdown-preview">
+            <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
           </div>
         </div>
-        <div class="type-option-last clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioNone" onclick="onLidTypeChanged(this)" />None</label>
-          </div>
+        <div style="display: none;">
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioInset" />
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioTabbed" />
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioFlat" />
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioNone" />
         </div>
       </div>
     </div>
@@ -177,34 +166,22 @@
     <div class="type-column-last">
       <div class="type-panel">
         <div class="type-panel-header">Bottom Type</div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadioInset" onclick="onBottomTypeChanged(this)"/>Inset</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/InsetBottom.png" alt="Flat bottom preview" />
-          </div>
-        </div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeTabbed" onclick="onBottomTypeChanged(this)" />Fingers</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabbedbottom.png" alt="Tabbed bottom preview" />
+        <div class="type-dropdown-content">
+          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
+            <option value="Inset">Inset</option>
+            <option value="Fingers">Fingers</option>
+            <option value="Flat">Flat</option>
+            <option value="None">None</option>
+          </select>
+          <div class="type-dropdown-preview">
+            <img id="BottomTypeImage" src="Images/InsetBottom.png" alt="Bottom type preview" />
           </div>
         </div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeFlat" onclick="onBottomTypeChanged(this)" />Flat</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/FlatBottom.png" alt="Flat bottom preview" />
-          </div>
-        </div>
-        <div class="type-option-last clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeNone" onclick="onBottomTypeChanged(this)" />None</label>
-          </div>
+        <div style="display: none;">
+          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadioInset" />
+          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeTabbed" />
+          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeFlat" />
+          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeNone" />
         </div>
       </div>
     </div>
@@ -281,25 +258,58 @@
     }
   }
 
-  // Hides the Lid Joint Width field when Flat Lid is selected (no joint needed).
-  function onLidTypeChanged(radio) {
-    var lidJointRow = document.getElementById("showHideLidJointWidth");
-    if (lidJointRow) {
-      lidJointRow.style.display = document.getElementById("LidTypeRadioTabbed").checked ? "block" : "none";
+  function onLidTypeChanged(el) {
+    var select = document.getElementById("LidTypeSelect");
+    var val = select ? select.options[select.selectedIndex].value : "Inset";
+
+    var radioIds = { "Inset": "LidTypeRadioInset", "Fingers": "LidTypeRadioTabbed",
+                     "Flat":  "LidTypeRadioFlat",  "None":    "LidTypeRadioNone" };
+    for (var key in radioIds) {
+      var r = document.getElementById(radioIds[key]);
+      if (r) { r.checked = (key === val); }
     }
-    var noLid = document.getElementById("LidTypeRadioNone").checked;
+
+    var imgSrcs = { "Inset": "Images/InsetLid.png", "Fingers": "Images/tabbedlid.png",
+                    "Flat":  "Images/FlatLid.png",  "None":    "" };
+    var img = document.getElementById("LidTypeImage");
+    if (img) {
+      var src = imgSrcs[val] || "";
+      img.src = src;
+      img.style.display = src ? "" : "none";
+    }
+
+    var lidJointRow = document.getElementById("showHideLidJointWidth");
+    if (lidJointRow) { lidJointRow.style.display = (val === "Fingers") ? "block" : "none"; }
+
     var lidCheckItem = document.getElementById("MakeLidCheckItem");
-    if (lidCheckItem) { lidCheckItem.style.display = noLid ? "none" : "block"; }
+    if (lidCheckItem) { lidCheckItem.style.display = (val === "None") ? "none" : "block"; }
   }
 
-  function onBottomTypeChanged(radio) {
-    var bottomJointRow = document.getElementById("showHideBottomJointWidth");
-    if (bottomJointRow) {
-      bottomJointRow.style.display = document.getElementById("BottomTypeTabbed").checked ? "block" : "none";
+  function onBottomTypeChanged(el) {
+    var select = document.getElementById("BottomTypeSelect");
+    var val = select ? select.options[select.selectedIndex].value : "Inset";
+
+    var radioIds = { "Inset": "BottomTypeRadioInset", "Fingers": "BottomTypeTabbed",
+                     "Flat":  "BottomTypeFlat",       "None":    "BottomTypeNone" };
+    for (var key in radioIds) {
+      var r = document.getElementById(radioIds[key]);
+      if (r) { r.checked = (key === val); }
     }
-    var noBottom = document.getElementById("BottomTypeNone").checked;
+
+    var imgSrcs = { "Inset": "Images/InsetBottom.png", "Fingers": "Images/tabbedbottom.png",
+                    "Flat":  "Images/FlatBottom.png",  "None":    "" };
+    var img = document.getElementById("BottomTypeImage");
+    if (img) {
+      var src = imgSrcs[val] || "";
+      img.src = src;
+      img.style.display = src ? "" : "none";
+    }
+
+    var bottomJointRow = document.getElementById("showHideBottomJointWidth");
+    if (bottomJointRow) { bottomJointRow.style.display = (val === "Fingers") ? "block" : "none"; }
+
     var bottomCheckItem = document.getElementById("MakeBottomCheckItem");
-    if (bottomCheckItem) { bottomCheckItem.style.display = noBottom ? "none" : "block"; }
+    if (bottomCheckItem) { bottomCheckItem.style.display = (val === "None") ? "none" : "block"; }
   }
 
   // Shows or hides the Bottom and Lid joint width fields.
@@ -328,11 +338,27 @@
       onDarkModeChanged(darkMode);
     }
 
-    var lid1 = document.getElementById("LidTypeRadioInset");
-    if (lid1) { onLidTypeChanged(lid1); }
+    var lidSelect = document.getElementById("LidTypeSelect");
+    if (lidSelect) {
+      var lidMap = [["LidTypeRadioInset","Inset"],["LidTypeRadioTabbed","Fingers"],
+                    ["LidTypeRadioFlat","Flat"],  ["LidTypeRadioNone","None"]];
+      for (var i = 0; i < lidMap.length; i++) {
+        var lr = document.getElementById(lidMap[i][0]);
+        if (lr && lr.checked) { lidSelect.value = lidMap[i][1]; break; }
+      }
+      onLidTypeChanged(lidSelect);
+    }
 
-    var bottom1 = document.getElementById("BottomTypeRadioInset")
-    if (bottom1) { onBottomTypeChanged(bottom1)}
+    var bottomSelect = document.getElementById("BottomTypeSelect");
+    if (bottomSelect) {
+      var bottomMap = [["BottomTypeRadioInset","Inset"],["BottomTypeTabbed","Fingers"],
+                       ["BottomTypeFlat","Flat"],      ["BottomTypeNone","None"]];
+      for (var j = 0; j < bottomMap.length; j++) {
+        var br = document.getElementById(bottomMap[j][0]);
+        if (br && br.checked) { bottomSelect.value = bottomMap[j][1]; break; }
+      }
+      onBottomTypeChanged(bottomSelect);
+    }
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

@@ -700,7 +700,11 @@ function GetFriendlyFaceLabel(face)
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+      if (with_tails) then
+        AddMaleDoveTailsAlongLine(thickness, topdovetail, -unit_x, unit_y, contour, num_flaps_top, tab_space_top)
+      else
+        AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+      end
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     end

@@ -40,7 +40,7 @@ g_version = "dev"
 g_subVersion = "development"                                      
 g_title = "Simple Box"
 g_width = 890
-g_height = 865                                                    
+g_height = 850                                                    
 g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"       
 
 local librayModule
