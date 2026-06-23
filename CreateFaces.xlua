@@ -36,14 +36,13 @@ end
 
 function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets)
   local obj ={}
-  obj.contour = outer_contour
-  obj.inset_contours = inset_contours
-  obj.dovetail_list = dovetails
   obj.name = name
   obj.tabs = tabs
-  -- obj.is_lid = false
   obj.facetype = facetype
   obj.jointtype = jointtype
+  obj.contour = outer_contour
+  obj.inset_contours = inset_contours -- used for an inset lid or bottom the contour for the rabbet
+  obj.dovetail_list = dovetails
   obj.flute_sockets = flute_sockets or {}
   return obj
 end
@@ -51,6 +50,7 @@ end
 function TransformFace(face, xform)
   face.contour:Transform(xform)
 
+  -- inset contours for rabbet lid or bottom
   if (face.inset_contours ~= nil) then
     face.inset_contours:Transform(xform)
   end
@@ -926,9 +926,8 @@ function GetFriendlyFaceLabel(face)
     LineToVector(contour, thickness*(-perp_vec))
   end
 
--- Split a comma‑separated string into a numeric array.
--- Includes validation, trimming, and safe conversion.
-
+  -- Splits a comma‑separated string into a numeric array.
+  -- Includes validation, trimming, and safe conversion.
   local function splitToNumbers(input)
     -- Validate that input is a string
     if type(input) ~= "string" then
@@ -956,8 +955,9 @@ function GetFriendlyFaceLabel(face)
     return result
   end
 
-  -- MakeInsetCountours will return a contour group of up to four rectangles
-  -- that are the pockets neede for an inset lid/bottom
+  -- MakeInsetCountours will return a contour group of up which
+  -- defines the rabbet for inset lids or bottoms taking into account
+  -- if there are any missing faces which should not be rabbetted
   function MakeInsetContours(width, height, thickness, start_point, facesToMake, 
       create_tabs_for_missing_faces, name, facetype,
       inner_width, inner_height)
@@ -994,7 +994,7 @@ function GetFriendlyFaceLabel(face)
     }
 
     -- points to side mapping, numbers indicate position in
-    -- table points above
+    -- table points above, numbers are the array index
     -- 
     -- 13 --- 14 ----------------------------- 15 --- 16 
     -- |                    side 2                    |  
@@ -1006,7 +1006,11 @@ function GetFriendlyFaceLabel(face)
     -- |                    side 1                    |
     -- 1 ---- 2 ------------------------------ 3 ---- 4
     -- 
+    
+    -- This table is the paths for each case definied by the bit field
     -- order is s1, s2, e1, e2 as a bit field
+    -- the values are indexes into the points table above
+    -- and can be visualised with the diagram
 
     local paths = {
       {""},                      -- 0 case, no path
@@ -1112,14 +1116,14 @@ function GetFriendlyFaceLabel(face)
     if (not noLidTabs) then
       contour:AppendPoint(start_point)
 
-      --- blc -> brc side1
+      --- blc -> brc connects to side1
       if (create_tabs_for_missing_faces or facesToMake.side1) then
         LineToVector(contour, (thickness + tab_space_w)*unit_x)
         AddMiddleOfLastSpanToList(contour, tablist)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, -unit_y, contour, num_flaps_w)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
         end
         contour:LineTo(outer_brc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1130,7 +1134,7 @@ function GetFriendlyFaceLabel(face)
         AddMiddleOfLastSpanToList(contour, tablist)
       end
 
-      -- brc --> trc end1
+      -- brc --> trc connects to end1
       if (create_tabs_for_missing_faces or facesToMake.end1) then
         LineToVector(contour, (thickness + tab_space_h)*unit_y)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1148,7 +1152,7 @@ function GetFriendlyFaceLabel(face)
         AddMiddleOfLastSpanToList(contour, tablist)
       end
 
-      -- trc --> tlc side2
+      -- trc --> tlc connects to side2
       if (create_tabs_for_missing_faces or facesToMake.side2) then
         LineToVector(contour, (thickness + tab_space_w)*-unit_x)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1166,7 +1170,7 @@ function GetFriendlyFaceLabel(face)
         AddMiddleOfLastSpanToList(contour, tablist)
       end
 
-      -- tlc --> trc end2
+      -- tlc --> trc connects to end2
       if (create_tabs_for_missing_faces or facesToMake.end2) then
         LineToVector(contour, (thickness + tab_space_h)* -unit_y)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1888,6 +1892,7 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
   profile_data.CutDepth = thickness
   profile_data.StartDepth = 0.0
   profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+  -- profile_data.CutDirection = ProfileParameterData.CONVENTIONAL_DIRECTION
   profile_data.UseTabs = false                                       --- Changed true to false markjones
   profile_data.TabThickness = math.min(0.25*thickness, 0.25)
   profile_data.TabLength = tab_length

@@ -336,9 +336,9 @@ function main(script_path)
   end
 
   if (not options.no_toolpath) and 
-  ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
+    ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
     (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
-    CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
+      CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
   end
 
   if not options.no_toolpath then
@@ -449,8 +449,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- At least one face must be selected
     local at_least_one =
-    options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
-    options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
+      options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
+      options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
     if not at_least_one then
       DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
       return false
@@ -534,7 +534,6 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local tab_space_w_top = total_tab_space_w_top / (num_flaps_w_top + 1)
     local tab_space_d_top = total_tab_space_d_top / (num_flaps_d_top + 1)
     local tab_space_h = total_tab_space_h / (num_flaps_h + 1)
-
 
     if options.cut_dovetails then
       local min_space = sideDoveTail.max_width - sideDoveTail.min_width
