@@ -449,3 +449,14 @@ body.dark-mode #ButtonCancel {
   color: #8a92a8;
   border-color: #383d4a;
 }
+body.dark-mode select {
+  background-color: #1a1d24;
+  color: #d4d8e8;
+  border: 1px solid #383d4a;
+}
+body.dark-mode .type-dropdown-content {
+  background-color: #22262f;
+}
+body.dark-mode .footer-option-item label {
+  color: #8a92a8;
+}
