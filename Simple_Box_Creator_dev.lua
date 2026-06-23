@@ -73,8 +73,10 @@ function main(script_path)
   options.sideOrAllTabWidth = 0.3                --- all or side widths depending on the above
   options.bottomTabWidth = 1.0              --- joint width for the bottom (as a separate value)   
   options.lidTabWidth = 1.0                 --- joint width for the top (as a separate value)
+
   options.allowance = 0.0                   --- allowance default 
-  options.clampingMargin = 0.75                 --- edge margin default
+  options.partSpacing = 0.5                 --- spacing between parts
+  options.clampingMargin = 0.75             --- edge margin default
 
   options.cut_layer_name  = "CutOut"        --- layer name default
   options.cut_dovetails = false
@@ -134,6 +136,7 @@ function main(script_path)
     options.lidTabWidth = truncate(options.lidTabWidth * multiplier, 2)
     options.allowance = truncate(options.allowance * multiplier, 2)
     options.clampingMargin = truncate(options.clampingMargin * multiplier, 2)
+    options.partSpacing = truncate(options.partSpacing * multiplier, 2)
     options.InMM = job.InMM
   end
 
@@ -310,7 +313,10 @@ function main(script_path)
   if _tool_ok(options.tool) then
     converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
   end
-  local part_gap    = 2 * converted_tool_diameter
+
+  -- use the largest part spacing provided, it has to be at least 2 * diameter of bit
+  -- so as a safety ignore input if it's less
+  local part_gap    = math.max( 2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
 
@@ -378,7 +384,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("BottomTabWidthField", options.bottomTabWidth)
   dialog:AddDoubleField("TopTabWidthField", options.lidTabWidth)
   dialog:AddCheckBox("AllJointWidths", options.useAllJointWidths)
+
   dialog:AddDoubleField("AllowanceField", options.allowance)
+  dialog:AddDoubleField("PartSpacingField", options.partSpacing)
   dialog:AddDoubleField("ClampingMargin", options.clampingMargin)
 
   dialog:AddCheckBox("DarkMode", options.dark_mode)
@@ -532,7 +540,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     if options.allowance > 0 then
       dia = dia - 2 * options.allowance
     end
-
+    
     local tab_space_w_bottom = total_tab_space_w_bottom / (num_flaps_w_bottom + 1)
     local tab_space_d_bottom = total_tab_space_d_bottom / (num_flaps_d_bottom + 1)
     local tab_space_w_top = total_tab_space_w_top / (num_flaps_w_top + 1)
@@ -668,6 +676,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   lidDoveTail.max_width = lidDoveTail.min_width + (2 * options.thickness / math.tan(lidDoveTail.angle))
 
   options.allowance   = dialog:GetDoubleField("AllowanceField")
+  options.partSpacing = dialog:GetDoubleField("PartSpacingField")
   options.clampingMargin = dialog:GetDoubleField("ClampingMargin")
   if not options.clampingMargin or options.clampingMargin <= 0 then
     options.clampingMargin = 0.75
@@ -755,8 +764,11 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomJointWidth", options.bottomTabWidth)     -- Added by Gremlin
   registry:SetDouble("TopJointWidth", options.lidTabWidth)         -- Added by Gremlin
   registry:SetBool("AllJointWidths", options.useAllJointWidths)           -- Added by Gremlin
+
   registry:SetDouble("Allowance", options.allowance)                 -- Added by Sharkcutup
+  registry:SetDouble("PartsSpacing", options.partSpacing)
   registry:SetDouble("EdgeMargin", options.clampingMargin)              -- Added by Sharkcutup
+
   registry:SetBool("CutDovetails", options.cut_dovetails)
   registry:SetDouble("LidType", options.lidType)
   registry:SetDouble("BottomType", options.bottomType)
@@ -793,8 +805,11 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomTabWidth = registry:GetDouble("BottomJointWidth", options.sideOrAllTabWidth)  --Added by Gremlin
   options.lidTabWidth = registry:GetDouble("TopJointWidth", options.sideOrAllTabWidth)      --Added by Gremlin
   options.useAllJointWidths = registry:GetBool("AllJointWidths", options.useAllJointWidths)  -- Added by Gremlin
+
   options.allowance = registry:GetDouble("Allowance", options.allowance)           -- Added by Sharkcutup
+  options.partSpacing = registry:GetDouble("PartsSpacing", options.partSpacing)
   options.clampingMargin = registry:GetDouble("EdgeMargin", options.clampingMargin)      -- Added by Sherkcutup
+
   -- sideDoveTail.min_width = options.sideOrAllTabWidth
   -- bottomDoveTail.min_width = options.bottomTabWidth -- Added by Gremlin
   -- lidDoveTail.min_width = options.lidTabWidth -- Added by Gremlin
@@ -835,6 +850,19 @@ function truncate(num, decimals)
     return math.ceil(num * factor) / factor
   end
 end
+
+-- function OnToolPicker_ToolChooseButton(dialog) 
+--   local tool = dialog:GetTool("ToolChooseButton")
+--   if tool == nil then
+-- 		MessageBox("No tool selected!")
+-- 		return true
+--   end
+  
+--   MessageBox("User picked tool ...\n" .. tool_name .. " Diameter = " .. tool.ToolDia)
+  
+--   return true
+-- end
+
 
 --- By putting this function in the script we don't need to create
 --- individual functions unless we need specific handling
