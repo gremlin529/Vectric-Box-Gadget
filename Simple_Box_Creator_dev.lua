@@ -79,7 +79,7 @@ function main(script_path)
   options.cut_layer_name  = "CutOut"        --- layer name default
   options.cut_dovetails = false
   options.lidType = FaceJointType.Inset -- default lid type is inset
-  options.bottomType = FaceJointType.Tabbed -- default bottom type is tabbed
+  options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
 
@@ -410,10 +410,14 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   else
     tab_default_index = 1  -- last time user chose finger joints
   end
+
   dialog:AddRadioGroup("TabTypeRadio", tab_default_index)
 
-  dialog:AddRadioGroup("LidTypeRadio", options.lidType)
-  dialog:AddRadioGroup("BottomTypeRadio", options.bottomType)
+  local topString = faceJointTypeToString(options.lidType)
+  dialog:AddDropDownList("LidTypeSelect", topString)
+
+  local bottomString = faceJointTypeToString(options.bottomType)
+  dialog:AddDropDownList("BottomTypeSelect", bottomString)
 
   local units_string = "Inches"
   if options.tool.InMM then
@@ -472,7 +476,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomDoveTail.min_width)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomDoveTail.min_width)
 
-    if (options.bottomType == FaceJointType.Tabbed) then
+    if (options.bottomType == FaceJointType.Fingers) then
       if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
         if (not options.useAllJointWidths) then
           DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomDoveTail.min_width, inner_width))
@@ -498,7 +502,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local total_tab_space_d_top = (inner_depth - num_flaps_d_top*lidDoveTail.min_width)
 
     -- check the joint widths only when making a tabbed lid
-    if (options.lidType == FaceJointType.Tabbed) then
+    if (options.lidType == FaceJointType.Fingers) then
       if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
         DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", lidDoveTail.min_width, inner_width))
         return false
@@ -552,7 +556,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         return false
       end
 
-      if (options.lidType == FaceJointType.Tabbed) then
+      if (options.lidType == FaceJointType.Fingers) then
         if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
           DisplayMessageBox("The joint width is too small for the lid.")
           return false
@@ -563,7 +567,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if (tab_space_w_bottom <= bottom_min_space) or 
       (tab_space_d_bottom <= bottom_min_space) or 
       (tab_space_h <= min_space) or 
-      ((options.lidType == FaceJointType.Tabbed) and 
+      ((options.lidType == FaceJointType.Fingers) and 
         ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
@@ -583,7 +587,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox("The selected tool will not fit between the side joints.")
         return false
       end 
-      if (options.useAllJointWidths and options.lidType == FaceJointType.Tabbed and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
+      if (options.useAllJointWidths and options.lidType == FaceJointType.Fingers and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
         if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
           DisplayMessageBox("The selected tool will not fit between the lid joints.")
           return false
@@ -634,6 +638,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.useAllJointWidths = dialog:GetCheckBox("AllJointWidths")
   options.bottomTabWidth = dialog:GetDoubleField("BottomTabWidthField")
   options.lidTabWidth = dialog:GetDoubleField("TopTabWidthField")
+
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
@@ -676,11 +681,11 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
     options.cut_dovetails = true    -- Dovetail joints
   end
 
-  local lid_index = dialog:GetRadioIndex("LidTypeRadio")
-  options.lidType = lid_index
+  local lid_type = dialog:GetDropDownListValue("LidTypeSelect")
+  options.lidType = FaceJointType[lid_type]
 
-  local bottom_index = dialog:GetRadioIndex("BottomTypeRadio")
-  options.bottomType = bottom_index
+  local bottom_type = dialog:GetDropDownListValue("BottomTypeSelect")
+  options.bottomType = FaceJointType[bottom_type]
 
 
   -- Get from tool picker

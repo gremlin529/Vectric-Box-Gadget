@@ -9,7 +9,7 @@
 -- Enums and constants
 FaceJointType = {
   Inset = 1,
-  Tabbed = 2,
+  Fingers = 2,
   Flat  = 3,
   None = 4
 }
@@ -25,6 +25,24 @@ local unit_x = Vector2D(1,0)
 local unit_y = Vector2D(0,1)
 
 -- ---------- VALIDATION HELPERS ----------
+
+function faceJointTypeToString( joint )
+  for k, v in pairs(FaceJointType) do
+    if (v == joint) then
+      return k
+    end
+  end
+  return ""
+end
+
+function enumToTypeName(enumValue)
+    if typeof(enumValue) ~= "EnumItem" then
+        error("Expected EnumItem, got " .. typeof(enumValue))
+    end
+
+    return enumValue.EnumType.Name
+end
+
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
 
 function _tool_ok(tool)
@@ -522,7 +540,7 @@ function GetFriendlyFaceLabel(face)
 
 
     -- line to first blc -> brc (Side 1)
-    if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
@@ -536,7 +554,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create brc -> trc (end 1)
-    if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
@@ -550,7 +568,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create trc -> tlc (side 2)
-    if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
@@ -564,7 +582,7 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- Create tlc -> blc (end 2)
-    if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Tabbed) then
+    if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
@@ -647,8 +665,8 @@ function GetFriendlyFaceLabel(face)
     contour:AppendPoint(inner_start_point)
 
     -- blc -> brc is the bottom edge of the side face
-    if ((bottomType ~= FaceJointType.Tabbed) or 
-      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Tabbed)) then
+    if ((bottomType ~= FaceJointType.Fingers) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Fingers)) then
       -- in this case the bottom edge has no tabs, and starts at 0,0
       LineToVector(contour, -0.0*unit_y)
       LineToVector(contour, inner_width*unit_x)
@@ -686,8 +704,8 @@ function GetFriendlyFaceLabel(face)
     end
 
     -- trc -> tlc (top line so has flaps for lid)
-    if ((lidType ~= FaceJointType.Tabbed) or 
-      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Tabbed)) then
+    if ((lidType ~= FaceJointType.Fingers) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Fingers)) then
       -- this is for no lid
       -- so the box goes the whole-way up
       -- Also used for a dovetail/tabbed lid where we're not cutting tabs as it would also 
@@ -727,7 +745,7 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Tabbed)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers)
   end
 
 -- Make an end face
@@ -787,8 +805,8 @@ function GetFriendlyFaceLabel(face)
     contour:AppendPoint(inner_start_point)
 
     -- blc --> brc (tabs for bottom)
-    if ((bottomType ~= FaceJointType.Tabbed) or 
-      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Tabbed)) then
+    if ((bottomType ~= FaceJointType.Fingers) or 
+      (facesToMake.bottom == false and not create_tabs_for_missing_faces and bottomType==FaceJointType.Fingers)) then
       contour:LineTo(inner_brc)
     else
       LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
@@ -818,8 +836,8 @@ function GetFriendlyFaceLabel(face)
 
     -- if the lid is flat then we go up by half thickness and then across
     -- trc -> tlc (top edge)
-    if ((lidType ~= FaceJointType.Tabbed) or 
-      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Tabbed)) then
+    if ((lidType ~= FaceJointType.Fingers) or 
+      (facesToMake.lid == false and not create_tabs_for_missing_faces and lidType==FaceJointType.Fingers)) then
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -864,7 +882,7 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Tabbed, flute_sockets)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets)
   end
 
   function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers, flute_sockets)

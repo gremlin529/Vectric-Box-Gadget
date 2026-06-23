@@ -154,12 +154,6 @@
             <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
           </div>
         </div>
-        <div style="display: none;">
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioInset" />
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioTabbed" />
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioFlat" />
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadioNone" />
-        </div>
       </div>
     </div>
 
@@ -177,12 +171,7 @@
             <img id="BottomTypeImage" src="Images/InsetBottom.png" alt="Bottom type preview" />
           </div>
         </div>
-        <div style="display: none;">
-          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadioInset" />
-          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeTabbed" />
-          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeFlat" />
-          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeNone" />
-        </div>
+
       </div>
     </div>
 
@@ -260,56 +249,42 @@
 
   function onLidTypeChanged(el) {
     var select = document.getElementById("LidTypeSelect");
-    var val = select ? select.options[select.selectedIndex].value : "Inset";
+    var selectedIndex = select ? select.selectedIndex : 0;
 
-    var radioIds = { "Inset": "LidTypeRadioInset", "Fingers": "LidTypeRadioTabbed",
-                     "Flat":  "LidTypeRadioFlat",  "None":    "LidTypeRadioNone" };
-    for (var key in radioIds) {
-      var r = document.getElementById(radioIds[key]);
-      if (r) { r.checked = (key === val); }
-    }
-
-    var imgSrcs = { "Inset": "Images/InsetLid.png", "Fingers": "Images/tabbedlid.png",
-                    "Flat":  "Images/FlatLid.png",  "None":    "" };
+    var imgFiles = ["Images/InsetLid.png", "Images/tabbedlid.png",
+                    "Images/FlatLid.png",  ""];
     var img = document.getElementById("LidTypeImage");
     if (img) {
-      var src = imgSrcs[val] || "";
+      var src = imgFiles[selectedIndex] || "";
       img.src = src;
       img.style.display = src ? "" : "none";
     }
 
     var lidJointRow = document.getElementById("showHideLidJointWidth");
-    if (lidJointRow) { lidJointRow.style.display = (val === "Fingers") ? "block" : "none"; }
+    if (lidJointRow) { lidJointRow.style.display = (selectedIndex === 1) ? "block" : "none"; }
 
     var lidCheckItem = document.getElementById("MakeLidCheckItem");
-    if (lidCheckItem) { lidCheckItem.style.display = (val === "None") ? "none" : "block"; }
+    if (lidCheckItem) { lidCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
   }
 
   function onBottomTypeChanged(el) {
     var select = document.getElementById("BottomTypeSelect");
-    var val = select ? select.options[select.selectedIndex].value : "Inset";
+    var selectedIndex = select ? select.selectedIndex : 0;
 
-    var radioIds = { "Inset": "BottomTypeRadioInset", "Fingers": "BottomTypeTabbed",
-                     "Flat":  "BottomTypeFlat",       "None":    "BottomTypeNone" };
-    for (var key in radioIds) {
-      var r = document.getElementById(radioIds[key]);
-      if (r) { r.checked = (key === val); }
-    }
-
-    var imgSrcs = { "Inset": "Images/InsetBottom.png", "Fingers": "Images/tabbedbottom.png",
-                    "Flat":  "Images/FlatBottom.png",  "None":    "" };
+    var imgFiles = ["Images/InsetBottom.png", "Images/tabbedbottom.png",
+                    "Images/FlatBottom.png",  "" ];
     var img = document.getElementById("BottomTypeImage");
     if (img) {
-      var src = imgSrcs[val] || "";
+      var src = imgFiles[selectedIndex] || "";
       img.src = src;
       img.style.display = src ? "" : "none";
     }
 
     var bottomJointRow = document.getElementById("showHideBottomJointWidth");
-    if (bottomJointRow) { bottomJointRow.style.display = (val === "Fingers") ? "block" : "none"; }
+    if (bottomJointRow) { bottomJointRow.style.display = (selectedIndex === 1) ? "block" : "none"; }
 
     var bottomCheckItem = document.getElementById("MakeBottomCheckItem");
-    if (bottomCheckItem) { bottomCheckItem.style.display = (val === "None") ? "none" : "block"; }
+    if (bottomCheckItem) { bottomCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
   }
 
   // Shows or hides the Bottom and Lid joint width fields.
@@ -340,23 +315,11 @@
 
     var lidSelect = document.getElementById("LidTypeSelect");
     if (lidSelect) {
-      var lidMap = [["LidTypeRadioInset","Inset"],["LidTypeRadioTabbed","Fingers"],
-                    ["LidTypeRadioFlat","Flat"],  ["LidTypeRadioNone","None"]];
-      for (var i = 0; i < lidMap.length; i++) {
-        var lr = document.getElementById(lidMap[i][0]);
-        if (lr && lr.checked) { lidSelect.value = lidMap[i][1]; break; }
-      }
       onLidTypeChanged(lidSelect);
     }
 
     var bottomSelect = document.getElementById("BottomTypeSelect");
     if (bottomSelect) {
-      var bottomMap = [["BottomTypeRadioInset","Inset"],["BottomTypeTabbed","Fingers"],
-                       ["BottomTypeFlat","Flat"],      ["BottomTypeNone","None"]];
-      for (var j = 0; j < bottomMap.length; j++) {
-        var br = document.getElementById(bottomMap[j][0]);
-        if (br && br.checked) { bottomSelect.value = bottomMap[j][1]; break; }
-      }
       onBottomTypeChanged(bottomSelect);
     }
 
