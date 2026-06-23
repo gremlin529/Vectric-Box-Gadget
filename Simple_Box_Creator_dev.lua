@@ -75,7 +75,7 @@ function main(script_path)
   options.lidTabWidth = 1.0                 --- joint width for the top (as a separate value)
 
   options.allowance = 0.0                   --- allowance default 
-  options.partSpacing = 0.5                 --- spacing between parts
+  options.partSpacing = 0.0                 --- spacing between parts
   options.clampingMargin = 0.75             --- edge margin default
 
   options.cut_layer_name  = "CutOut"        --- layer name default
@@ -315,7 +315,7 @@ function main(script_path)
   end
 
   -- use the largest part spacing provided, it has to be at least 2 * diameter of bit
-  -- so as a safety ignore input if it's less
+  -- so as a safety ignore input if it's less and use that
   local part_gap    = math.max( 2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
