@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="X-UA-Compatible" content="IE=7" />
+  <title>Please Read</title>
+  <link href="stylesheets/layout-css-8.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+  <div style="padding:18px; font-family:Arial;">
+   <h1>Box Creator Version 10</h1>
+   <h2>Please Read Before Use</h2>
+   
+    <p><strong>Box Size are <u>Internal Usable</u> Dimensions</strong></p>
+    
+    <ul>
+     <li><strong><u>Important</u></strong>: All Box Dimensions entered in this Gadget represent the Internal Usable Size of the Box.</li>  
+     <li>For example, a Box entered as 12" X 12" X 12" will have approximately 12" of Internal Width, Depth, and height.</li>
+     <li>The Finished Outside Dimensions will be larger depending on Material Thickness and the Selected Lid and Bottom Configuration.</li>
+
+     <li>Side and End Panel Heights are Automatically Adjusted where Required to Maintain the Specified Internal Dimensions.</li>
+    </ul>
+
+    <p><strong>More Important Information:</strong></p>
+
+    <ul>
+      <li>At Job Setup, use the Lower Left-Hand Corner as the XY Datum Location.</li>
+      <li>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</li>
+      <li>The Cutout Toolpath Vector was Retained for Three Reasons: Out of <strong>Respect</strong> for the Original Gadget Author and The Cutout Toolpath Vector contains Proven Dogbones that provide Proper Interference-Fit Assembly.</li>
+      <li>Even though Dogbones are for Dovetails. Consistency remains to be Key throughout the Gadget.</li>
+      <li>Please use <strong>Caution</strong> on the <u>Fluting Toolpath Plunge Rate Feed Speed</u>.</li>
+      <li>Flat Lid Panel does not Automatically create a Recess Pocket. Recess Pocket is Now <strong>USER OPTIONAL!</strong></li>
+      <li>Use Add Recess Pocket only when a Recessed Flat Lid or Flat Bottom Panels are Desired.</li>
+      <li>When the No Toolpath Checkbox is Selected, the Gadget creates Vectors Only.</li>
+    </ul>
+    
+    <p><strong><u>CAUTION: CLOSE PART PLACEMENT</u></strong></p>
+    
+    <ul>
+      <li>When Box Parts are placed Close Together, Small Pieces of Waste Material may be created between Cutout Vectors.</li>
+
+      <li>If the Cutout Toolpath is run without holding tabs, these Small Pieces can become Loose and may be Struck or Thrown by the Router Bit.</li>
+     
+      <li><strong><u>Recommendations</u></strong>:</li>
+      
+      <li>Use Holding Tabs whenever possible on Cutout Toolpaths.</li>
+      <li>Increase the Part Gap when Needed.</li>
+      <li>Review the 2D/3D Previews before Machining.</li>
+      <li>Remove or Secure Small Waste Pieces when Safe to Do So.</li>
+    </ul>
+    
+    
+    <p><strong>Special Geometry Considerations (Dovetails Joint Type)</strong></p>
+    
+    
+    <div style="text-align:center;">
+    <p><strong><u>Problem Example</u></strong></p>
+    <img src="images/Problem.png" width="500" style="border:1px solid #666;" alt="Problem Example" />
+    <br /><br />
+    <p><strong><u>Solution Example</u></strong></p>
+    <img src="images/Solution.png" width="500" style="border:1px solid #666;" alt="Solution Example" />
+   </div>
+    
+    <ul>
+    
+    <li>In Rare Cases, certain Combinations of Box Dimensions and Joint Widths may create a very Small Remaining Feature that is Smaller than the Selected Cutout Tool Diameter.</li>
+    <li>Message Box Message --"The Selected Tool will not fit between the Joint Width. Increase Joint Width."</li>
+    
+    <li><strong><u>Problem</u></strong>:</li>
+    
+    <li>Box Size: 8" X 8" X 8"</li>
+    <li>Joint Width: 1.0"</li>
+    <li>Remaining Feature: approximately 0.057"</li>
+    
+    <li>Similar Small-Feature Conditions may occur with other Box Dimensions and Joint-Width Combinations.</li>
+
+    <li>Since the Cutter cannot Physically Fit into this Area, a Small Amount of Material may Remain after Machining.</li>
+    
+    <li><strong><u>Solution</u></strong>:</li>
+    
+    <li>Increase the Joint Width Slightly. Increasing by 1/8" Corrected this Example during Testing.</li>
+    <li>Adjust the Box Dimensions.</li>
+    <li>Use a Smaller Cutter where Appropriate.</li>
+    
+    <li><strong>Testing Status:</strong> Actual Machining Tests were Performed on Mating Dovetail Joints.</li>
+    <li>Full Box Assembly Testing is Ongoing.</li>
+
+    <li>Always Review the 2D and 3D Previews before Machining.</li>
+    
+    </ul>
+
+    <p>
+      Review All Settings before Clicking <strong>OK</strong> in the Main Gadget Window.
+    </p>
+
+    <div style="text-align:center; margin-top:20px;">
+      <button type="button" id="ButtonOK">Close</button>
+    </div>
+  </div>
+</body>
+</html>

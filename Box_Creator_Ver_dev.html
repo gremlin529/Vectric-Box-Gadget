@@ -1,7 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
   "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
+ <head>
   <meta http-equiv="X-UA-Compatible" content="IE=7" />
   <link href="stylesheets/reset.css" rel="stylesheet" type="text/css" />
   <title>Box Creator Gadget</title>
@@ -12,22 +12,23 @@
   <div id="page-wrapper">
    <!-- ── Header: diagram + description ──────────────────────────────── -->
    <div class="card clearfix">
-    <div class="header-image">
-     <img alt="Box dimensions diagram" src="Images/boxdim.png" />
-    </div>
-    <div class="header-text">
-     <p>This Gadget Creates <u>Two Sets</u> of Vectors for <u>Each Box Part</u> on <u>Two Separate Layers (Box and CutOut)</u>. The <u>First (Box Layer) Vector</u> Shows the <u>Box Part Shape</u>. The <u>Second (CutOut Layer) Vector</u> Shows &amp; is the <u>Actual Toolpath</u> Set to <u>ON</u> the Vector.</p>
-     <p>The <u>Datum</u> is located in the <u>Lower Left</u> Hand Corner.</p>
-     <p>The <u>Dovetail Toolpath</u> is a Gadget Created Toolpath which cannot be <u>Re-Calculated</u> if Vectors have been moved. <u>Users Who</u> are <u>Familiar with the Gadget</u> can <u>Un-Check</u> the <u>Show Dovetail Re-Calc Warning</u> for <u>Better Productivity</u>.</p>
-     <p><u>Please use Caution</u> on the <u>Dovetail Toolpath Plunge Rate Speed</u> for it <u>travels</u> to <u>FULL DEPTH of the Material</u>!!!</p>
+    <div class="row_6">
+     <div class="column_21">
+      <input class="LuaButton" type="button" id="ButtonRead"value="Please Read!" ></button>
+     </div>
+     <div class="column_100">
+      <h1 class="heading1"><span id="GadgetTitle"></span>&nbsp;Version&nbsp;<span id="GadgetVersion"></span></h1>
+      </div>
     </div>
    </div>
    <!-- ── Geometry Options ────────────────────────────────────────────── -->
-   <div class="section-header">Geometry Options</div>
+   <div class="section-header">Geometry Measurement Options</div>
    <div class="card">
-    <div class="card-body clearfix">
-     <!-- Box dimensions -->
-     <div class="geometry-column">
+    <div class="row_4">
+     <div class="column_12">
+      <img class="image" src="images/boxdim.png" />
+     </div>
+     <div class="column_13">
       <div class="sub-panel">
        <div class="sub-panel-title">Box Dimensions</div>
        <div class="field-row">
@@ -44,8 +45,7 @@
        </div>
       </div>
      </div>
-     <!-- Joint widths -->
-     <div class="geometry-column">
+     <div class="column_14">
       <div class="sub-panel">
        <div class="sub-panel-title">Joint Widths</div>
        <div class="checkbox-row">
@@ -56,7 +56,7 @@
         <label for="SideTabWidthField">Side Joint Width:</label>
         <input type="text" id="SideTabWidthField" placeholder="Width of Joint">
        </div>
-       <div id="showHideTopBottomJoints" style="display:none;">
+       <div id="showHideTopBottomJoints" style="display: none; " class="">
         <div class="field-row">
          <label for="BottomTabWidthField">Bottom Joint Width:</label>
          <input type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint">
@@ -68,23 +68,32 @@
        </div>
       </div>
      </div>
-     <!-- Machining allowances -->
-     <div class="geometry-column-last">
+     <div class="column_16">
       <div class="sub-panel">
        <div class="sub-panel-title">Machining</div>
        <div class="field-row">
         <label for="AllowanceField">Allowance:</label>
         <input type="text" id="AllowanceField" placeholder="Allowance">
        </div>
+       
+       <div class="field-row">
+        <label for="PartGapField">Part Spacing:</label>
+        <input type="text" id="PartGapField" placeholder="Part Gap">
+       </div>
+       
        <div class="field-row">
         <label for="EdgeField">Clamping Margin:</label>
         <input type="text" id="EdgeField" placeholder="Clamping Margin">
        </div>
       </div>
      </div>
-     <!-- Faces to machine -->
+    </div>
+    <div class="row_3">
+     <div class="row_5">
+      <div class="section-header">CNC Machine Options</div>
+     </div>
      <div class="faces-panel">
-      <div class="sub-panel-title">Faces To Machine</div>
+      <div class="sub-panel-title ui-droppable">Parts To Machine</div>
       <div class="face-checkbox">
        <label>
         <input type="checkbox" name="faces" id="MakeLid" value="1" class="LuaButton" onclick="onMakeLidChanged()">Lid</label>
@@ -110,19 +119,20 @@
         <input type="checkbox" name="faces" id="MakeEnd2" value="" class="LuaButton">End 2</label>
       </div>
      </div>
+     <div class="column_20">
+      <div class="tool-bar-left">
+       <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool"> <span id="ToolNameField">— No Tool Selected —</span>
+
+      </div>
+      <div class="tool-bar-right">
+       <label class="no-toolpath-label">
+        <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="">No toolpath (create vectors only)</label>
+      </div>
+     </div>
     </div>
    </div>
    <!-- ── Tool picker ─────────────────────────────────────────────────── -->
-   <div class="tool-bar clearfix">
-    <div class="tool-bar-left">
-     <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool"> <span id="ToolNameField">— No Tool Selected —</span>
-
-    </div>
-    <div class="tool-bar-right">
-     <label class="no-toolpath-label">
-      <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="">No toolpath (create vectors only)</label>
-    </div>
-   </div>
+   <div class="section-header">Box Configuration Joint Options</div>
    <div class="row_1">
     <div class="column_1">
      <div class="type-panel">
@@ -133,13 +143,13 @@
          <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1">Finger</label>
        </div>
        <div class="type-option-preview">
-        <img alt="Finger joint preview" src="images/tabs.png" />
+        <img alt="Finger joint preview" src="images/fingerjoint.png" />
        </div>
       </div>
       <div class="type-option-last clearfix">
        <div class="type-option-radio">
         <label>
-         <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2">Dovetail</label>
+         <input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2">Dovetail (Pins/Tails)</label>
        </div>
        <div class="type-option-preview">
         <img alt="Dovetail joint preview" src="images/dovetails.png" />
@@ -154,19 +164,28 @@
        <div class="type-option clearfix">
         <div class="type-option-radio">
          <label>
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)">Recess Lid</label>
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio1" onclick="onLidTypeChanged(this)">Flat Lid Panel</label>
         </div>
         <div class="type-option-preview">
-         <img alt="Flat lid preview" src="images/RecessLid.png" />
+         <img alt="Flat lid preview" src="Images/flatlid.png" />
         </div>
        </div>
        <div class="type-option-last clearfix">
         <div class="type-option-radio">
          <label class="">
-          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)">Tabbed Lid</label>
+          <input type="radio" class="LuaButton" name="LidTypeRadio" id="LidTypeRadio2" onclick="onLidTypeChanged(this)">Jointed Lid</label>
         </div>
         <div class="type-option-preview">
-         <img alt="Tabbed lid preview" src="images/tabbedlid.png" />
+         <img alt="Jointed lid preview" src="Images/jointedlid.png" />
+        </div>
+       </div>
+       <div class="type-option-last clearfix" id="RecessFlatLidRow">
+        <div class="type-option-radio">
+         <label class="">
+          <input type="checkbox" class="LuaButton" id="RecessFlatLid">Add Recess Pocket</label>
+        </div>
+        <div class="type-option-preview">
+         <img alt="Recess lid preview" src="Images/RecessLid.png" />
         </div>
        </div>
       </div>
@@ -181,20 +200,20 @@
          <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio1" onclick="onBottomTypeChanged(this)">Jointed Bottom</label>
        </div>
        <div class="type-option-preview">
-        <img alt="Flat bottom preview" src="images/tabbedbottom.png" />
+        <img alt="Flat bottom preview" src="images/jointedbottom.png" />
        </div>
       </div>
       <div class="bottom-option clearfix">
        <div class="type-option-radio">
         <label>
-         <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio2" onclick="onBottomTypeChanged(this)">Bottom Panel</label>
+         <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio2" onclick="onBottomTypeChanged(this)">Flat Bottom Panel</label>
        </div>
        <img alt="Tabbed bottom preview" src="images/BottomPanel.png" width="100" height="46" />
       </div>
-      <div class="bottom-option clearfix">
+      <div class="bottom-option clearfix" id="RecessFlatBottomRow">
        <div class="type-option-radio">
         <label class="">
-         <input type="radio" class="LuaButton" name="BottomTypeRadio" id="BottomTypeRadio3" onclick="onBottomTypeChanged(this)">Recess Bottom</label>
+         <input type="checkbox" class="LuaButton" id="RecessFlatBottom">Add Recess Pocket</label>
        </div>
        <div class="type-option-preview">
         <img alt="No bottom preview" src="images/RecessBottom.png" />
@@ -235,6 +254,27 @@
        return "100%";
      }
      
+     function applyUiScaleFromRadio() {
+  var scale = "100%";
+
+  if (document.getElementById("UiScaleRadio2") &&
+      document.getElementById("UiScaleRadio2").checked) {
+    scale = "125%";
+  }
+
+  if (document.getElementById("UiScaleRadio3") &&
+      document.getElementById("UiScaleRadio3").checked) {
+    scale = "150%";
+  }
+
+  if (document.getElementById("UiScaleRadio4") &&
+      document.getElementById("UiScaleRadio4").checked) {
+    scale = "175%";
+  }
+
+  document.body.style.zoom = scale;
+}
+     
      // Applies or removes dark mode by toggling the dark-mode class on body.
      function onDarkModeChanged(checkbox) {
      
@@ -258,29 +298,36 @@
            ? "none"
            : "block";
        }
+      var recessRow = document.getElementById("RecessFlatLidRow");
+  if (recessRow) {
+    recessRow.style.display = document.getElementById("LidTypeRadio1").checked ? "block" : "none";
+  }
      }
      
      // Bottom Type radio buttons are read by Lua.
      function onBottomTypeChanged(radio) {
-       var makeBottom = document.getElementById("MakeBottom");
-     
-       if (makeBottom) {
-     
-      if (radio.id == "BottomTypeRadio1" ||
-         radio.id == "BottomTypeRadio2" ||
-         radio.id == "BottomTypeRadio3") {
-     
-         makeBottom.checked = true;
-       }
-     
-       if (radio.id == "BottomTypeRadio4") {
-         makeBottom.checked = false;
-       }
-     }
-     
-       updateFaceOptionPanels();
-       return true;
-     }
+  var makeBottom = document.getElementById("MakeBottom");
+  var recessBottomRow = document.getElementById("RecessFlatBottomRow");
+
+  if (makeBottom) {
+    if (radio.id == "BottomTypeRadio1" ||
+        radio.id == "BottomTypeRadio2") {
+      makeBottom.checked = true;
+    }
+
+    if (radio.id == "BottomTypeRadio4") {
+      makeBottom.checked = false;
+    }
+  }
+
+  if (recessBottomRow) {
+    recessBottomRow.style.display =
+      document.getElementById("BottomTypeRadio2").checked ? "block" : "none";
+  }
+
+  updateFaceOptionPanels();
+  return true;
+}
      
      // Shows or hides the Bottom and Lid joint width fields.
      function onShowAllWidthsChanged(checkbox) {
@@ -349,22 +396,11 @@
        updateFaceOptionPanels();
      }
      
-    function onUiScaleChanged(selectBox) {
-      if (!selectBox) {
-        return;
-      }
-
-      document.body.style.zoom = selectBox.value + "%";
-}  
-     
      // On load: apply DPI zoom, then restore saved state from Lua registry.
      setTimeout(function() {
      
-       var uiScale = document.getElementById("UiScale");
-      if (uiScale) {
-        onUiScaleChanged(uiScale);
-}
-     
+      applyUiScaleFromRadio();
+    
        // Dark mode
        var darkMode = document.getElementById("DarkMode");
      
@@ -393,40 +429,37 @@
     </script>
    </div>
    <div class="footer-bar clearfix">
-    <div class="footer-ok-button">
-     <button type="button" id="ButtonOK">OK</button>
-    </div>
-    <div class="footer-options">
-     <div class="footer-options-col">
-      <div class="footer-option-item">
-       <label>
-        <input type="checkbox" class="LuaButton" id="WarnDovetail">Show dovetail re-calc warning</label>
-      </div>
-      <div class="footer-option-item">
-       <label>
-        <input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)">Enable dark mode</label>
-      </div>
-      <div class="footer-option-item">
-       <label for="UiScale">UI Scale:</label>
-       <select id="UiScale" onchange="onUiScaleChanged(this)">
-       <option value="100">100%</option>
-       <option value="125">125%</option>
-       <option value="150">150%</option>
-       <option value="175">175%</option>
-       </select>
+    <div class="row_7">
+     <div class="column_22">
+      <div class="footer-ok-button">
+       <button type="button" id="ButtonOK">OK</button>
       </div>
      </div>
-     <div class="footer-options-col">
+     <div class="column_23">
+      <div class="row_9">
+       <label class="customClass1">
+        <input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)">Enable Dark Mode</label>
+      </div>
+      <label class="">
+       <input type="checkbox" class="LuaButton" id="LabelFaces">Label Part Names</label>
       <div class="footer-option-item">
+       <label class="customClass">UI Scale:</label>
+       <label class="">
+        <input type="radio" class="LuaButton" name="UiScaleRadio" id="UiScaleRadio1" onclick="applyUiScaleFromRadio()">100%</label>
+       <label class="">
+        <input type="radio" class="LuaButton" name="UiScaleRadio" id="UiScaleRadio2" onclick="applyUiScaleFromRadio()">125%</label>
+       <label class="">
+        <input type="radio" class="LuaButton" name="UiScaleRadio" id="UiScaleRadio3" onclick="applyUiScaleFromRadio()">150%</label>
        <label>
-        <input type="checkbox" class="LuaButton" id="LabelFaces">Label face names</label>
+        <input type="radio" class="LuaButton" name="UiScaleRadio" id="UiScaleRadio4" onclick="applyUiScaleFromRadio()">175%</label>
       </div>
      </div>
-    </div>
-    <div class="footer-cancel-button">
-     <button type="button" id="ButtonCancel">Cancel</button>
+     <div class="column_24">
+      <button type="button" id="ButtonCancel" class="">Cancel</button>
+     </div>
     </div>
    </div>
+   <div class="footer-option-item"></div>
   </div>
  </body>
 
