@@ -283,6 +283,18 @@ input.ToolPicker {
   display: inline;
   vertical-align: middle;
 }
+.type-dropdown-content {
+  padding: 8px 10px;
+}
+.type-dropdown-preview {
+  text-align: center;
+  margin-top: 8px;
+  min-height: 34px;
+}
+.type-dropdown-preview img {
+  height: 34px;
+  width: auto;
+}
 
 /* ── Footer bar ───────────────────────────────────────────────────── */
 .footer-bar {
@@ -314,7 +326,7 @@ input.ToolPicker {
   margin-right: 4px;
 }
 .footer-cancel-button {
-  float: left;
+  float: right;
   width: 155px;
   padding-top: 8px;
   text-align: center;
@@ -436,4 +448,15 @@ body.dark-mode #ButtonCancel {
   background-color: #2a2f3b;
   color: #8a92a8;
   border-color: #383d4a;
+}
+body.dark-mode select {
+  background-color: #1a1d24;
+  color: #d4d8e8;
+  border: 1px solid #383d4a;
+}
+body.dark-mode .type-dropdown-content {
+  background-color: #22262f;
+}
+body.dark-mode .footer-option-item label {
+  color: #8a92a8;
 }
