@@ -84,6 +84,7 @@ function main(script_path)
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
+  options.no_dogbones = false
 
   options.ZoomLevel = "Auto"
   options.dark_mode     = true        --- default to dark mode on
@@ -186,6 +187,11 @@ function main(script_path)
   if options.lidType == FaceJointType.None then
     -- if we aren't making a lid then we shouldn't make tabs for the lid since there won't be a lid to fit them
     computedFacesToMake.lid = false
+  end
+
+  if (options.bottomType == FaceJointType.None) then
+    -- if we aren't making a bottom then we shouldn't make tabs for the bottom since there won't be a bottom to fit them
+    computedFacesToMake.bottom = false
   end
 
   local noLidTabs = (options.lidType == FaceJointType.Flat) or (options.lidType == FaceJointType.None) or (options.lidType == FaceJointType.Inset)
@@ -325,20 +331,25 @@ function main(script_path)
   local cdcontours = GetAllProfileCadContours(faces)
 
   local offset_radius = 0.5* converted_tool_diameter - options.allowance
-  local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-  local dogboned_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+  local cutout_cadcontours
+  if options.no_dogbones then
+    local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
+    cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
+  else
+    local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
+    cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+  end
 
-  -- -- AddCadContourToJob(job, cad_contour, "Box")
   -- These extra vectors represent the actual output
   -- so you can place extra details on them if you wish
   AddCadListToJob(job, cdcontours, "Box")
-  AddCadListToJob(job, dogboned_cadcontours, options.cut_layer_name)
+  AddCadListToJob(job, cutout_cadcontours, options.cut_layer_name)
   if options.label_faces then
     AddPartsLabelsToJob(job, faces, "Box", options.thickness)
   end
 
   if options.cut_dovetails then
-    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME, options.tool.ToolDia)
+    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME, options.tool)
   end
 
   if (not options.no_toolpath) and 
@@ -359,7 +370,7 @@ function main(script_path)
       end
     end
 
-    CreateCutoutToolpath(dogboned_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, options.cut_layer_name)
+    CreateCutoutToolpath(cutout_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, options.cut_layer_name)
   end
 
   SaveDefaultsToRegistry(options, false)
@@ -410,6 +421,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
   dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
+  dialog:AddCheckBox("NoDogbones", options.no_dogbones)
 
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
   local tab_default_index
@@ -476,7 +488,17 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     local inner_width = options.width - double_thickness
     local inner_depth = options.depth - double_thickness
-    local inner_height = options.height - double_thickness
+
+    -- the inner height needs to be computed
+    -- based on options for lid and bototm
+    local lidAndBottomThickness = 0
+    if (options.lidType ~= FaceJointType.None) then
+      lidAndBottomThickness = lidAndBottomThickness + options.thickness
+    end
+    if (options.bottomType ~= FaceJointType.None) then
+      lidAndBottomThickness = lidAndBottomThickness + options.thickness
+    end
+    local inner_height = options.height - lidAndBottomThickness
 
     -- Gremlin added join size seperations overall
     local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomDoveTail.min_width)
@@ -554,7 +576,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local top_min_space = lidDoveTail.max_width - lidDoveTail.min_width
 
       -- make sure dovetails don't overlap
-      if (tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space) then
+      if (options.bottomType == FaceJointType.Fingers) and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
         DisplayMessageBox("The joint width is too small for the bottom.")
         return false
       end      
@@ -576,7 +598,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       (tab_space_d_bottom <= bottom_min_space) or 
       (tab_space_h <= min_space) or 
       ((options.lidType == FaceJointType.Fingers) and 
-        ((tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space))) then        
+        ((tab_space_w_top <= (top_min_space+dia)) or (tab_space_d_top <= (top_min_space+dia)))) or
+      ((options.bottomType == FaceJointType.Fingers) and 
+        ((tab_space_w_bottom <= (bottom_min_space+dia)) or (tab_space_d_bottom <= (bottom_min_space+dia)))) then        
         DisplayMessageBox("The selected tool will not fit between the joints.")
         return false
       end  
@@ -652,6 +676,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
 
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
+  options.no_dogbones  = dialog:GetCheckBox("NoDogbones")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
@@ -778,6 +803,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   end
 
   registry:SetBool("NoToolpath", options.no_toolpath)
+  registry:SetBool("NoDogbones", options.no_dogbones)
 
   -- Machining settings
   registry:SetBool("MakeLid", options.facesToMake.lid)
@@ -822,6 +848,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
+  options.no_dogbones = registry:GetBool("NoDogbones", options.no_dogbones)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
   options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)

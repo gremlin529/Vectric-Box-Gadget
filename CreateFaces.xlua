@@ -1484,12 +1484,13 @@ function GetFriendlyFaceLabel(face)
     return cad
   end
 
-  function AddFlutingVectorsForSocket(layer, socket, toolDiameter)
+  function AddFlutingVectorsForSocket(layer, socket, tool)
     local thickness      = socket.thickness
     local angle          = socket.angle
     local flute_length   = thickness / math.tan(angle) + 0.02
     local flute_fit_offset = 0.1
-    local flute_spacing  = toolDiameter / 2 -- I think this should be 1/2 the bit size...
+    -- local flute_spacing  = tool.ToolDia / 2 -- I think this should be 1/2 the bit size...
+    local flute_spacing = tool.Stepover -- Use the stepover instead of tool diameter for spacing
 
     local along = socket.along
     local out   = socket.out
@@ -1497,7 +1498,7 @@ function GetFriendlyFaceLabel(face)
     out:Normalize()
 
     local t = 0.0
-    while t <= thickness + 0.0001 do
+    -- while t <= thickness + 0.0001 do
       local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
       local left_start = left_wall - (flute_length * along)
       CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
@@ -1507,16 +1508,16 @@ function GetFriendlyFaceLabel(face)
       CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
 
       t = t + flute_spacing
-    end
+    -- end
   end
 
-  function AddFlutingVectorsForFaces(job, faces, layer_name, toolDiameter)
+  function AddFlutingVectorsForFaces(job, faces, layer_name, tool)
     local layer = job.LayerManager:GetLayerWithName(layer_name)
     for i = 1, #faces do
       local face = faces[i]
       if face.flute_sockets then
         for j = 1, #face.flute_sockets do
-          AddFlutingVectorsForSocket(layer, face.flute_sockets[j], toolDiameter)
+          AddFlutingVectorsForSocket(layer, face.flute_sockets[j], tool)
         end
       end
     end
