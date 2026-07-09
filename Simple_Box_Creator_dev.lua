@@ -192,12 +192,10 @@ function main(script_path)
     computedFacesToMake.lid = false
   end
 
-  if (options.bottomType == FaceJointType.None) then
+  if options.bottomType == FaceJointType.None then
     -- if we aren't making a bottom then we shouldn't make tabs for the bottom since there won't be a bottom to fit them
     computedFacesToMake.bottom = false
   end
-
-  local noLidTabs = (options.lidType == FaceJointType.Flat) or (options.lidType == FaceJointType.None) or (options.lidType == FaceJointType.Inset)
 
 -- Make the bottom face
   local cad_list = CadObjectList(true)
