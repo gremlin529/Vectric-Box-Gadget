@@ -1498,7 +1498,7 @@ function GetFriendlyFaceLabel(face)
     out:Normalize()
 
     local t = 0.0
-    -- while t <= thickness + 0.0001 do
+    while t <= thickness + 0.0001 do
       local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
       local left_start = left_wall - (flute_length * along)
       CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
@@ -1508,7 +1508,7 @@ function GetFriendlyFaceLabel(face)
       CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
 
       t = t + flute_spacing
-    -- end
+    end
   end
 
   function AddFlutingVectorsForFaces(job, faces, layer_name, tool)

@@ -84,7 +84,7 @@ function main(script_path)
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
-  options.no_dogbones = false
+  options.create_dogbones = true
 
   options.ZoomLevel = "Auto"
   options.dark_mode     = true        --- default to dark mode on
@@ -332,12 +332,12 @@ function main(script_path)
 
   local offset_radius = 0.5* converted_tool_diameter - options.allowance
   local cutout_cadcontours
-  if options.no_dogbones then
-    local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
-    cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
-  else
+  if options.create_dogbones then
     local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
     cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+  else
+    local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
+    cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
   end
 
   -- These extra vectors represent the actual output
@@ -421,7 +421,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
   dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
-  dialog:AddCheckBox("NoDogbones", options.no_dogbones)
+  dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
 
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
   local tab_default_index
@@ -676,7 +676,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
 
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
-  options.no_dogbones  = dialog:GetCheckBox("NoDogbones")
+  options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
@@ -803,7 +803,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   end
 
   registry:SetBool("NoToolpath", options.no_toolpath)
-  registry:SetBool("NoDogbones", options.no_dogbones)
+  registry:SetBool("CreateDogbones", options.create_dogbones)
 
   -- Machining settings
   registry:SetBool("MakeLid", options.facesToMake.lid)
@@ -848,7 +848,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
-  options.no_dogbones = registry:GetBool("NoDogbones", options.no_dogbones)
+  options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
   options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)
