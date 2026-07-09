@@ -52,7 +52,7 @@ function _tool_ok(tool)
   return (dia or 0) > 0
 end
 
-function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets)
+function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets, fingerSides)
   local obj ={}
   obj.name = name
   obj.tabs = tabs
@@ -62,6 +62,7 @@ function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jo
   obj.inset_contours = inset_contours -- used for an inset lid or bottom the contour for the rabbet
   obj.dovetail_list = dovetails
   obj.flute_sockets = flute_sockets or {}
+  obj.fingerSides = fingerSides or nil
   return obj
 end
 
@@ -86,6 +87,12 @@ function TransformFace(face, xform)
     face.tabs[i] =  xform * face.tabs[i]
   end
 
+  -- Transform the finger sides
+  if (face.fingerSides ~= nil)then
+    face.fingerSides:Transform(xform)
+  end
+
+  -- Transform the flute sockets
   if face.flute_sockets then
     for i = 1, #face.flute_sockets do
       local socket = face.flute_sockets[i]
@@ -112,6 +119,7 @@ function CloneFace(face)
   if (face.inset_contours ~= nil) then
     clone.inset_contours = face.inset_contours:Clone()
   end
+  clone.fingerSides = face.fingerSides:Clone()
   return clone
 end
 
@@ -121,6 +129,16 @@ function GetAllProfileContours(faces)
     contour_group:AddTail(faces[i].contour:Clone())
   end
   return contour_group
+end
+
+function GetAllFingerSides(faces)
+  local finger_sides = ContourGroup(true)
+  for i=1,#faces do
+    if (faces[i].fingerSides ~= nil) then
+      finger_sides:AppendGroup(faces[i].fingerSides:Clone())
+    end
+  end
+  return finger_sides
 end
 
 function GetAllProfileCadContours(faces)
@@ -202,24 +220,17 @@ end
 |  Adds a group of contours to a job
 |
 ]]
-function AddGroupToJob(vectric_job, group, layer_name, create_group)
-  --  create a CadObject to represent the  group 
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  if create_group then
-    local cad_object = CreateCadGroup(group);   -- and add our object to it
-    layer:AddObject(cad_object, true)
-    return
-  end
+function AddGroupToJob(job, group, layer_name)
+     --  create a CadObject to represent the  group
+   local cad_object = CreateCadGroup(group);
+   
+   -- create a layer with passed name if it doesnt already exist
+   local layer = job.LayerManager:GetLayerWithName(layer_name)
 
-  local cad_contour
-  local contour
-  local pos = group:GetHeadPosition()
-  while pos ~= nil do
-    contour, pos = group:GetNext(pos)
-    cad_contour = CreateCadContour(contour)
-    layer:AddObject(cad_contour, true)
-  end
-
+   -- and add our object to it
+   layer:AddObject(cad_object, true)
+   
+   return cad_object
 end
 
 --[[  -------------- AddCadContourToJob --------------------------------------------------  
@@ -517,6 +528,7 @@ function GetFriendlyFaceLabel(face)
     local outer_brc = start_point  + width*Vector2D(1,0)
     local outer_trc = outer_brc + height*Vector2D(0,1)
     local outer_tlc = start_point + height*Vector2D(0, 1)
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     -- // Width and height of interior rectangle
     local inner_width = width - 2*thickness
@@ -543,7 +555,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, 
+                                   tab_space_w, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -557,7 +570,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, 
+                                    tab_space_h, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -571,7 +585,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, 
+                                    tab_space_w, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -585,7 +600,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, 
+                                    tab_space_h, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -600,18 +616,19 @@ function GetFriendlyFaceLabel(face)
       create_tabs_for_missing_faces, name, FaceType.Bottom,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets, fingerSides)
   end
 
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
-  function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
+  function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint, 
       lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name)
 
     local dovetail_markers = {}
     local tablist = {}
     local inner_start_point = start_point + Vector2D(thickness, thickness)
     local inner_width  = width - 2*thickness
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     -- inner height is the inside height of the box,
     -- or the distance before the fingers
@@ -676,10 +693,10 @@ function GetFriendlyFaceLabel(face)
       -- in this case the bottom edge has tabs and starts at thickness, thickness
       LineToVector(contour, tab_space_bottom*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
       else
-        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom, fingerSides)
       end
       contour:LineTo(inner_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -689,10 +706,10 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForRightFace) then
       LineToVector(contour, tab_space_side*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if with_tails then
-        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
+      if dovetailJoint then
+        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
+        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side, fingerSides)
       end
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -718,10 +735,10 @@ function GetFriendlyFaceLabel(face)
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, topdovetail, -unit_x, unit_y, contour, num_flaps_top, tab_space_top)
       else
-        AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+        AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top, fingerSides)
       end
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -731,10 +748,10 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForLeftFace) then
       LineToVector(contour, -tab_space_side*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
+        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side, fingerSides)
       end
       contour:LineTo(inner_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -745,17 +762,18 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides)
   end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
-  function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
+  function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint, 
       lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name)
 
     local tablist = {}
     local dovetail_markers = {}
     local flute_sockets = {}
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     local bottom_thickness = 0
     if (bottomType == FaceJointType.None) then
@@ -811,10 +829,10 @@ function GetFriendlyFaceLabel(face)
     else
       LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
       else
-        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom, fingerSides)
       end
       contour:LineTo(inner_brc)
     end
@@ -824,7 +842,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForRightEnd) then
       LineToVector(contour,  (tab_space_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -844,7 +862,7 @@ function GetFriendlyFaceLabel(face)
       LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
 
-      if with_tails then
+      if dovetailJoint then
         AddMaleDoveTailsAlongLine(thickness,
           topdovetail,
           -unit_x,
@@ -861,7 +879,8 @@ function GetFriendlyFaceLabel(face)
           -unit_x,
           unit_y,
           contour,
-          num_flaps_top
+          num_flaps_top,
+          fingerSides
         )
       end
 
@@ -873,7 +892,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForLeftEnd) then
       LineToVector(contour, (tab_space_side*-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
       LineToVector(contour, (tab_space_side*-unit_y))
@@ -882,10 +901,11 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides)
   end
 
-  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers, flute_sockets)
+  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, 
+                                         markers, flute_sockets, fingerSides)
     for i=1,num_tails do
       local start_pos = contour.EndPoint2D
       AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
@@ -902,6 +922,18 @@ function GetFriendlyFaceLabel(face)
           angle     = dovetail.angle
         }
       end
+      if fingerSides then
+        -- add the first side of the finger to the fingerSides contour group
+        local end_vector = thickness*out
+        local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+        local fingerSide = MakeLine(start_pos, end_pt)
+        fingerSides:AddTail(fingerSide)
+        -- now add the second side of the finger to the fingerSides contour group
+        local second_side_start = Point2D(end_pt.x + dovetail.min_width*along.x, end_pt.y + dovetail.min_width*along.y)
+        local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+        local secondFingerSide = MakeLine(second_side_start, second_side_end)
+        fingerSides:AddTail(secondFingerSide)
+      end
       LineToVector(contour, space_dist*along)
     end
   end
@@ -915,9 +947,9 @@ function GetFriendlyFaceLabel(face)
 
   end
 
-  function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps)
+  function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps, fingerSides)
     for i=1,num_flaps do
-      AddFemaleDoveTail(flap_height, flap_width, out, along, contour)
+      AddFemaleDoveTail(flap_height, flap_width, out, along, contour, fingerSides)
       LineToVector(contour, space_dist*along)
     end
   end
@@ -938,7 +970,20 @@ function GetFriendlyFaceLabel(face)
   end
 
 -- Add a flap
-  function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour)
+  function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour, fingerSides)
+    if fingerSides then 
+      -- add the first side of the finger to the fingerSides contour group
+      local start_pos = contour.EndPoint2D
+      local end_vector = thickness*perp_vec
+      local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+      local fingerSide = MakeLine(start_pos, end_pt)
+      fingerSides:AddTail(fingerSide)
+      -- now add the second side of the finger to the fingerSides contour group
+      local second_side_start = Point2D(end_pt.x + tab_width*along_vec.x, end_pt.y + tab_width*along_vec.y)
+      local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+      local secondFingerSide = MakeLine(second_side_start, second_side_end)
+      fingerSides:AddTail(secondFingerSide)
+    end
     LineToVector(contour, thickness*perp_vec)
     LineToVector(contour, tab_width*along_vec)
     LineToVector(contour, thickness*(-perp_vec))
@@ -1130,6 +1175,8 @@ function GetFriendlyFaceLabel(face)
     local tab_space_w = (inner_width - num_flaps_w*tab_width) / (num_flaps_w + 1)
     local tab_space_h = (inner_height - num_flaps_h*tab_width) / (num_flaps_h + 1)
 
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
+
     local contour = Contour(0.0)
     if (not noLidTabs) then
       contour:AppendPoint(start_point)
@@ -1141,7 +1188,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w, fingerSides)
         end
         contour:LineTo(outer_brc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1159,7 +1206,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h, fingerSides)
         end
         contour:LineTo(outer_trc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1177,7 +1224,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w, fingerSides)
         end
         contour:LineTo(outer_tlc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1195,7 +1242,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h, fingerSides)
         end
         contour:LineTo(outer_blc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1227,7 +1274,7 @@ function GetFriendlyFaceLabel(face)
       create_tabs_for_missing_faces, name, FaceType.Lid,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets, fingerSides)
   end
 
 

@@ -43,6 +43,10 @@ g_title = "Simple Box"
 g_width = 890
 g_height = 850                                                    
 g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"       
+g_finger_side_layer_name = "Finger Roundover"
+g_box_layer_name = "Box"
+g_labels_layer_name = "Labels"
+g_cutout_layer_name = "CutOut"
 
 local librayModule
 
@@ -78,8 +82,7 @@ function main(script_path)
   options.partSpacing = 0.0                 --- spacing between parts
   options.clampingMargin = 0.75             --- edge margin default
 
-  options.cut_layer_name  = "CutOut"        --- layer name default
-  options.cut_dovetails = false
+  options.dovetailJoint = false             --- if false means we're making box joints, true dovetails
   options.lidType = FaceJointType.Inset -- default lid type is inset
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
@@ -210,7 +213,7 @@ function main(script_path)
       options.thickness, 
       options.start_point, 
       bottomDoveTail, 
-      options.cut_dovetails,  -- if true then create dovetails
+      options.dovetailJoint,  -- if true then create dovetails
       options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
@@ -228,7 +231,7 @@ function main(script_path)
       sideDoveTail, 
       bottomDoveTail,
       lidDoveTail,
-      options.cut_dovetails, 
+      options.dovetailJoint, 
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -247,7 +250,7 @@ function main(script_path)
       sideDoveTail, 
       bottomDoveTail,
       lidDoveTail,
-      options.cut_dovetails, 
+      options.dovetailJoint, 
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -267,7 +270,7 @@ function main(script_path)
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.cut_dovetails, 
+      options.dovetailJoint, 
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -286,7 +289,7 @@ function main(script_path)
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.cut_dovetails, 
+      options.dovetailJoint, 
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -306,7 +309,7 @@ function main(script_path)
       options.lidType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
-      options.cut_dovetails,
+      options.dovetailJoint,
       "Lid"
     )
     faces[#faces + 1] = lid
@@ -329,6 +332,7 @@ function main(script_path)
   -- Get at the actual contours and dogbone them. Then transfer the tabs
   local vdcontours = GetAllProfileContours(faces)
   local cdcontours = GetAllProfileCadContours(faces)
+  local fingerSideContours = GetAllFingerSides(faces)
 
   local offset_radius = 0.5* converted_tool_diameter - options.allowance
   local cutout_cadcontours
@@ -342,13 +346,16 @@ function main(script_path)
 
   -- These extra vectors represent the actual output
   -- so you can place extra details on them if you wish
-  AddCadListToJob(job, cdcontours, "Box")
-  AddCadListToJob(job, cutout_cadcontours, options.cut_layer_name)
+  AddCadListToJob(job, cdcontours, g_box_layer_name)
+  AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
+  if not options.create_dogbones then
+    AddGroupToJob(job, fingerSideContours, g_finger_side_layer_name)
+  end
   if options.label_faces then
-    AddPartsLabelsToJob(job, faces, "Box", options.thickness)
+    AddPartsLabelsToJob(job, faces, g_labels_layer_name, options.thickness)
   end
 
-  if options.cut_dovetails then
+  if options.dovetailJoint then
     AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME, options.tool)
   end
 
@@ -360,7 +367,7 @@ function main(script_path)
 
   if not options.no_toolpath then
     -- if we are doing dovetails make toolpath for them
-    if options.cut_dovetails then
+    if options.dovetailJoint then
       local flute_layer = job.LayerManager:FindLayerWithName(FLUTE_LAYER_NAME)
       if flute_layer then
         local selection = job.Selection
@@ -370,7 +377,7 @@ function main(script_path)
       end
     end
 
-    CreateCutoutToolpath(cutout_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, options.cut_layer_name)
+    CreateCutoutToolpath(cutout_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, g_cutout_layer_name)
   end
 
   SaveDefaultsToRegistry(options, false)
@@ -425,7 +432,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
   local tab_default_index
-  if options.cut_dovetails then
+  if options.dovetailJoint then
     tab_default_index = 2  -- last time user chose dovetails
   else
     tab_default_index = 1  -- last time user chose finger joints
@@ -569,7 +576,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local tab_space_d_top = total_tab_space_d_top / (num_flaps_d_top + 1)
     local tab_space_h = total_tab_space_h / (num_flaps_h + 1)
 
-    if options.cut_dovetails then
+    if options.dovetailJoint then
       local min_space = sideDoveTail.max_width - sideDoveTail.min_width
       -- Gremlin added bottomDoveTail seperation from side which
       local bottom_min_space = bottomDoveTail.max_width - bottomDoveTail.min_width
@@ -710,9 +717,9 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   local tab_index = dialog:GetRadioIndex("TabTypeRadio")
   if tab_index == 1 then
-    options.cut_dovetails = false   -- Finger joints
+    options.dovetailJoint = false   -- Box joints
   else
-    options.cut_dovetails = true    -- Dovetail joints
+    options.dovetailJoint = true    -- Dovetail joints
   end
 
   local lid_type = dialog:GetDropDownListValue("LidTypeSelect")
@@ -794,7 +801,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("PartsSpacing", options.partSpacing)
   registry:SetDouble("EdgeMargin", options.clampingMargin)              -- Added by Sharkcutup
 
-  registry:SetBool("CutDovetails", options.cut_dovetails)
+  registry:SetBool("CutDovetails", options.dovetailJoint)
   registry:SetDouble("LidType", options.lidType)
   registry:SetDouble("BottomType", options.bottomType)
 
@@ -839,7 +846,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   -- sideDoveTail.min_width = options.sideOrAllTabWidth
   -- bottomDoveTail.min_width = options.bottomTabWidth -- Added by Gremlin
   -- lidDoveTail.min_width = options.lidTabWidth -- Added by Gremlin
-  options.cut_dovetails = registry:GetBool("CutDovetails", options.cut_dovetails)
+  options.dovetailJoint = registry:GetBool("CutDovetails", options.dovetailJoint)
   options.lidType = registry:GetDouble("LidType", options.lidType)
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
