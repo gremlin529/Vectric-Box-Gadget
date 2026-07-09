@@ -157,14 +157,6 @@ body {
 }
 
 /* ── Faces to machine ─────────────────────────────────────────────── */
-.faces-panel {
-  background-color: #f2f4f8;
-  border: 1px solid #d0d4de;
-  padding: 8px 10px;
-  margin-top: 12px;
-  clear: both;
-  overflow: hidden;
-}
 .face-checkbox {
   float: left;
   margin-right: 10px;
@@ -240,14 +232,13 @@ input.ToolPicker {
   border: 1px solid #c0c4d0;
 }
 .type-panel-header {
-  background-color: #e8eaf0;
-  border-bottom: 1px solid #c0c4d0;
+  background-color: #2255aa;
   padding: 5px 10px;
   font-size: 15px;
   font-weight: bold;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: #6b7280;
+  color: #ffffff;
 }
 .type-option {
   padding: 8px 10px;
@@ -397,10 +388,6 @@ body.dark-mode .field-row input {
 body.dark-mode .checkbox-row {
   color: #b0b8cc;
 }
-body.dark-mode .faces-panel {
-  background-color: #2a2f3b;
-  border-color: #383d4a;
-}
 body.dark-mode .face-checkbox {
   color: #b0b8cc;
 }
@@ -427,9 +414,7 @@ body.dark-mode .type-panel {
   border-color: #383d4a;
 }
 body.dark-mode .type-panel-header {
-  background-color: #2a2f3b;
-  border-bottom-color: #383d4a;
-  color: #8a92a8;
+  background-color: #1a3a6b;
 }
 body.dark-mode .type-option {
   border-bottom-color: #383d4a;
