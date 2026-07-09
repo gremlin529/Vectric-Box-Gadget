@@ -336,7 +336,8 @@ function main(script_path)
 
   local offset_radius = 0.5* converted_tool_diameter - options.allowance
   local cutout_cadcontours
-  if options.create_dogbones then
+  
+  if options.create_dogbones or options.dovetailJoint then
     local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
     cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
   else
@@ -348,7 +349,7 @@ function main(script_path)
   -- so you can place extra details on them if you wish
   AddCadListToJob(job, cdcontours, g_box_layer_name)
   AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
-  if not options.create_dogbones then
+  if not options.create_dogbones and not options.dovetailJoint then
     AddGroupToJob(job, fingerSideContours, g_finger_side_layer_name)
   end
   if options.label_faces then
