@@ -17,8 +17,8 @@
       <img src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
-      <p>This gadget creates two layers of vectors. The layer called box is the actual physical outlines, and the layer called cutout is the one the toolpath is created with.</p>
-      <p>The measurements specifies the external dimensions of the box.</p>
+      <p>This gadget creates a box of the specified external dimensions.</p>
+      <p>There are several layers created depending on the options selected. Please hover over any option to see a description.</p>
     </div>
   </div>
 
@@ -61,7 +61,7 @@
           <div id="showHideTopBottomJoints" style="display: none">
             <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid joints</label>
-              <input title="Width of the lids finger" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input title="Width of the lid fingers" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
             <div class="field-row" id="showHideBottomJointWidth">
               <label for="BottomTabWidthField">Bottom joints</label>
@@ -178,8 +178,8 @@
   <div class="section-header">Faces To Machine</div>
   <div class="card">
     <div class="card-body clearfix">
-      <div class="face-checkbox" id="MakeLidCheckItem"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton" />Lid</label></div>
-      <div class="face-checkbox" id="MakeBottomCheckItem"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <div class="face-checkbox" id="MakeLidCheckItem"><label  title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
+      <div class="face-checkbox" id="MakeBottomCheckItem"><label title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>

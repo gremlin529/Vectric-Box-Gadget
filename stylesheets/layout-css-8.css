@@ -78,7 +78,7 @@ body {
   padding: 10px 14px;
 }
 .header-text p {
-  font-size: 15px;
+  font-size: 18px;
   color: #6b7280;
   line-height: 1.6;
   margin-bottom: 5px;
@@ -101,7 +101,7 @@ body {
 .geometry-column {
   float: left;
   width: 245px;
-  margin-right: 10px;
+  margin-right: 20px;
   margin-bottom: 10px;
 }
 .geometry-column-last {
@@ -137,8 +137,11 @@ body {
     display: inline;   /* IE7 hack */
     zoom: 1;
 
-    width: 100px;
+    -ms-box-sizing: border-box;
+    box-sizing: border-box;
+    width: 95px;
     margin-left: 10px;
+    padding-left: 5px;
 
     vertical-align: middle;
     font-size: 15px;
