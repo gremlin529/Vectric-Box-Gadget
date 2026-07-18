@@ -183,14 +183,17 @@ body {
 .tool-bar-left {
   float: left;
   width: 490px;
-  line-height: 26px;
+  /* Matches tool-bar-right's line-height so both floated columns render
+     the same height and their vertical-align:middle content lines up. */
+  line-height: 36px;
 }
 .tool-bar-right {
   float: left;
   width: 225px;
-  line-height: 26px;
+  line-height: 36px;
   font-size: 15px;
   color: #6b7280;
+  text-align: right;
 }
 input.ToolPicker {
   background-color: #dce8ff;
@@ -199,7 +202,7 @@ input.ToolPicker {
   font-family: Tahoma, Arial, sans-serif;
   font-size: 15px;
   font-weight: bold;
-  padding: 4px 12px;
+  padding: 4px 6px;
   cursor: pointer;
   vertical-align: middle;
 }
@@ -218,6 +221,20 @@ input.ToolPicker {
 .no-toolpath-label input {
   margin-right: 4px;
   vertical-align: middle;
+}
+.cut-depth-label {
+  font-size: 15px;
+  font-weight: bold;
+  color: #374151;
+  vertical-align: middle;
+}
+.cut-depth-input {
+  box-sizing: border-box;
+  width: 70px;
+  margin-left: 8px;
+  padding-left: 5px;
+  vertical-align: middle;
+  font-size: 15px;
 }
 
 /* ── Joint type / Lid type side-by-side panels ────────────────────── */
@@ -400,6 +417,14 @@ body.dark-mode .tool-bar {
 }
 body.dark-mode .tool-bar-right {
   color: #8a92a8;
+}
+body.dark-mode .cut-depth-label {
+  color: #b0b8cc;
+}
+body.dark-mode .cut-depth-input {
+  background-color: #1a1d24;
+  border-color: #383d4a;
+  color: #d4d8e8;
 }
 body.dark-mode input.ToolPicker {
   background-color: #1a3a6b;

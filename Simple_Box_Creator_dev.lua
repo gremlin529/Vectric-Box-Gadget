@@ -41,7 +41,7 @@ g_version = "dev"
 g_subVersion = "development"                                      
 g_title = "Simple Box"
 g_width = 890
-g_height = 850                                                    
+g_height = 885                                                    
 g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"       
 g_finger_side_layer_name = "Finger Roundover"
 g_box_layer_name = "Box"
@@ -88,6 +88,7 @@ function main(script_path)
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.create_dogbones = true
+  options.roundover_cut_depth = 0.125      --- cut depth for the finger roundover tool (box joints, no dogbones only)
 
   options.ZoomLevel = "Auto"
   options.dark_mode     = true        --- default to dark mode on
@@ -141,6 +142,7 @@ function main(script_path)
     options.allowance = truncate(options.allowance * multiplier, 2)
     options.clampingMargin = truncate(options.clampingMargin * multiplier, 2)
     options.partSpacing = truncate(options.partSpacing * multiplier, 2)
+    options.roundover_cut_depth = truncate(options.roundover_cut_depth * multiplier, 2)
     options.InMM = job.InMM
   end
 
@@ -149,6 +151,12 @@ function main(script_path)
   tool.InMM = false
 
   options.tool = tool
+
+  local roundover_tool = Tool("0.125 Inch Round Over", Tool.FORM_TOOL)
+  roundover_tool.ToolDia = 0.125
+  roundover_tool.InMM = false
+
+  options.roundover_tool = roundover_tool
 
   -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
   local dialog_displayed = DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
@@ -349,6 +357,10 @@ function main(script_path)
   AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
   if not options.create_dogbones and not options.dovetailJoint then
     AddGroupToJob(job, fingerSideContours, g_finger_side_layer_name)
+    -- create the toolpath for this set
+    if (not options.no_toolpath) then
+      CreateFingerSideToolpath(g_finger_side_layer_name, options.roundover_tool, job, options.roundover_cut_depth)
+    end
   end
   if options.label_faces then
     AddPartsLabelsToJob(job, faces, g_labels_layer_name, options.thickness)
@@ -376,7 +388,7 @@ function main(script_path)
       end
     end
 
-    CreateCutoutToolpath(cutout_cadcontours, options.tool, job, options.thickness, options.sideOrAllTabWidth, g_cutout_layer_name)
+    CreateCutoutToolpath(options.tool, job, options.thickness, options.sideOrAllTabWidth, g_cutout_layer_name)
   end
 
   SaveDefaultsToRegistry(options, false)
@@ -429,6 +441,12 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
   dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
 
+  -- Roundover tool picker (only used for box joints with no dogbones, see HTML/JS visibility)
+  dialog:AddLabelField("RoundoverToolNameField", "")
+  dialog:AddToolPicker("RoundoverToolChooseButton", "RoundoverToolNameField", options.roundover_default_toolid)
+  dialog:AddToolPickerValidToolType("RoundoverToolChooseButton", Tool.FORM_TOOL)
+  dialog:AddDoubleField("RoundoverCutDepthField", options.roundover_cut_depth)
+
 -- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
   local tab_default_index
   if options.dovetailJoint then
@@ -474,6 +492,22 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if not _tool_ok(options.tool) then
         DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid End Mill.")
         return false
+      end
+    end
+
+    -- Roundover tool + cut depth are only required for box joints with no dogbones (mirrors HTML/JS visibility)
+    local roundover_needed = (not options.no_toolpath) and (not options.dovetailJoint) and (not options.create_dogbones)
+    if roundover_needed then
+      if not _tool_ok(options.roundover_tool) then
+        DisplayMessageBox("No roundover tool selected or tool diameter is invalid.\n\nClick 'Select Roundover Tool' and pick a valid tool.")
+        return false
+      end
+      if not _is_nonneg(options.roundover_cut_depth) or options.roundover_cut_depth <= 0 then
+        DisplayMessageBox("Roundover cut depth must be greater than 0.")
+        return false
+      end
+      if options.roundover_cut_depth > (options.tool.ToolDia/2) then
+        DisplayMessageBox("Make sure your roundover bit and depth are correct for your cutting tool.\nUsually the roundover cut depth should be less than or equal to half the diameter of the cutting tool.\n\nI have created the requested toolpaths but these could be wrong.")
       end
     end
 
@@ -731,6 +765,10 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   -- Get from tool picker
   options.tool = dialog:GetTool("ToolChooseButton")
 
+  -- Roundover tool + cut depth
+  options.roundover_tool = dialog:GetTool("RoundoverToolChooseButton")
+  options.roundover_cut_depth = dialog:GetDoubleField("RoundoverCutDepthField")
+
   ------------------------------------------------------------------
   -- NEW: clamp Joint Width (SideTabWidthField) to
   --      max(existing_width, calculated_min_for_tool)
@@ -811,6 +849,11 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetBool("NoToolpath", options.no_toolpath)
   registry:SetBool("CreateDogbones", options.create_dogbones)
 
+  registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
+  if options.roundover_tool ~= nil then
+    options.roundover_tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "Roundover")
+  end
+
   -- Machining settings
   registry:SetBool("MakeLid", options.facesToMake.lid)
   registry:SetBool("MakeBottom", options.facesToMake.bottom)
@@ -849,6 +892,9 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.lidType = registry:GetDouble("LidType", options.lidType)
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
   options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
+
+  options.roundover_cut_depth = registry:GetDouble("RoundoverCutDepth", options.roundover_cut_depth)
+  options.roundover_default_toolid = ToolDBId("BoxCreator_"..g_version, "Roundover")
 
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON

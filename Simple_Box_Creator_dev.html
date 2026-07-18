@@ -56,7 +56,7 @@
           </div>
           <div class="field-row">
             <label for="SideTabWidthField" id="SideJointLabel">Side joints</label>
-            <input title="width of the finger to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+            <input title="Width of the finger to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div id="showHideTopBottomJoints" style="display: none">
             <div class="field-row" id="showHideLidJointWidth">
@@ -89,7 +89,7 @@
             <input title="Margin on the edge for clamping the workpiece" type="text" id="ClampingMargin" placeholder="Clamping Margin" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div class="checkbox-row" id="showHideDogbones">
-            <input type="checkbox" class="LuaButton" id="CreateDogbones" />
+            <input type="checkbox" class="LuaButton" id="CreateDogbones" onclick="updateRoundoverToolVisibility()" />
             <label title="When unchecked will not create the dogbones. Warning! parts will require additional processing for joints to work" for="CreateDogbones">Create dogbones</label>
           </div>
         </div>
@@ -160,17 +160,36 @@
 
   </div>
 
-  <!-- ── Tool picker ─────────────────────────────────────────────────── -->
-  <div class="tool-bar clearfix">
-    <div class="tool-bar-left">
-      <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool" />
-      <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
-    </div>
-    <div class="tool-bar-right">
-      <label class="no-toolpath-label">
-        <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" />
-        No toolpath (create vectors only)
-      </label>
+  <!-- ── Tools ─────────────────────────────────────────────────────────── -->
+  <div class="section-header">Tools</div>
+  <div class="card">
+    <div class="card-body clearfix">
+
+      <div class="tool-bar clearfix">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Cutting" title="The tool used for cutting out the box and fluting the dovetails" />
+          <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
+        </div>
+        <div class="tool-bar-right">
+          <label class="no-toolpath-label">
+            <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" title="Only create the vectors"/>
+            <label title="Only create the vectors">No toolpath</label>
+          </label>
+        </div>
+      </div>
+
+      <!-- Roundover tool picker (box joints without dogbones only) -->
+      <div class="tool-bar clearfix" id="showHideRoundoverTool" style="display: none; margin-bottom: 0;">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="RoundoverToolChooseButton" id="RoundoverToolChooseButton" value="Roundover" title="The tool used for rounding over the finger edges. It is recommended to use a tool with a radius half the diameter of the cutting bit."/>
+          <span id="RoundoverToolNameField">&#8212; No Tool Selected &#8212;</span>
+        </div>
+        <div class="tool-bar-right">
+          <label for="RoundoverCutDepthField" class="cut-depth-label">Cut Depth</label>
+          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input" placeholder="Cut Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -311,6 +330,19 @@
     var boxRadio = document.getElementById("TabTypeRadio1");
     var dogboneRow = document.getElementById("showHideDogbones");
     if (dogboneRow) { dogboneRow.style.display = (boxRadio && boxRadio.checked) ? "block" : "none"; }
+    updateRoundoverToolVisibility();
+  }
+
+  // The finger roundover tool only applies to box (finger) joints that are not using dogbones.
+  function updateRoundoverToolVisibility() {
+    var boxRadio = document.getElementById("TabTypeRadio1");
+    var dogbones = document.getElementById("CreateDogbones");
+    var roundoverRow = document.getElementById("showHideRoundoverTool");
+    if (roundoverRow) {
+      var isBoxJoint = boxRadio && boxRadio.checked;
+      var noDogbones = !(dogbones && dogbones.checked);
+      roundoverRow.style.display = (isBoxJoint && noDogbones) ? "block" : "none";
+    }
   }
 
   function onZoomLevelChanged(select) {

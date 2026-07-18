@@ -1947,7 +1947,56 @@ function GetFriendlyFaceLabel(face)
   return objects_selected   
 end   
 
-function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, layer_name)
+function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth)
+
+  if not _tool_ok(roundover_tool) then
+    DisplayMessageBox("Finger Side Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local profile_data = ProfileParameterData()
+  profile_data.CutDepth = roundover_cut_depth
+  profile_data.StartDepth = 0.0
+  profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+  profile_data.UseTabs = false
+
+  local ramping_data = RampingData()
+  ramping_data.DoRamping = false
+  ramping_data.RampAngle = 30.0
+  ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
+
+  local lead_data = LeadInOutData()
+
+  local pos_data = ToolpathPosData()
+
+  local geometry_selector = GeometrySelector()
+
+    -- Select all on a layer
+  local selection = job.Selection
+  selection:Clear()
+  local layer = job.LayerManager:FindLayerWithName(fingerSideLayerName)
+  SelectVectorsOnLayer(layer, selection, true, true, true)
+
+  local toolpath_manager = ToolpathManager()
+  local toolpath = toolpath_manager:CreateProfilingToolpath(
+    "Finger Side",
+    roundover_tool,
+    profile_data,
+    ramping_data,
+    lead_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true
+  )
+
+  if toolpath == nil then
+    DisplayMessageBox("Error creating roundover toolpath.")
+  end
+end
+
+
+function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name)
 
   if not _tool_ok(tool) then
     DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
@@ -1974,8 +2023,6 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
 
   local geometry_selector = GeometrySelector()
 
-  -- AddToSelection(cad_contours, job)
-
   -- Select all on a layer
   local selection = job.Selection
   selection:Clear()
@@ -1996,7 +2043,7 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
   )
 
   if toolpath == nil then
-    DisplayMessageBox("Error creating toolpath.")
+    DisplayMessageBox("Error creating cutout toolpath.")
   end
 end
 
