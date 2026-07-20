@@ -386,7 +386,7 @@ function main(script_path)
       if flute_layer then
         local selection = job.Selection
         selection:Clear()
-        SelectVectorsOnLayer(flute_layer, selection, false, true, false)
+        SelectVectorsOnLayer(flute_layer, selection, false, true, true)
         CreateFlutingToolpath("Fluting Dovetails", 0.0, options.thickness, options.tool)
       end
     end

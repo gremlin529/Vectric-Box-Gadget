@@ -1525,16 +1525,14 @@ function GetFriendlyFaceLabel(face)
 
   FLUTE_LAYER_NAME = "Fluting Vectors"
 
-  function CreateOpenLine(layer, x1, y1, x2, y2)
+  function CreateOpenLine(flutingGroup, x1, y1, x2, y2)
     local contour = Contour(0.0)
     contour:AppendPoint(Point2D(x1, y1))
     contour:LineTo(Point2D(x2, y2))
-    local cad = CreateCadContour(contour)
-    layer:AddObject(cad, true)
-    return cad
+    flutingGroup:AddTail(contour)
   end
 
-  function AddFlutingVectorsForSocket(layer, socket, tool)
+  function AddFlutingVectorsForSocket(flutingGroup, socket, tool)
     local thickness      = socket.thickness
     local angle          = socket.angle
     local flute_length   = thickness / math.tan(angle) + 0.02
@@ -1551,11 +1549,11 @@ function GetFriendlyFaceLabel(face)
     while t <= thickness + 0.0001 do
       local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
       local left_start = left_wall - (flute_length * along)
-      CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
+      CreateOpenLine(flutingGroup, left_start.x, left_start.y, left_wall.x, left_wall.y)
 
       local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
       local right_start = right_wall + (flute_length * along)
-      CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
+      CreateOpenLine(flutingGroup, right_start.x, right_start.y, right_wall.x, right_wall.y)
 
       t = t + flute_spacing
     end
@@ -1566,9 +1564,12 @@ function GetFriendlyFaceLabel(face)
     for i = 1, #faces do
       local face = faces[i]
       if face.flute_sockets then
+        local flutingGroup = ContourGroup(true)
         for j = 1, #face.flute_sockets do
-          AddFlutingVectorsForSocket(layer, face.flute_sockets[j], tool)
+          AddFlutingVectorsForSocket(flutingGroup, face.flute_sockets[j], tool)
         end
+        local cadObjectGroup = CreateCadGroup(flutingGroup)
+        layer:AddObject(cadObjectGroup, true)
       end
     end
   end
