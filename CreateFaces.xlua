@@ -131,16 +131,6 @@ function GetAllProfileContours(faces)
   return contour_group
 end
 
-function GetAllFingerSides(faces)
-  local finger_sides = ContourGroup(true)
-  for i=1,#faces do
-    if (faces[i].fingerSides ~= nil) then
-      finger_sides:AppendGroup(faces[i].fingerSides:Clone())
-    end
-  end
-  return finger_sides
-end
-
 function GetAllProfileCadContours(faces)
   local cad_object_list = CadObjectList(true)	
   for i=1,#faces do
@@ -149,6 +139,19 @@ function GetAllProfileCadContours(faces)
     cad_object_list:AddTail(cad_contour)
   end
   return cad_object_list
+end
+
+-- we actually want to group each side and return a list of groups
+-- that somehow we then want to add.
+-- each fingerSides on a face is a ContourGroup
+function GetAllFingerSides(faces)
+  fingerSideArray = {}
+  for i=1,#faces do
+    if (faces[i].fingerSides ~= nil) then
+      fingerSideArray[#fingerSideArray + 1] = faces[i].fingerSides:Clone()
+    end
+  end
+  return fingerSideArray
 end
 
 function GetAllMarkers(faces)

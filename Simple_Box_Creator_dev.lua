@@ -356,7 +356,10 @@ function main(script_path)
   AddCadListToJob(job, cdcontours, g_box_layer_name)
   AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
   if not options.create_dogbones and not options.dovetailJoint then
-    AddGroupToJob(job, fingerSideContours, g_finger_side_layer_name)
+    for i=1,#fingerSideContours do
+      AddGroupToJob(job, fingerSideContours[i], g_finger_side_layer_name)
+    end
+
     -- create the toolpath for this set
     if (not options.no_toolpath) then
       CreateFingerSideToolpath(g_finger_side_layer_name, options.roundover_tool, job, options.roundover_cut_depth)
