@@ -605,6 +605,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     if options.allowance > 0 then
       dia = dia - 2 * options.allowance
     end
+
+    if (dia <= 0) then
+      DisplayMessageBox("The allowance is too large given the tool diameter.\n\nThe allowance must be less than half the tool diameter.")
+      return false
+    end
     
     local tab_space_w_bottom = total_tab_space_w_bottom / (num_flaps_w_bottom + 1)
     local tab_space_d_bottom = total_tab_space_d_bottom / (num_flaps_d_bottom + 1)

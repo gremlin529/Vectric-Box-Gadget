@@ -1021,9 +1021,10 @@ function GetFriendlyFaceLabel(face)
     return result
   end
 
-  -- MakeInsetCountours will return a contour group of up which
-  -- defines the rabbet for inset lids or bottoms taking into account
-  -- if there are any missing faces which should not be rabbetted
+  --[[ MakeInsetCountours will return a contour group of up which
+  |    defines the rabbet for inset lids or bottoms taking into account
+  |    if there are any missing faces which should not be rabbetted
+  ]]
   function MakeInsetContours(width, height, thickness, start_point, facesToMake, 
       create_tabs_for_missing_faces, name, facetype,
       inner_width, inner_height)
@@ -1951,6 +1952,13 @@ function GetFriendlyFaceLabel(face)
   return objects_selected   
 end   
 
+--[[  ---------------- CreateFingerSideToolpath ----------------
+| Uses the vectors on the current layer and creates a ToolpathManager
+| using the roundover bit to round the edge so that they will fit into 
+| the finger slots on the other piece. This is only used for the box joint case 
+| when no dogbones are created
+]]
+
 function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth)
 
   if not _tool_ok(roundover_tool) then
@@ -1983,7 +1991,7 @@ function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roun
 
   local toolpath_manager = ToolpathManager()
   local toolpath = toolpath_manager:CreateProfilingToolpath(
-    "Finger Side",
+    "Finger Roundover",
     roundover_tool,
     profile_data,
     ramping_data,
