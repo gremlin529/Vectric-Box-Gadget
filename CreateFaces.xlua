@@ -66,6 +66,14 @@ function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jo
   return obj
 end
 
+-- Apply only the linear (rotation/scale) part of a transform to a direction
+-- vector, so a pure translation leaves it unchanged.
+function TransformVector2D(xform, v)
+  local origin = xform * Point2D(0.0, 0.0)
+  local tip    = xform * Point2D(v.x, v.y)
+  return Vector2D(tip.x - origin.x, tip.y - origin.y)
+end
+
 function TransformFace(face, xform)
   face.contour:Transform(xform)
 
@@ -92,17 +100,20 @@ function TransformFace(face, xform)
     face.fingerSides:Transform(xform)
   end
 
-  -- Transform the flute sockets
+  -- Transform the flute sockets. The socket owns its points and vectors
+  -- (see AddFemaleDoveTailsAlongLine) so they must be moved explicitly.
+  -- The direction vectors only take the rotation part of the transform.
   if face.flute_sockets then
     for i = 1, #face.flute_sockets do
       local socket = face.flute_sockets[i]
 
-      -- Recalculate along from transformed points.
-      socket.along = socket.end_pt - socket.start_pt
-      socket.along:Normalize()
+      socket.start_pt = xform * socket.start_pt
+      socket.end_pt   = xform * socket.end_pt
 
-      -- Do NOT recalculate socket.out here.
-      -- ArrangeContours uses translation only, so original socket.out remains valid.
+      socket.along = TransformVector2D(xform, socket.along)
+      socket.out   = TransformVector2D(xform, socket.out)
+      socket.along:Normalize()
+      socket.out:Normalize()
     end
   end
 end
@@ -917,11 +928,15 @@ function GetFriendlyFaceLabel(face)
         markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D)
       end
       if flute_sockets then
+        -- Take our own copies. The points must not alias the contour and the
+        -- vectors must not alias the shared unit_x / unit_y globals, because
+        -- TransformFace rotates them in place when a face is nested rotated.
+        local end_pos = contour.EndPoint2D
         flute_sockets[#flute_sockets + 1] = {
-          start_pt  = start_pos,
-          end_pt    = contour.EndPoint2D,
-          along     = along,
-          out       = out,
+          start_pt  = Point2D(start_pos.x, start_pos.y),
+          end_pt    = Point2D(end_pos.x, end_pos.y),
+          along     = Vector2D(along.x, along.y),
+          out       = Vector2D(out.x, out.y),
           thickness = thickness,
           angle     = dovetail.angle
         }
@@ -1340,63 +1355,193 @@ function GetFriendlyFaceLabel(face)
 
 --[[  -------------- ArrangeContoursToSheets ------------------------------------------
 |
-|  Sheet Management wrapper for the existing ArrangeContours layout.
-|  The face geometry itself is unchanged; this only assigns each face to a sheet
-|  and restarts the existing row layout at the lower-left of each new sheet.
+|  Sheet Management layout. Assigns each face to a sheet and positions it, then
+|  returns the faces (in their original order) and the number of sheets required.
 |
-| Warning: This only ever creates a new sheet if the face doesn't fit the existing sheet 
-| it will never go back and see if the face could fit on a previous sheet that might
-| be a good optimisation in which case make sure the return value is the number of sheets 
-| required and not current sheet
+|  Shelf packing: each sheet holds a list of shelves (rows) running bottom to top.
+|  Faces are placed largest first, and for each face every open sheet is tried in
+|  turn - earliest sheet first, and in both the original and a 90 degree rotated
+|  orientation - so a face will backfill a gap on an earlier sheet rather than
+|  forcing a new one. A new sheet is only opened when nothing fits anywhere.
+|
+|  As with ArrangeContours, a face that is too big for the material is still laid
+|  out (overhanging its sheet) rather than aborting, so the user can adjust the
+|  job size afterwards.
 |
 ]]
-function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
-  local sheetCount = 1
-  local transformed_faces = {}
-  if #faces == 0 then
-    return transformed_faces
+
+-- Try to fit a width x height box on a sheet, starting a new shelf if that is
+-- what it takes. Returns x, y and the shelf it landed on, or nil if it will not
+-- fit. The caller advances the shelf's cursor once the face is actually placed.
+function SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+  local shelves = sheet.shelves
+
+  for i = 1, #shelves do
+    local shelf = shelves[i]
+    -- Only the topmost shelf is allowed to grow taller; anything below it has
+    -- a shelf sitting on top of it and would overlap.
+    local vertical_fit
+    if i == #shelves then
+      vertical_fit = (shelf.y + height) <= usable_top
+    else
+      vertical_fit = height <= shelf.height
+    end
+
+    if vertical_fit and ((shelf.x_cursor + width) <= usable_right) then
+      return shelf.x_cursor, shelf.y, shelf
+    end
   end
 
-  local current_sheet = 1
-  local x_cursor = edge_margin
-  local y_cursor = edge_margin
-  local row_height = 0
+  -- No existing shelf works, so start a new one above the topmost.
+  local new_y = edge_margin
+  if #shelves > 0 then
+    local top = shelves[#shelves]
+    new_y = top.y + top.height + clearance_gap
+  end
 
+  if ((new_y + height) <= usable_top) and ((edge_margin + width) <= usable_right) then
+    local shelf = { y = new_y, height = 0, x_cursor = edge_margin }
+    shelves[#shelves + 1] = shelf
+    return shelf.x_cursor, shelf.y, shelf
+  end
+
+  return nil
+end
+
+-- RotationMatrix2D's angle argument isn't documented as radians or degrees, and
+-- getting it wrong would silently skew every rotated part instead of turning it.
+-- Work it out once by rotating a throwaway 2 x 1 contour and checking whether
+-- its bounding box actually swapped over.
+local g_quarter_turn = nil
+
+function QuarterTurnAngle()
+  if g_quarter_turn ~= nil then
+    return g_quarter_turn
+  end
+
+  local probe = Contour(0.0)
+  probe:AppendPoint(Point2D(0.0, 0.0))
+  probe:LineTo(Point2D(2.0, 0.0))
+  probe:LineTo(Point2D(2.0, 1.0))
+  probe:Transform(RotationMatrix2D(Point2D(0.0, 0.0), math.pi / 2.0))
+
+  if math.abs(probe.BoundingBox2D.XLength - 1.0) < 0.001 then
+    g_quarter_turn = math.pi / 2.0
+  else
+    g_quarter_turn = 90.0
+  end
+
+  return g_quarter_turn
+end
+
+-- Move a face so the lower left of its bounding box sits at (x, y), rotating it
+-- 90 degrees first if asked.
+function PlaceFaceAt(face, x, y, rotated)
+  if rotated then
+    local bounds = face.contour.BoundingBox2D
+    local pivot = Point2D(bounds.MinX, bounds.MinY)
+    TransformFace(face, RotationMatrix2D(pivot, QuarterTurnAngle()))
+  end
+
+  local bounds = face.contour.BoundingBox2D
+  TransformFace(face, TranslationMatrix2D(Vector2D(x - bounds.MinX, y - bounds.MinY)))
+end
+
+function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
+  local transformed_faces = {}
+  if #faces == 0 then
+    return transformed_faces, 1
+  end
+
+  local usable_right = job_width - edge_margin
+  local usable_top   = job_height - edge_margin
+
+  -- Place the biggest faces first so the small ones can backfill around them.
+  -- This only changes the order we place in; the faces are returned in their
+  -- original order so everything downstream is unaffected.
+  local order = {}
   for i = 1, #faces do
-    local face = faces[i]
+    local bounds = faces[i].contour.BoundingBox2D
+    order[#order + 1] = {
+      index = i,
+      long  = math.max(bounds.XLength, bounds.YLength),
+      short = math.min(bounds.XLength, bounds.YLength)
+    }
+  end
+
+  table.sort(order, function(a, b)
+    if a.long ~= b.long then return a.long > b.long end
+    if a.short ~= b.short then return a.short > b.short end
+    return a.index < b.index
+  end)
+
+  local sheets = {}
+
+  local function AddSheet()
+    sheets[#sheets + 1] = { shelves = {} }
+    return sheets[#sheets]
+  end
+
+  AddSheet()
+
+  for i = 1, #order do
+    local face = faces[order[i].index]
     local bounds = face.contour.BoundingBox2D
     local width = bounds.XLength
     local height = bounds.YLength
 
-    if (x_cursor > edge_margin) and
-       ((x_cursor + width + clearance_gap) > (job_width - edge_margin)) then
-      x_cursor = edge_margin
-      y_cursor = y_cursor + row_height + clearance_gap
-      row_height = 0
+    local placed = false
+
+    -- Sheet major, so earlier sheets fill up before a later one is used.
+    for sheet_num = 1, #sheets do
+      local sheet = sheets[sheet_num]
+
+      local x, y, shelf = SheetClaimSpace(sheet,width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet,height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
+      end
+
+      if x ~= nil then
+        local placed_width  = rotated and height or width
+        local placed_height = rotated and width or height
+
+        face.sheet_number = sheet_num
+        PlaceFaceAt(face, x, y, rotated)
+
+        shelf.x_cursor = x + placed_width + clearance_gap
+        if placed_height > shelf.height then
+          shelf.height = placed_height
+        end
+
+        placed = true
+        break
+      end
     end
 
-    if (y_cursor + height) > (job_height - edge_margin) then
-      current_sheet = current_sheet + 1
-      sheetCount = math.max(sheetCount, current_sheet)
-      x_cursor = edge_margin
-      y_cursor = edge_margin
-      row_height = 0
-    end
+    if not placed then
+      -- Nothing fits, which for a face larger than the material is expected.
+      -- Give it a sheet of its own and let it overhang rather than failing.
+      -- Reuse the last sheet if nothing has landed on it yet.
+      local sheet = sheets[#sheets]
+      if #sheet.shelves > 0 then
+        sheet = AddSheet()
+      end
+      sheet.shelves[1] = { y = edge_margin, height = height,
+                           x_cursor = edge_margin + width + clearance_gap }
 
-    face.sheet_number = current_sheet
-
-    local dx = x_cursor - bounds.MinX
-    local dy = y_cursor - bounds.MinY
-    TransformFace(face, TranslationMatrix2D(Vector2D(dx, dy)))
-
-    transformed_faces[#transformed_faces + 1] = face
-    x_cursor = x_cursor + width + clearance_gap
-    if height > row_height then
-      row_height = height
+      face.sheet_number = #sheets
+      PlaceFaceAt(face, edge_margin, edge_margin, false)
     end
   end
 
-  return transformed_faces, sheetCount
+  for i = 1, #faces do
+    transformed_faces[#transformed_faces + 1] = faces[i]
+  end
+
+  return transformed_faces, #sheets
 end -- ArrangeContoursToSheets
 
 function SheetFindId(job, sheet_name)
@@ -1410,7 +1555,7 @@ function SheetFindId(job, sheet_name)
   return nil
 end
 
-function SheetSet(job, sheet_name)
+function SetSheet(job, sheet_name)
   local id = SheetFindId(job, sheet_name)
   if id == nil then
     DisplayMessageBox("Could not find sheet: " .. tostring(sheet_name))
@@ -2096,7 +2241,7 @@ end
 | when no dogbones are created
 ]]
 
-function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth)
+function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth, exact_objects)
 
   if not _tool_ok(roundover_tool) then
     DisplayMessageBox("Finger Side Toolpath: Please select a valid tool before continuing.")

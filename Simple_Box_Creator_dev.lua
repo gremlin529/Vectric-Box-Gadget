@@ -344,7 +344,7 @@ function main(script_path)
 
   for sheet_num = 1, required_sheets do
     local sheet_name = "Sheet " .. tostring(sheet_num)
-    if not SheetSet(job, sheet_name) then
+    if not SetSheet(job, sheet_name) then
       return false
     end
 
@@ -432,7 +432,7 @@ function main(script_path)
     end -- if #sheet_faces > 0 then
   end -- for sheet_num = 1, required_sheets do
 
-  SheetSet(job, "Sheet 1")
+  SetSheet(job, "Sheet 1")
 
   SaveDefaultsToRegistry(options, false)
   job:Refresh2DView()
