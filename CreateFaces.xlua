@@ -18,7 +18,7 @@ FaceType = {
   Bottom = 1,
   Lid = 2,
   Side = 3,
-  End =4
+  End = 4
 }
 
 local unit_x = Vector2D(1,0)
@@ -187,11 +187,8 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
     end
   end
 
-  AddCadListToJob(job, cad_object_list, layer_name)
-  local layer = job.LayerManager:FindLayerWithName(layer_name)
-  local selection = job.Selection
-  selection:Clear()
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
+  SelectExactObjects(job, pocket_objects)
 
   local pos_data = ToolpathPosData()
   local pocket_data = PocketParameterData()
@@ -257,13 +254,17 @@ end
 function AddCadListToJob(vectric_job, cad_list, layer_name)
 
   --  create a CadObject to represent the group
+  local added_objects = {}
   local pos = cad_list:GetHeadPosition()
   local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
   while (pos) do
     local obj
     obj, pos = cad_list:GetNext(pos)
-    layer:AddObject(obj:Clone(), true)
+    local cloned_obj = obj:Clone()
+    layer:AddObject(cloned_obj, true)
+    added_objects[#added_objects + 1] = cloned_obj
   end
+  return added_objects
 end
 
 function GetFriendlyFaceLabel(face)
@@ -1336,6 +1337,139 @@ function GetFriendlyFaceLabel(face)
     return transformed_faces
   end
 
+
+--[[  -------------- ArrangeContoursToSheets ------------------------------------------
+|
+|  Sheet Management wrapper for the existing ArrangeContours layout.
+|  The face geometry itself is unchanged; this only assigns each face to a sheet
+|  and restarts the existing row layout at the lower-left of each new sheet.
+|
+| Warning: This only ever creates a new sheet if the face doesn't fit the existing sheet 
+| it will never go back and see if the face could fit on a previous sheet that might
+| be a good optimisation in which case make sure the return value is the number of sheets 
+| required and not current sheet
+|
+]]
+function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
+  local sheetCount = 1
+  local transformed_faces = {}
+  if #faces == 0 then
+    return transformed_faces
+  end
+
+  local current_sheet = 1
+  local x_cursor = edge_margin
+  local y_cursor = edge_margin
+  local row_height = 0
+
+  for i = 1, #faces do
+    local face = faces[i]
+    local bounds = face.contour.BoundingBox2D
+    local width = bounds.XLength
+    local height = bounds.YLength
+
+    if (x_cursor > edge_margin) and
+       ((x_cursor + width + clearance_gap) > (job_width - edge_margin)) then
+      x_cursor = edge_margin
+      y_cursor = y_cursor + row_height + clearance_gap
+      row_height = 0
+    end
+
+    if (y_cursor + height) > (job_height - edge_margin) then
+      current_sheet = current_sheet + 1
+      sheetCount = math.max(sheetCount, current_sheet)
+      x_cursor = edge_margin
+      y_cursor = edge_margin
+      row_height = 0
+    end
+
+    face.sheet_number = current_sheet
+
+    local dx = x_cursor - bounds.MinX
+    local dy = y_cursor - bounds.MinY
+    TransformFace(face, TranslationMatrix2D(Vector2D(dx, dy)))
+
+    transformed_faces[#transformed_faces + 1] = face
+    x_cursor = x_cursor + width + clearance_gap
+    if height > row_height then
+      row_height = height
+    end
+  end
+
+  return transformed_faces, sheetCount
+end -- ArrangeContoursToSheets
+
+function SheetFindId(job, sheet_name)
+  local sheet_manager = job.SheetManager
+  local sheet_ids = sheet_manager:GetSheetIds()
+  for id in sheet_ids do
+    if sheet_manager:GetSheetName(id) == sheet_name then
+      return id
+    end
+  end
+  return nil
+end
+
+function SheetSet(job, sheet_name)
+  local id = SheetFindId(job, sheet_name)
+  if id == nil then
+    DisplayMessageBox("Could not find sheet: " .. tostring(sheet_name))
+    return false
+  end
+  job.SheetManager.ActiveSheetId = id
+  return true
+end
+
+function SheetEnsureExists(job, sheet_number)
+  local sheet_name = "Sheet " .. tostring(sheet_number)
+  local sheet_manager = job.SheetManager
+  local existing_id = SheetFindId(job, sheet_name)
+  if existing_id ~= nil then
+    sheet_manager.ActiveSheetId = existing_id
+    return true
+  end
+
+  local source_sheet_id = SheetFindId(job, "Sheet 1")
+  if source_sheet_id == nil then
+    DisplayMessageBox("Sheet 1 was not found. Cannot create " .. sheet_name .. ".")
+    return false
+  end
+
+  local material_block = MaterialBlock()
+  sheet_manager:CreateSheets(
+    1,
+    source_sheet_id,
+    Box2D(Point2D(0, 0), Point2D(material_block.Width, material_block.Height))
+  )
+
+  local new_id = SheetFindId(job, sheet_name)
+  if new_id ~= nil then
+    sheet_manager.ActiveSheetId = new_id
+    return true
+  end
+
+  DisplayMessageBox("Unable to create " .. sheet_name .. ".")
+  return false
+end
+
+function SelectExactObjects(job, objects)
+  local selection = job.Selection
+  selection:Clear()
+  local selected = false
+  if objects ~= nil then
+    for i = 1, #objects do
+      if objects[i] ~= nil then
+        selection:Add(objects[i], true, true)
+        selected = true
+      end
+    end
+  end
+  if selected then
+    selection:GroupSelectionFinished()
+  end
+  return selected
+end
+
 --[[  -------------- ComputeDogBones --------------------------------------------------  
 |
 | Compute the markers for where dog bones should be placed on preradiused contours
@@ -1561,6 +1695,7 @@ function GetFriendlyFaceLabel(face)
   end
 
   function AddFlutingVectorsForFaces(job, faces, layer_name, tool)
+    local added_objects = {}
     local layer = job.LayerManager:GetLayerWithName(layer_name)
     for i = 1, #faces do
       local face = faces[i]
@@ -1568,11 +1703,13 @@ function GetFriendlyFaceLabel(face)
         local flutingGroup = ContourGroup(true)
         for j = 1, #face.flute_sockets do
           AddFlutingVectorsForSocket(flutingGroup, face.flute_sockets[j], tool)
-        end
+        end -- for j
         local cadObjectGroup = CreateCadGroup(flutingGroup)
         layer:AddObject(cadObjectGroup, true)
-      end
-    end
+        added_objects[#added_objects + 1] = cadObjectGroup
+      end -- if face.flute_sockets
+    end -- for i
+    return added_objects
   end
 
 --[[  ----------------- CreateFlutingToolpath -----------------  
@@ -1983,11 +2120,15 @@ function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roun
 
   local geometry_selector = GeometrySelector()
 
-    -- Select all on a layer
-  local selection = job.Selection
-  selection:Clear()
-  local layer = job.LayerManager:FindLayerWithName(fingerSideLayerName)
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+    -- Select the current sheet objects when supplied; otherwise preserve the original layer selection.
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(fingerSideLayerName)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
 
   local toolpath_manager = ToolpathManager()
   local toolpath = toolpath_manager:CreateProfilingToolpath(
@@ -2008,7 +2149,7 @@ function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roun
 end
 
 
-function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name)
+function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects)
 
   if not _tool_ok(tool) then
     DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
@@ -2035,11 +2176,15 @@ function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name)
 
   local geometry_selector = GeometrySelector()
 
-  -- Select all on a layer
-  local selection = job.Selection
-  selection:Clear()
-  local layer = job.LayerManager:FindLayerWithName(layer_name)
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+  -- Select the current sheet objects when supplied; otherwise select objects on the provided layer
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(layer_name)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
 
   local toolpath_manager = ToolpathManager()
   local toolpath = toolpath_manager:CreateProfilingToolpath(

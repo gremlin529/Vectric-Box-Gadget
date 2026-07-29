@@ -321,78 +321,118 @@ function main(script_path)
     faces[#faces + 1] = lid
   end
 
-  -- Arrange the contours
-  -- this line shouldn't be needed we got it above
-  -- local mtl_block = MaterialBlock()
+  -- Arrange the contours across as many sheets as required.
+  -- All existing geometry and machining rules below remain unchanged;
+  -- they are simply applied to one sheet's faces at a time.
   local converted_tool_diameter = 0.25
   if _tool_ok(options.tool) then
     converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
   end
 
-  -- use the largest part spacing provided, it has to be at least 2 * diameter of bit
-  -- so as a safety ignore input if it's less and use that
-  local part_gap    = math.max( 2 * converted_tool_diameter, options.partSpacing)
+  local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
-  faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+  local required_sheets = 1
+  faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin)
 
-  -- Get at the actual contours and dogbone them. Then transfer the tabs
-  local vdcontours = GetAllProfileContours(faces)
-  local cdcontours = GetAllProfileCadContours(faces)
-  local fingerSideContours = GetAllFingerSides(faces)
-
-  local offset_radius = 0.5* converted_tool_diameter - options.allowance
-  local cutout_cadcontours
-  
-  if options.create_dogbones or options.dovetailJoint then
-    local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-    cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
-  else
-    local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
-    cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
-  end
-
-  -- These extra vectors represent the actual output
-  -- so you can place extra details on them if you wish
-  AddCadListToJob(job, cdcontours, g_box_layer_name)
-  AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
-  if not options.create_dogbones and not options.dovetailJoint then
-    for i=1,#fingerSideContours do
-      AddGroupToJob(job, fingerSideContours[i], g_finger_side_layer_name)
-    end
-
-    -- create the toolpath for this set
-    if (not options.no_toolpath) then
-      CreateFingerSideToolpath(g_finger_side_layer_name, options.roundover_tool, job, options.roundover_cut_depth)
+  for sheet_num = 1, required_sheets do
+    if not SheetEnsureExists(job, sheet_num) then
+      return false
     end
   end
-  if options.label_faces then
-    AddPartsLabelsToJob(job, faces, g_labels_layer_name, options.thickness)
-  end
 
-  if options.dovetailJoint then
-    AddFlutingVectorsForFaces(job, faces, FLUTE_LAYER_NAME, options.tool)
-  end
+  local offset_radius = 0.5 * converted_tool_diameter - options.allowance
 
-  if (not options.no_toolpath) and 
-    ((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
-    (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)) then
-      CreateInsetPocketToolpath(job, options, faces, options.tool, "Pockets")
-  end
+  for sheet_num = 1, required_sheets do
+    local sheet_name = "Sheet " .. tostring(sheet_num)
+    if not SheetSet(job, sheet_name) then
+      return false
+    end
 
-  if not options.no_toolpath then
-    -- if we are doing dovetails make toolpath for them
-    if options.dovetailJoint then
-      local flute_layer = job.LayerManager:FindLayerWithName(FLUTE_LAYER_NAME)
-      if flute_layer then
-        local selection = job.Selection
-        selection:Clear()
-        SelectVectorsOnLayer(flute_layer, selection, false, true, true)
-        CreateFlutingToolpath("Fluting Dovetails", 0.0, options.thickness, options.tool)
+    -- I really wanted this to be a bit field but this version
+    -- of lua doesn't support bitwise operations so I'm using a table of booleans instead
+    -- this is so we can decide which tool paths to create
+    local jointsOnSheet = {false, false, false, false}
+
+    local sheet_faces = {}
+    for i = 1, #faces do
+      if (faces[i].sheet_number or 1) == sheet_num then
+        sheet_faces[#sheet_faces + 1] = faces[i]
+        jointsOnSheet[faces[i].jointtype] = true
       end
     end
 
-    CreateCutoutToolpath(options.tool, job, options.thickness, options.sideOrAllTabWidth, g_cutout_layer_name)
-  end
+    if #sheet_faces > 0 then
+      -- Original 12.3 Beta3 geometry logic, now scoped to this sheet's faces.
+      local vdcontours = GetAllProfileContours(sheet_faces)
+      local cdcontours = GetAllProfileCadContours(sheet_faces)
+      local fingerSideContours = GetAllFingerSides(sheet_faces)
+
+      local cutout_cadcontours
+      if options.create_dogbones or options.dovetailJoint then
+        local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
+        cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+      else
+        local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
+        cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
+      end
+
+      AddCadListToJob(job, cdcontours, g_box_layer_name)
+      local cutout_objects = AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
+
+      if not options.create_dogbones and not options.dovetailJoint then
+        local finger_side_objects = {}
+        for i = 1, #fingerSideContours do
+          finger_side_objects[#finger_side_objects + 1] =
+            AddGroupToJob(job, fingerSideContours[i], g_finger_side_layer_name)
+        end
+
+        if not options.no_toolpath and jointsOnSheet[FaceJointType.Fingers] then
+          CreateFingerSideToolpath(
+            g_finger_side_layer_name,
+            options.roundover_tool,
+            job,
+            options.roundover_cut_depth,
+            finger_side_objects)
+        end
+      end
+
+      if options.label_faces then
+        AddPartsLabelsToJob(job, sheet_faces, g_labels_layer_name, options.thickness)
+      end
+
+      local fluting_objects = nil
+      if options.dovetailJoint then
+        fluting_objects = AddFlutingVectorsForFaces(
+          job, sheet_faces, FLUTE_LAYER_NAME, options.tool)
+      end
+
+      if (not options.no_toolpath) then
+        if jointsOnSheet[FaceJointType.Inset] then
+          assert(((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
+          (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)), "Expected that if there are inset joints on this sheet, then at least one of the lid or bottom faces should be present and have an inset joint type.")
+          CreateInsetPocketToolpath(job, options, sheet_faces, options.tool, "Pockets")
+        end
+
+        if options.dovetailJoint then
+          if SelectExactObjects(job, fluting_objects) then
+            CreateFlutingToolpath(
+              "Fluting Dovetails", 0.0, options.thickness, options.tool)
+          end
+        end
+
+        CreateCutoutToolpath(
+          options.tool,
+          job,
+          options.thickness,
+          options.sideOrAllTabWidth,
+          g_cutout_layer_name,
+          cutout_objects)
+      end -- not options.no_toolpath
+
+    end -- if #sheet_faces > 0 then
+  end -- for sheet_num = 1, required_sheets do
+
+  SheetSet(job, "Sheet 1")
 
   SaveDefaultsToRegistry(options, false)
   job:Refresh2DView()
@@ -956,5 +996,3 @@ end
 function OnLuaButton_XXXX()
   return true
 end
-
-
