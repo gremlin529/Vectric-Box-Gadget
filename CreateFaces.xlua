@@ -1298,12 +1298,16 @@ function GetFriendlyFaceLabel(face)
   end
 
 
---[[  -------------- ArrangeContours --------------------------------------------------  
+--[[  -------------- ArrangeContours --------------------------------------------------
 |
-| Arrange the contours
-| NEW: Always lays out ALL faces, even if they extend beyond the
-|      current job size. This lets the user adjust the job size
-|      afterwards instead of aborting with an error.
+|  Best-effort single-sheet layout, using the same shelf packing and rotation
+|  as ArrangeContoursToSheets, but restricted to one sheet. Faces are placed
+|  largest first, trying both the original and a 90 degree rotated orientation
+|  so pieces backfill gaps rather than wasting space.
+|
+|  A face that doesn't fit within the material at all (even rotated) is still
+|  stacked above the rest and returned rather than aborting, so it overhangs
+|  the sheet and the user can adjust the job size or move it afterwards.
 |
 ]]
   function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin)
@@ -1314,39 +1318,71 @@ function GetFriendlyFaceLabel(face)
       return transformed_faces
     end
 
-    -- Simple row/column layout
-    local x_cursor   = edge_margin
-    local y_cursor   = edge_margin
-    local row_height = 0
+    local usable_right = job_width - edge_margin
+    local usable_top   = job_height - edge_margin
 
+    -- Place the biggest faces first so the small ones can backfill around them.
+    -- This only changes the order we place in; the faces are returned in their
+    -- original order so everything downstream is unaffected.
+    local order = {}
     for i = 1, #faces do
-      local face   = faces[i]
+      local bounds = faces[i].contour.BoundingBox2D
+      order[#order + 1] = {
+        index = i,
+        long  = math.max(bounds.XLength, bounds.YLength),
+        short = math.min(bounds.XLength, bounds.YLength)
+      }
+    end
+
+    table.sort(order, function(a, b)
+      if a.long ~= b.long then return a.long > b.long end
+      if a.short ~= b.short then return a.short > b.short end
+      return a.index < b.index
+    end)
+
+    local sheet = { shelves = {} }
+
+    for i = 1, #order do
+      local face = faces[order[i].index]
       local bounds = face.contour.BoundingBox2D
-      local width  = bounds.XLength
+      local width = bounds.XLength
       local height = bounds.YLength
 
-      -- If we would run past the row width, wrap to a new row.
-      -- NOTE: we do NOT abort if we run past the job height; vectors
-      --       are still created, even if they extend outside the material.
-      if (x_cursor > edge_margin)
-      and (x_cursor + width + clearance_gap) > (job_width - edge_margin) then
-        x_cursor   = edge_margin
-        y_cursor   = y_cursor + row_height + clearance_gap
-        row_height = 0
+      local x, y, shelf = SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet, height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
       end
 
-      -- Position so the face's lower-left corner sits at (x_cursor, y_cursor)
-      local dx = x_cursor - bounds.MinX
-      local dy = y_cursor - bounds.MinY
-      local xform = TranslationMatrix2D(Vector2D(dx, dy))
-      TransformFace(face, xform)
-
-      transformed_faces[#transformed_faces + 1] = face
-
-      x_cursor   = x_cursor + width + clearance_gap
-      if height > row_height then
-        row_height = height
+      if x == nil then
+        -- Nothing fits within the material, even rotated. Stack it above
+        -- everything else and let it overhang rather than failing.
+        local new_y = edge_margin
+        if #sheet.shelves > 0 then
+          local top = sheet.shelves[#sheet.shelves]
+          new_y = top.y + top.height + clearance_gap
+        end
+        shelf = { y = new_y, height = height, x_cursor = edge_margin + width + clearance_gap }
+        sheet.shelves[#sheet.shelves + 1] = shelf
+        x, y = edge_margin, new_y
+        rotated = false
       end
+
+      local placed_width  = rotated and height or width
+      local placed_height = rotated and width or height
+
+      PlaceFaceAt(face, x, y, rotated)
+
+      shelf.x_cursor = x + placed_width + clearance_gap
+      if placed_height > shelf.height then
+        shelf.height = placed_height
+      end
+    end
+
+    for i = 1, #faces do
+      transformed_faces[#transformed_faces + 1] = faces[i]
     end
 
     return transformed_faces

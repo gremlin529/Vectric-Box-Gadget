@@ -8,6 +8,17 @@
 
 -- The notice at the head of the gadget source files may not be removed or altered from any source distribution.
 -------------------------------------------------------------------------------------------------------------------------------------------
+-- 
+-- Want to Contribue to this gadget or learn more about it? 
+--
+--                       
+-- █▀▀ █ ▀█▀ █░█ █░█ █▄▄       https://github.com/gremlin529/Vectric-Box-Gadget
+-- █▄█ █ ░█░ █▀█ █▄█ █▄█
+--
+-- this repository contains the latest version of the gadget, and is where you can submit issues or pull requests to contribute to the project.
+-- also includes the readme file on how to contribute to the project and how to build the gadget from source.
+--
+-------------------------------------------------------------------------------------------------------------------------------------------
 -- Added Disclaimer Information Above                                                                   -- by Sharkcutup 11/10/2023
 -- Added "Allowance" to the Registry Load and Save Dialog                                               -- by Sharkcutup 11/10/2023
 -- Changed the Select Tool (in .html file) to where tool info shows next to button instead of under it. -- by Sharkcutup 11/10/2023
@@ -21,7 +32,7 @@
 -- Changed up the User Interface a bit by colorizing and defining lines of images                       -- by Sharkcutup 11/23/2025
 -- Added a separate field for the width of the bottom tabs vs side tabs                                 -- by Gremlin 2/27/2026
 -- Renamed the Gadget and stopping the upkeep of these comments as we're in GitHub now and the history is preserved there.    2/27/2026     
--- June 21st, just to give proper credit Gremlin ported Sharkcutup's amazing fluting dovetail code to the project, per github history
+-- June 21st, just to give proper credit Gremlin ported Sharkcutup's amazing fluting dovetail code to the project, per github history (see above)
 -------------------------------------------------------------------------------------------------------------------------------------------
 -- It is provided 'as-is' with changes made, without any express or implied warranty, and you make use of them entirely at your own risk.
 -- In no event will "Sharkcutup" be held liable for any damages arising from this gadgets use.
@@ -88,6 +99,7 @@ function main(script_path)
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.create_dogbones = true
+  options.single_sheet_best_effort = false --- if true, pack everything onto one sheet and let non-fitting pieces overhang instead of creating new sheets
   options.roundover_cut_depth = 0.125      --- cut depth for the finger roundover tool (box joints, no dogbones only)
 
   options.ZoomLevel = "Auto"
@@ -332,7 +344,16 @@ function main(script_path)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local required_sheets = 1
-  faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+  if options.single_sheet_best_effort then
+    -- Best effort: pack everything onto Sheet 1. Pieces that don't fit are
+    -- still laid out (overhanging the material) rather than opening a new sheet.
+    faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+    for i = 1, #faces do
+      faces[i].sheet_number = 1
+    end
+  else
+    faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+  end
 
   for sheet_num = 1, required_sheets do
     if not SheetEnsureExists(job, sheet_num) then
@@ -409,7 +430,8 @@ function main(script_path)
       if (not options.no_toolpath) then
         if jointsOnSheet[FaceJointType.Inset] then
           assert(((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
-          (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)), "Expected that if there are inset joints on this sheet, then at least one of the lid or bottom faces should be present and have an inset joint type.")
+          (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)), 
+           "Expected that if there are inset joints on this sheet, then at least one of the lid or bottom faces should be present and have an inset joint type.")
           CreateInsetPocketToolpath(job, options, sheet_faces, options.tool, "Pockets")
         end
 
@@ -483,6 +505,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
   dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
+  dialog:AddCheckBox("SingleSheetBestEffort", options.single_sheet_best_effort)
 
   -- Roundover tool picker (only used for box joints with no dogbones, see HTML/JS visibility)
   dialog:AddLabelField("RoundoverToolNameField", "")
@@ -765,6 +788,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
+  options.single_sheet_best_effort = dialog:GetCheckBox("SingleSheetBestEffort")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
@@ -896,6 +920,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
 
   registry:SetBool("NoToolpath", options.no_toolpath)
   registry:SetBool("CreateDogbones", options.create_dogbones)
+  registry:SetBool("SingleSheetBestEffort", options.single_sheet_best_effort)
 
   registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
   if options.roundover_tool ~= nil then
@@ -949,6 +974,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
+  options.single_sheet_best_effort = registry:GetBool("SingleSheetBestEffort", options.single_sheet_best_effort)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
   options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)
