@@ -1814,7 +1814,16 @@ end
     local thickness      = socket.thickness
     local angle          = socket.angle
     local flute_length   = thickness / math.tan(angle) + 0.02
-    local flute_fit_offset = 0.1
+
+    -- The vector's centerline needs to sit in from the tab's true edge by the
+    -- tool's own radius, so the tool's cutting edge (not its center) is what
+    -- actually lines up with that edge. A fixed offset (as before) only lines
+    -- up for one particular tool size: too large an offset for a smaller tool
+    -- stops the cut short of the true edge, leaving it un-relieved (socket
+    -- too small for the tab to fit); too small an offset for a larger tool
+    -- overshoots past it.
+    local tool_radius = 0.5 * ConvertUnitsFrom(tool.ToolDia or 0, tool, MaterialBlock())
+    local flute_fit_offset = math.max(0, tool_radius - 0.02)
     -- local flute_spacing  = tool.ToolDia / 2 -- I think this should be 1/2 the bit size...
     local flute_spacing = tool.Stepover -- Use the stepover instead of tool diameter for spacing
 
@@ -2467,6 +2476,9 @@ end
 
 -- end
 
+-- [[  -------------- ConvertUnitsFrom --------------------------------------------------
+--        Ensure the value is in the correct units for the tool and block material
+--        
 function ConvertUnitsFrom(value, tool, blockmaterial)
 
   if (tool.InMM == blockmaterial.InMM) then
