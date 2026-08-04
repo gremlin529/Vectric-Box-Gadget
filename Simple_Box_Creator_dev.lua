@@ -99,7 +99,7 @@ function main(script_path)
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.create_dogbones = true
-  options.single_sheet_best_effort = false --- if true, pack everything onto one sheet and let non-fitting pieces overhang instead of creating new sheets
+  options.useSingleSheet = false --- if true, pack everything onto one sheet and let non-fitting pieces overhang instead of creating new sheets
   options.roundover_cut_depth = 0.125      --- cut depth for the finger roundover tool (box joints, no dogbones only)
 
   options.ZoomLevel = "Auto"
@@ -344,7 +344,7 @@ function main(script_path)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local required_sheets = 1
-  if options.single_sheet_best_effort then
+  if options.useSingleSheet then
     -- Best effort: pack everything onto Sheet 1. Pieces that don't fit are
     -- still laid out (overhanging the material) rather than opening a new sheet.
     faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
@@ -505,7 +505,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
   dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
-  dialog:AddCheckBox("SingleSheetBestEffort", options.single_sheet_best_effort)
+  dialog:AddCheckBox("UseSingleSheet", options.useSingleSheet)
 
   -- Roundover tool picker (only used for box joints with no dogbones, see HTML/JS visibility)
   dialog:AddLabelField("RoundoverToolNameField", "")
@@ -596,15 +596,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local inner_depth = options.depth - double_thickness
 
     -- the inner height needs to be computed
-    -- based on options for lid and bototm
-    local lidAndBottomThickness = 0
-    if (options.lidType ~= FaceJointType.None) then
-      lidAndBottomThickness = lidAndBottomThickness + options.thickness
-    end
-    if (options.bottomType ~= FaceJointType.None) then
-      lidAndBottomThickness = lidAndBottomThickness + options.thickness
-    end
-    local inner_height = options.height - lidAndBottomThickness
+    -- based on options for lid and bottom
+    local inner_height = options.height - ThicknessForFaceType(options.lidType, options.thickness) - ThicknessForFaceType(options.bottomType, options.thickness)
 
     -- Gremlin added join size seperations overall
     local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomDoveTail.min_width)
@@ -704,15 +697,31 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         end
       end
 
-      min_space = min_space + dia
+      -- A mathematically exact fit is not sufficient for Vectric's offset engine.
+      -- Keep 0.010 inch (0.254 mm) extra clearance so near-tangent CutOut
+      -- offsets do not create an invalid or incomplete toolpath.
+      local toolpath_safety_clearance = options.InMM and 0.254 or 0.010
+      local required_side_space = min_space + dia + toolpath_safety_clearance
+      local required_bottom_space = bottom_min_space + dia + toolpath_safety_clearance
+      local required_top_space = top_min_space + dia + toolpath_safety_clearance
+
+      if (tab_space_h <= required_side_space) then
+        DisplayMessageBox("The selected tool will not fit between the side joints.")
+        return false
+      end  
       if (tab_space_w_bottom <= bottom_min_space) or 
-      (tab_space_d_bottom <= bottom_min_space) or 
-      (tab_space_h <= min_space) or 
-      ((options.lidType == FaceJointType.Fingers) and 
-        ((tab_space_w_top <= (top_min_space+dia)) or (tab_space_d_top <= (top_min_space+dia)))) or
-      ((options.bottomType == FaceJointType.Fingers) and 
-        ((tab_space_w_bottom <= (bottom_min_space+dia)) or (tab_space_d_bottom <= (bottom_min_space+dia)))) then        
-        DisplayMessageBox("The selected tool will not fit between the joints.")
+         (tab_space_d_bottom <= bottom_min_space) or 
+         ((options.bottomType == FaceJointType.Fingers) and 
+           ((tab_space_w_bottom <= (required_bottom_space)) or (tab_space_d_bottom <= (required_bottom_space)))) then        
+        DisplayMessageBox("The selected tool will not fit between the bottom joints.")
+        return false
+      end  
+
+      if (tab_space_w_top <= top_min_space) or 
+         (tab_space_d_top <= top_min_space) or 
+         ((options.lidType == FaceJointType.Fingers) and 
+           ((tab_space_w_top <= (required_top_space)) or (tab_space_d_top <= (required_top_space)))) then
+        DisplayMessageBox("The selected tool will not fit between the lid joints.")
         return false
       end  
     else
@@ -788,7 +797,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
-  options.single_sheet_best_effort = dialog:GetCheckBox("SingleSheetBestEffort")
+  options.useSingleSheet = dialog:GetCheckBox("UseSingleSheet")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
@@ -920,7 +929,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
 
   registry:SetBool("NoToolpath", options.no_toolpath)
   registry:SetBool("CreateDogbones", options.create_dogbones)
-  registry:SetBool("SingleSheetBestEffort", options.single_sheet_best_effort)
+  registry:SetBool("SingleSheetBestEffort", options.useSingleSheet)
 
   registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
   if options.roundover_tool ~= nil then
@@ -974,7 +983,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
-  options.single_sheet_best_effort = registry:GetBool("SingleSheetBestEffort", options.single_sheet_best_effort)
+  options.useSingleSheet = registry:GetBool("SingleSheetBestEffort", options.useSingleSheet)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
   options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)

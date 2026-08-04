@@ -26,6 +26,16 @@ local unit_y = Vector2D(0,1)
 
 -- ---------- VALIDATION HELPERS ----------
 
+function ThicknessForFaceType(faceType, thickness)
+  if (faceType == FaceJointType.None) then -- No lid or bottom, inner height isn't reduced
+    return 0
+  elseif (faceType == FaceJointType.Inset) then -- if Inset than the inner height is reduced by half the thickness of the material
+    return 0.5 * thickness
+  end 
+  -- if Flat or Fingers than the inner height is reduced by the thickness of the material
+  return thickness
+end
+  
 function faceJointTypeToString( joint )
   for k, v in pairs(FaceJointType) do
     if (v == joint) then
@@ -33,14 +43,6 @@ function faceJointTypeToString( joint )
     end
   end
   return ""
-end
-
-function enumToTypeName(enumValue)
-    if typeof(enumValue) ~= "EnumItem" then
-        error("Expected EnumItem, got " .. typeof(enumValue))
-    end
-
-    return enumValue.EnumType.Name
 end
 
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
@@ -118,22 +120,6 @@ function TransformFace(face, xform)
   end
 end
 
-function CloneFace(face)
-  local clone = {}
-  clone.contour = face.contour:Clone()
-  clone.dovetail_list = face.dovetail_list
-  clone.tabs = face.tabs
-  clone.name = face.name
-  clone.facetype = face.facetype
-  clone.jointtype = face.jointtype
-  clone.flute_sockets = face.flute_sockets
-  if (face.inset_contours ~= nil) then
-    clone.inset_contours = face.inset_contours:Clone()
-  end
-  clone.fingerSides = face.fingerSides:Clone()
-  return clone
-end
-
 function GetAllProfileContours(faces)
   local contour_group = ContourGroup(true)
   for i=1,#faces do
@@ -163,17 +149,6 @@ function GetAllFingerSides(faces)
     end
   end
   return fingerSideArray
-end
-
-function GetAllMarkers(faces)
-  local markers = {}
-  for i=1,#faces do
-    local cur_markers = faces[i].dovetail_list
-    for j=1,#cur_markers do
-      markers[#markers+1] = cur_markers[j]
-    end
-  end
-  return markers;
 end
 
 function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
@@ -243,21 +218,8 @@ function AddGroupToJob(job, group, layer_name)
    
    return cad_object
 end
-
---[[  -------------- AddCadContourToJob --------------------------------------------------  
-|
-|  Adds a group of contours to a job
-|
-]]
-function AddCadContourToJob(vectric_job, cad_contour, layer_name)
-  --  create a CadObject to represent the group
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  if cad_contour and layer then
-    layer:AddObject(cad_contour, true)
-  end
-end   
-
---[[  -------------- AddCadContourToJob --------------------------------------------------  
+   
+--[[  -------------- AddCadListToJob --------------------------------------------------  
 |
 |  Adds a group of contours to a job
 |
@@ -2161,20 +2123,6 @@ end
     return cad_contour
   end
 
-  function GetContours(cad_object_list)
-    local vdcontours = ContourGroup(true)
-    local pos, obj
-    pos = cad_object_list:GetHeadPosition()
-    while (pos) do
-      obj, pos = cad_object_list:GetNext(pos)
-      local ctr = obj:GetContour()
-      if ctr then
-        vdcontours:AddTail(ctr:Clone())
-      end
-    end
-    return vdcontours
-  end
-
 -- Create tabbed versions of the vdcontours by creating 
 -- a cad contour version of each contour and transferring all
 -- tabs
@@ -2200,17 +2148,6 @@ end
 
     end
     return cad_obj_list
-  end
-
-  function AddToSelection(cadobjlist, job)
-    local selection_list = job.Selection
-    selection_list:Clear()
-    local pos = cadobjlist:GetHeadPosition()
-    local obj
-    while (pos) do
-      obj, pos = cadobjlist:GetNext(pos)
-      selection_list:Add(obj, true, false)
-    end
   end
 
 --[[  ---------------- SelectVectorsOnLayer ----------------  
@@ -2255,13 +2192,12 @@ end
         if contour.IsOpen and select_open then
           selection:Add(object, true, true)
           objects_selected = true
-        else if select_closed then
+        elseif select_closed then
           selection:Add(object, true, true)
-          objects_selected = true
-        end            
-      end
-    end
-  end  
+          objects_selected = true     
+        end -- contour was NOT nil, test if Open or Closed
+    end -- while pos ~= nil do
+  end  -- function SelectVectorsOnLayer
   -- to avoid excessive redrawing etc  we added vectors to the selection in 'batch' mode
   -- tell selection we have now finished updating
   if objects_selected then
@@ -2385,151 +2321,151 @@ function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exac
   end
 end
 
---[[  -------------- CalculateRails --------------------------------------------------  
-|
-|  Calculate a list of rails along which we will run our tool
-|  Returns a ContourGroup corresponding to this rail
-|
-]]
-function CalculateRails
-  (
-    side_rail,   -- contour which represents side of dovetial
-    angle,       -- angle
-    on_left,     -- if true then we create rails to left of side_rail
-    offset,      -- Allowance
-    tool,        -- tool used
-    start_z,     -- depth start cutting
-    cut_z        -- depth finish cutting 
-  )
-  local is_dodgy = false
-  if side_rail.StartPoint2D:IsCoincident(Point2D(53, 25), 1) then
-    is_dodgy = true
-  end
-  local side_length = side_rail.Length
-  local blk_material = MaterialBlock()
-  local converted_Stepover = ConvertUnitsFrom(tool.Stepover,tool,blk_material)
-  local num_stripes = math.ceil(side_length/ converted_Stepover )
-  local stripe_shift = (side_length) / num_stripes
-  local horizontal_distance = (math.abs(start_z - cut_z) / math.tan(angle))
-  local along_rail = (side_rail.EndPoint2D - side_rail.StartPoint2D):Normalize()
-  local contours = {}
+-- --[[  -------------- CalculateRails --------------------------------------------------  
+-- |
+-- |  Calculate a list of rails along which we will run our tool
+-- |  Returns a ContourGroup corresponding to this rail
+-- |
+-- ]]
+-- function CalculateRails
+--   (
+--     side_rail,   -- contour which represents side of dovetial
+--     angle,       -- angle
+--     on_left,     -- if true then we create rails to left of side_rail
+--     offset,      -- Allowance
+--     tool,        -- tool used
+--     start_z,     -- depth start cutting
+--     cut_z        -- depth finish cutting 
+--   )
+--   local is_dodgy = false
+--   if side_rail.StartPoint2D:IsCoincident(Point2D(53, 25), 1) then
+--     is_dodgy = true
+--   end
+--   local side_length = side_rail.Length
+--   local blk_material = MaterialBlock()
+--   local converted_Stepover = ConvertUnitsFrom(tool.Stepover,tool,blk_material)
+--   local num_stripes = math.ceil(side_length/ converted_Stepover )
+--   local stripe_shift = (side_length) / num_stripes
+--   local horizontal_distance = (math.abs(start_z - cut_z) / math.tan(angle))
+--   local along_rail = (side_rail.EndPoint2D - side_rail.StartPoint2D):Normalize()
+--   local contours = {}
 
-  -- The normal vector points along the direction we expect
-  local normal_vec = (side_rail.EndPoint2D - side_rail.StartPoint2D):NormalTo()
-  normal_vec:Normalize()
-  normal_vec = (horizontal_distance)*normal_vec
-  if (on_left) then
-    normal_vec = -normal_vec
-  end
+--   -- The normal vector points along the direction we expect
+--   local normal_vec = (side_rail.EndPoint2D - side_rail.StartPoint2D):NormalTo()
+--   normal_vec:Normalize()
+--   normal_vec = (horizontal_distance)*normal_vec
+--   if (on_left) then
+--     normal_vec = -normal_vec
+--   end
 
-  -- iterate over the stripes getting start and end points
-  local contour_group = ContourGroup(true)
-  for i = 1, num_stripes do
-    local start_pt = Point3D(side_rail.StartPoint2D  + (i - 1)*stripe_shift*along_rail, start_z)
-    local end_pt = Point3D(start_pt.x + normal_vec.x, start_pt.y + normal_vec.y, cut_z)
-    local contour = MakeLine(start_pt, end_pt)
-    contour_group:AddTail(contour)
-  end
+--   -- iterate over the stripes getting start and end points
+--   local contour_group = ContourGroup(true)
+--   for i = 1, num_stripes do
+--     local start_pt = Point3D(side_rail.StartPoint2D  + (i - 1)*stripe_shift*along_rail, start_z)
+--     local end_pt = Point3D(start_pt.x + normal_vec.x, start_pt.y + normal_vec.y, cut_z)
+--     local contour = MakeLine(start_pt, end_pt)
+--     contour_group:AddTail(contour)
+--   end
 
-  return contour_group
-end
+--   return contour_group
+-- end
 
---[[  -------------- CalculateToolpathContour --------------------------------------------------  
-|
-|  From a list of rails calculate the toolpath contour
-|
-]]
-function CalculateToolpathContour
-  (
-    rails,        -- a contour group corresponding to one set of rails
-    rad_angle,    -- angle in radians
-    z_depth,      -- z height of cut depth
-    pos_data
-  )
+-- --[[  -------------- CalculateToolpathContour --------------------------------------------------  
+-- |
+-- |  From a list of rails calculate the toolpath contour
+-- |
+-- ]]
+-- function CalculateToolpathContour
+--   (
+--     rails,        -- a contour group corresponding to one set of rails
+--     rad_angle,    -- angle in radians
+--     z_depth,      -- z height of cut depth
+--     pos_data
+--   )
 
-  local toolpath_contour = Contour(0.0)
+--   local toolpath_contour = Contour(0.0)
 
-  if rails.IsEmpty then 
-    return
-  end
+--   if rails.IsEmpty then 
+--     return
+--   end
 
-  -- Add start point at safe z height above start point of first rail
-  local start_pt = Point3D(rails:GetHead().StartPoint2D, pos_data.SafeZ)
-  local lift_z = rails:GetHead().StartPoint3D.z + pos_data.StartZGap
-  toolpath_contour:AppendPoint(start_pt)
+--   -- Add start point at safe z height above start point of first rail
+--   local start_pt = Point3D(rails:GetHead().StartPoint2D, pos_data.SafeZ)
+--   local lift_z = rails:GetHead().StartPoint3D.z + pos_data.StartZGap
+--   toolpath_contour:AppendPoint(start_pt)
 
-  local do_backwards = false
-  local contour_pos = rails:GetHeadPosition()
-  local rail
-  while contour_pos ~= nil do
-    rail, contour_pos = rails:GetNext(contour_pos)
+--   local do_backwards = false
+--   local contour_pos = rails:GetHeadPosition()
+--   local rail
+--   while contour_pos ~= nil do
+--     rail, contour_pos = rails:GetNext(contour_pos)
 
-    if do_backwards then
-      toolpath_contour:LineTo(rail.EndPoint3D)
-      toolpath_contour:LineTo(rail.StartPoint3D)
-    else
-      toolpath_contour:LineTo(rail.StartPoint3D)
-      toolpath_contour:LineTo(rail.EndPoint3D)
-    end
-    do_backwards = not do_backwards
-  end
+--     if do_backwards then
+--       toolpath_contour:LineTo(rail.EndPoint3D)
+--       toolpath_contour:LineTo(rail.StartPoint3D)
+--     else
+--       toolpath_contour:LineTo(rail.StartPoint3D)
+--       toolpath_contour:LineTo(rail.EndPoint3D)
+--     end
+--     do_backwards = not do_backwards
+--   end
 
--- lift to safe z
-  local current_pos = toolpath_contour.EndPoint2D
-  toolpath_contour:LineTo(Point3D(current_pos, pos_data.SafeZ))
+-- -- lift to safe z
+--   local current_pos = toolpath_contour.EndPoint2D
+--   toolpath_contour:LineTo(Point3D(current_pos, pos_data.SafeZ))
 
-  return toolpath_contour
-end
+--   return toolpath_contour
+-- end
 
---[[  -------------- CalculateSideRails --------------------------------------------------  
-|
-|  Calculate the side rails of our contours
-|
-]]
-function CalculateSideRails
-  (
-    vectors,    -- vectors for which we hope to construct side rails
-    depth,      -- depth of the dovetial
-    side_rails, -- side rails
-    is_on_left,  -- list indexing whether a given side rail has its dove tail on its right
-    tool_diam,
-    rad_angle,
-    thickness,
-    allowance
-  )
+-- --[[  -------------- CalculateSideRails --------------------------------------------------  
+-- |
+-- |  Calculate the side rails of our contours
+-- |
+-- ]]
+-- function CalculateSideRails
+--   (
+--     vectors,    -- vectors for which we hope to construct side rails
+--     depth,      -- depth of the dovetial
+--     side_rails, -- side rails
+--     is_on_left,  -- list indexing whether a given side rail has its dove tail on its right
+--     tool_diam,
+--     rad_angle,
+--     thickness,
+--     allowance
+--   )
 
-  for i=1, #vectors do
-    local contour = vectors[i]
-    local right_contour_normal = contour:GetFirstSpan():StartVector(true):NormalTo()
-    local contour_vec = contour:GetFirstSpan():StartVector(true)
-    local horizontal_offset = thickness/ math.tan(rad_angle)
+--   for i=1, #vectors do
+--     local contour = vectors[i]
+--     local right_contour_normal = contour:GetFirstSpan():StartVector(true):NormalTo()
+--     local contour_vec = contour:GetFirstSpan():StartVector(true)
+--     local horizontal_offset = thickness/ math.tan(rad_angle)
 
 
-    local start_start_point = vectors[i].StartPoint2D 
-    - (horizontal_offset + allowance)*contour_vec + 
-    0.5*tool_diam*contour_vec 
-    + allowance*right_contour_normal
+--     local start_start_point = vectors[i].StartPoint2D 
+--     - (horizontal_offset + allowance)*contour_vec + 
+--     0.5*tool_diam*contour_vec 
+--     + allowance*right_contour_normal
 
-    local start_end_point = start_start_point  - (depth+ 2*allowance)*right_contour_normal
-    local start_contour = Contour(0.0)
-    start_contour:AppendPoint(start_start_point)
-    start_contour:LineTo(start_end_point)
-    side_rails[#side_rails + 1] = start_contour
-    is_on_left[#is_on_left +1] = false -- the start side rail has its dove tail on its right
+--     local start_end_point = start_start_point  - (depth+ 2*allowance)*right_contour_normal
+--     local start_contour = Contour(0.0)
+--     start_contour:AppendPoint(start_start_point)
+--     start_contour:LineTo(start_end_point)
+--     side_rails[#side_rails + 1] = start_contour
+--     is_on_left[#is_on_left +1] = false -- the start side rail has its dove tail on its right
 
-    local end_start_point = vectors[i].EndPoint2D 
-    - 0.5*tool_diam*contour_vec 
-    + (horizontal_offset + allowance)*contour_vec +
-    allowance*right_contour_normal
-    local end_end_point = end_start_point - (depth + 2*allowance)*right_contour_normal
-    local end_contour = Contour(0.0)
-    end_contour:AppendPoint(end_start_point)
-    end_contour:LineTo(end_end_point)
-    side_rails[#side_rails + 1] = end_contour
-    is_on_left[#is_on_left +1] = true -- the end side rail has its dove tail on its left  
-  end
+--     local end_start_point = vectors[i].EndPoint2D 
+--     - 0.5*tool_diam*contour_vec 
+--     + (horizontal_offset + allowance)*contour_vec +
+--     allowance*right_contour_normal
+--     local end_end_point = end_start_point - (depth + 2*allowance)*right_contour_normal
+--     local end_contour = Contour(0.0)
+--     end_contour:AppendPoint(end_start_point)
+--     end_contour:LineTo(end_end_point)
+--     side_rails[#side_rails + 1] = end_contour
+--     is_on_left[#is_on_left +1] = true -- the end side rail has its dove tail on its left  
+--   end
 
-end
+-- end
 
 function ConvertUnitsFrom(value, tool, blockmaterial)
 
@@ -2544,104 +2480,104 @@ function ConvertUnitsFrom(value, tool, blockmaterial)
   return value * 25.4     -- caller is in inches but we want mm   
 end
 
-function CreateDoveTailToolpath(markers, dovetail, tool, allowance, warn_user)
+-- function CreateDoveTailToolpath(markers, dovetail, tool, allowance, warn_user)
 
-  if not _tool_ok(tool) then
-    DisplayMessageBox("Dovetail Toolpath: please select a valid tool before continuing.")
-    return false
-  end
+--   if not _tool_ok(tool) then
+--     DisplayMessageBox("Dovetail Toolpath: please select a valid tool before continuing.")
+--     return false
+--   end
 
-  -- Calculate side rails
-  local side_rails = {}
-  local is_on_left = {}
+--   -- Calculate side rails
+--   local side_rails = {}
+--   local is_on_left = {}
 
-  -- Convert tool diameter using the tool passed in (no global 'options'!)
-  local mtl_block = MaterialBlock()
-  local dia = ConvertUnitsFrom(tool.ToolDia, tool, mtl_block)
+--   -- Convert tool diameter using the tool passed in (no global 'options'!)
+--   local mtl_block = MaterialBlock()
+--   local dia = ConvertUnitsFrom(tool.ToolDia, tool, mtl_block)
 
-  CalculateSideRails(
-    markers,
-    dovetail.depth,
-    side_rails,
-    is_on_left,
-    dia,
-    dovetail.angle,
-    math.abs(dovetail.cut_z - dovetail.start_z),
-    allowance
-  )
+--   CalculateSideRails(
+--     markers,
+--     dovetail.depth,
+--     side_rails,
+--     is_on_left,
+--     dia,
+--     dovetail.angle,
+--     math.abs(dovetail.cut_z - dovetail.start_z),
+--     allowance
+--   )
 
-  if #side_rails == 0 then
-    DisplayMessageBox("Unable to create dovetails.")
-    return false
-  end
+--   if #side_rails == 0 then
+--     DisplayMessageBox("Unable to create dovetails.")
+--     return false
+--   end
 
-  -- Build the toolpath contour from rails
-  local contour_group = ContourGroup(true)
-  local pos_data = ToolpathPosData()
+--   -- Build the toolpath contour from rails
+--   local contour_group = ContourGroup(true)
+--   local pos_data = ToolpathPosData()
 
-  for i = 1, #side_rails do
-    local rails = CalculateRails(
-      side_rails[i],
-      dovetail.angle,
-      is_on_left[i],
-      allowance,
-      tool,
-      dovetail.start_z,
-      dovetail.cut_z
-    )
+--   for i = 1, #side_rails do
+--     local rails = CalculateRails(
+--       side_rails[i],
+--       dovetail.angle,
+--       is_on_left[i],
+--       allowance,
+--       tool,
+--       dovetail.start_z,
+--       dovetail.cut_z
+--     )
 
-    local contour = CalculateToolpathContour(
-      rails,
-      dovetail.angle,
-      dovetail.cut_z,
-      pos_data
-    )
+--     local contour = CalculateToolpathContour(
+--       rails,
+--       dovetail.angle,
+--       dovetail.cut_z,
+--       pos_data
+--     )
 
-    if contour ~= nil then
-      contour_group:AddTail(contour)
-    end
-  end
+--     if contour ~= nil then
+--       contour_group:AddTail(contour)
+--     end
+--   end
 
-  -- Emit external toolpath
-  if contour_group.IsEmpty then
-    DisplayMessageBox("No dovetails created.")
-    return false
-  end
+--   -- Emit external toolpath
+--   if contour_group.IsEmpty then
+--     DisplayMessageBox("No dovetails created.")
+--     return false
+--   end
 
-  local toolpath_options = ExternalToolpathOptions()
-  toolpath_options.StartDepth = dovetail.start_z
-  toolpath_options.CreatePreview = true
+--   local toolpath_options = ExternalToolpathOptions()
+--   toolpath_options.StartDepth = dovetail.start_z
+--   toolpath_options.CreatePreview = true
 
-  -- Name the toolpath clearly
-  local tp_name = "Dovetail (External)"
+--   -- Name the toolpath clearly
+--   local tp_name = "Dovetail (External)"
 
-  local toolpath = ExternalToolpath(
-    tp_name,
-    tool,
-    pos_data,
-    toolpath_options,
-    contour_group
-  )
+--   local toolpath = ExternalToolpath(
+--     tp_name,
+--     tool,
+--     pos_data,
+--     toolpath_options,
+--     contour_group
+--   )
 
-  if toolpath:Error() then
-    DisplayMessageBox("Error creating toolpath.")
-    return true
-  end
+--   if toolpath:Error() then
+--     DisplayMessageBox("Error creating toolpath.")
+--     return true
+--   end
 
-  local toolpath_manager = ToolpathManager()
-  toolpath_manager:AddExternalToolpath(toolpath)
+--   local toolpath_manager = ToolpathManager()
+--   toolpath_manager:AddExternalToolpath(toolpath)
 
--- *** NEW: warning message ***
--- Show the warning only if requested
-  if warn_user then
-    DisplayMessageBox(
-      "Dovetail Toolpath Notice:\n\n"
-      .. "This Dovetail Toolpath is created as an *External Toolpath* by the Gadget.\n"
-      .. "External toolpaths CANNOT be recalculated in VCarve/Aspire.\n\n"
-      .. "If user moves the cectors (e.g., center on material) and needs this Toolpath Again:\n"
-      .. "  • The User will Need to Re-Run this Gadget after proper planning is achieved.\n\n"
-      .. "Tip: Plan vector placement before running the Box Creator Gadget."
-    )
-  end
-end
+-- -- *** NEW: warning message ***
+-- -- Show the warning only if requested
+--   if warn_user then
+--     DisplayMessageBox(
+--       "Dovetail Toolpath Notice:\n\n"
+--       .. "This Dovetail Toolpath is created as an *External Toolpath* by the Gadget.\n"
+--       .. "External toolpaths CANNOT be recalculated in VCarve/Aspire.\n\n"
+--       .. "If user moves the cectors (e.g., center on material) and needs this Toolpath Again:\n"
+--       .. "  • The User will Need to Re-Run this Gadget after proper planning is achieved.\n\n"
+--       .. "Tip: Plan vector placement before running the Box Creator Gadget."
+--     )
+--   end
+-- end
 
