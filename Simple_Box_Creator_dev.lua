@@ -536,6 +536,57 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
   dialog:AddTextField("UnitsLabel", units_string)
 
+  -- Helpers for the geometry-validation messages below: given the inner
+  -- dimension(s) a joint width has to divide into, suggest a width that
+  -- would actually work, so the error message tells the user what to try
+  -- instead of just what's wrong.
+
+  -- Largest width that still fits at least one flap across every given
+  -- inner dimension (used when the current width is too big).
+  local function SuggestSmallerJointWidth(inner_dims)
+    local max_width = math.huge
+    for _, inner_dim in ipairs(inner_dims) do
+      max_width = math.min(max_width, 0.5 * inner_dim)
+    end
+    return truncate(math.max(max_width - 0.001, 0), 3)
+  end
+
+  -- Smallest width above current_width that leaves at least required_space
+  -- of clearance across every given inner dimension (used when the current
+  -- width is too small, or the tool won't fit between the joints). Searches
+  -- using the same formula the validator itself uses below, so the
+  -- suggestion is guaranteed self-consistent.
+  local function SuggestLargerJointWidth(current_width, inner_dims, required_space)
+    local step = options.InMM and 0.1 or 0.005
+    local max_search_width = 0
+    for _, inner_dim in ipairs(inner_dims) do
+      max_search_width = math.max(max_search_width, inner_dim)
+    end
+    max_search_width = 2 * max_search_width
+
+    local w = current_width
+    while w <= max_search_width do
+      w = w + step
+      local fits = true
+      for _, inner_dim in ipairs(inner_dims) do
+        local num_flaps = math.floor(0.5 * inner_dim / w)
+        if num_flaps < 1 then
+          fits = false
+          break
+        end
+        local tab_space = (inner_dim - num_flaps * w) / (num_flaps + 1)
+        if tab_space <= required_space then
+          fits = false
+          break
+        end
+      end
+      if fits then
+        return truncate(w, 3)
+      end
+    end
+    return nil
+  end
+
   local validator = function(dialog)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
@@ -607,37 +658,43 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     if (options.bottomType == FaceJointType.Fingers) then
       if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
+        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
+        local suggestion_text = string.format(" Try a joint width of %.3f or smaller.", suggested)
         if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.", bottomDoveTail.min_width, inner_width))
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
         else
-          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.", bottomDoveTail.min_width, inner_width))
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
         end
         return false
       end
 
       if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
+        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
+        local suggestion_text = string.format(" Try a joint width of %.3f or smaller.", suggested)
         if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
+          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
         else
-          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.", bottomDoveTail.min_width, inner_depth))
+          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
         end
         return false
       end
     end
 
-    local num_flaps_w_top = math.floor((0.5*inner_width) / lidDoveTail.min_width)
-    local total_tab_space_w_top = (inner_width - num_flaps_w_top*lidDoveTail.min_width)
-    local num_flaps_d_top = math.floor((0.5*inner_depth) / lidDoveTail.min_width)
-    local total_tab_space_d_top = (inner_depth - num_flaps_d_top*lidDoveTail.min_width)
+    local num_flaps_w_lid = math.floor((0.5*inner_width) / lidDoveTail.min_width)
+    local total_tab_space_w_lid = (inner_width - num_flaps_w_lid*lidDoveTail.min_width)
+    local num_flaps_d_lid = math.floor((0.5*inner_depth) / lidDoveTail.min_width)
+    local total_tab_space_d_lid = (inner_depth - num_flaps_d_lid*lidDoveTail.min_width)
 
     -- check the joint widths only when making a tabbed lid
     if (options.lidType == FaceJointType.Fingers) then
-      if (num_flaps_w_top < 1) or (total_tab_space_w_top < 0) then
-        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f.", lidDoveTail.min_width, inner_width))
+      if (num_flaps_w_lid < 1) or (total_tab_space_w_lid < 0) then
+        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f. Try a joint width of %.3f or smaller.", lidDoveTail.min_width, inner_width, suggested))
         return false
       end
-      if (num_flaps_d_top < 1) or (total_tab_space_d_top < 0) then
-        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f.", lidDoveTail.min_width, inner_depth)) 
+      if (num_flaps_d_lid < 1) or (total_tab_space_d_lid < 0) then
+        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
+        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f. Try a joint width of %.3f or smaller.", lidDoveTail.min_width, inner_depth, suggested))
         return false
       end
     end
@@ -646,7 +703,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local total_tab_space_h = (inner_height - num_flaps_h*sideDoveTail.min_width)
 
     if (num_flaps_h < 1) or (total_tab_space_h < 0) then
-      DisplayMessageBox(string.format("The side joint width %.3f is too big given box inner height is %.3f.", sideDoveTail.min_width, inner_height))
+      local suggested = SuggestSmallerJointWidth({inner_height})
+      DisplayMessageBox(string.format("The side joint width %.3f is too big given box inner height is %.3f. Try a joint width of %.3f or smaller.", sideDoveTail.min_width, inner_height, suggested))
       return false
     end
 
@@ -669,8 +727,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     
     local tab_space_w_bottom = total_tab_space_w_bottom / (num_flaps_w_bottom + 1)
     local tab_space_d_bottom = total_tab_space_d_bottom / (num_flaps_d_bottom + 1)
-    local tab_space_w_top = total_tab_space_w_top / (num_flaps_w_top + 1)
-    local tab_space_d_top = total_tab_space_d_top / (num_flaps_d_top + 1)
+    local tab_space_w_lid = total_tab_space_w_lid / (num_flaps_w_lid + 1)
+    local tab_space_d_lid = total_tab_space_d_lid / (num_flaps_d_lid + 1)
     local tab_space_h = total_tab_space_h / (num_flaps_h + 1)
 
     if options.dovetailJoint then
@@ -679,69 +737,90 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local bottom_min_space = bottomDoveTail.max_width - bottomDoveTail.min_width
       local top_min_space = lidDoveTail.max_width - lidDoveTail.min_width
 
+      -- A mathematically exact fit is not sufficient for Vectric's offset engine.
+      -- Keep 0.010 inch (0.254 mm) extra clearance so near-tangent CutOut
+      -- offsets do not create an invalid or incomplete toolpath. Computed up
+      -- here (rather than just before it's first needed below) so the
+      -- "too small" checks right after can also use it to suggest a width
+      -- that will actually let the tool fit, not just clear the dovetails.
+      local toolpath_safety_clearance = options.InMM and 0.254 or 0.010
+      local required_side_space = min_space + dia + toolpath_safety_clearance
+      local required_bottom_space = bottom_min_space + dia + toolpath_safety_clearance
+      local required_lid_space = top_min_space + dia + toolpath_safety_clearance
+
       -- make sure dovetails don't overlap
       if (options.bottomType == FaceJointType.Fingers) and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
-        DisplayMessageBox("The joint width is too small for the bottom.")
+        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The joint width is too small for the bottom." .. suggestion_text)
         return false
-      end      
+      end
 
-      if (tab_space_h <= min_space) then        
-        DisplayMessageBox("The joint width is too small for the side.")
+      if (tab_space_h <= min_space) then
+        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The joint width is too small for the side." .. suggestion_text)
         return false
       end
 
       if (options.lidType == FaceJointType.Fingers) then
-        if (tab_space_w_top <= top_min_space) or (tab_space_d_top <= top_min_space) then
-          DisplayMessageBox("The joint width is too small for the lid.")
+        if (tab_space_w_lid <= top_min_space) or (tab_space_d_lid <= top_min_space) then
+          local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
+          local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+          DisplayMessageBox("The joint width is too small for the lid." .. suggestion_text)
           return false
         end
       end
 
-      -- A mathematically exact fit is not sufficient for Vectric's offset engine.
-      -- Keep 0.010 inch (0.254 mm) extra clearance so near-tangent CutOut
-      -- offsets do not create an invalid or incomplete toolpath.
-      local toolpath_safety_clearance = options.InMM and 0.254 or 0.010
-      local required_side_space = min_space + dia + toolpath_safety_clearance
-      local required_bottom_space = bottom_min_space + dia + toolpath_safety_clearance
-      local required_top_space = top_min_space + dia + toolpath_safety_clearance
-
       if (tab_space_h <= required_side_space) then
-        DisplayMessageBox("The selected tool will not fit between the side joints.")
+        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
-      end  
-      if (tab_space_w_bottom <= bottom_min_space) or 
-         (tab_space_d_bottom <= bottom_min_space) or 
-         ((options.bottomType == FaceJointType.Fingers) and 
-           ((tab_space_w_bottom <= (required_bottom_space)) or (tab_space_d_bottom <= (required_bottom_space)))) then        
-        DisplayMessageBox("The selected tool will not fit between the bottom joints.")
+      end
+      if (tab_space_w_bottom <= bottom_min_space) or
+         (tab_space_d_bottom <= bottom_min_space) or
+         ((options.bottomType == FaceJointType.Fingers) and
+           ((tab_space_w_bottom <= (required_bottom_space)) or (tab_space_d_bottom <= (required_bottom_space)))) then
+        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
-      end  
+      end
 
-      if (tab_space_w_top <= top_min_space) or 
-         (tab_space_d_top <= top_min_space) or 
-         ((options.lidType == FaceJointType.Fingers) and 
-           ((tab_space_w_top <= (required_top_space)) or (tab_space_d_top <= (required_top_space)))) then
-        DisplayMessageBox("The selected tool will not fit between the lid joints.")
+      if (tab_space_w_lid <= top_min_space) or
+         (tab_space_d_lid <= top_min_space) or
+         ((options.lidType == FaceJointType.Fingers) and
+           ((tab_space_w_lid <= (required_lid_space)) or (tab_space_d_lid <= (required_lid_space)))) then
+        local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
         return false
-      end  
+      end
     else
       -- Gremlin added bottomDoveTail seperation from side
       tab_space_w_bottom = math.min(tab_space_w_bottom, bottomDoveTail.min_width)
       tab_space_d_bottom = math.min(tab_space_d_bottom, bottomDoveTail.min_width)
-      tab_space_w_top = math.min(tab_space_w_top, lidDoveTail.min_width)
-      tab_space_d_top = math.min(tab_space_d_top, lidDoveTail.min_width)
+      tab_space_w_lid = math.min(tab_space_w_lid, lidDoveTail.min_width)
+      tab_space_d_lid = math.min(tab_space_d_lid, lidDoveTail.min_width)
       tab_space_h = math.min(tab_space_h, sideDoveTail.min_width)
-      if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then        
-        DisplayMessageBox("The selected tool will not fit between the bottom joints.")
+      if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then
+        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, dia)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
-      if (tab_space_h <= dia) then        
-        DisplayMessageBox("The selected tool will not fit between the side joints.")
+      if (tab_space_h <= dia) then
+        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, dia)
+        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
-      end 
+      end
       if (options.useAllJointWidths and options.lidType == FaceJointType.Fingers and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
-        if (tab_space_w_top <= dia) or (tab_space_d_top <= dia) then        
-          DisplayMessageBox("The selected tool will not fit between the lid joints.")
+        if (tab_space_w_lid <= dia) or (tab_space_d_lid <= dia) then
+          local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, dia)
+          local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
+          DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
           return false
         end
       end
