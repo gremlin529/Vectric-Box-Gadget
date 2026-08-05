@@ -7,12 +7,42 @@ param (
 Write-Host ""
 Write-Host ""
 
+# Remember the last version/subversion used, so they can be suggested next time.
+$releaseVerFile = "ReleaseVer.txt"
+
+$lastVersion = $null
+$lastSubversion = $null
+if (Test-Path $releaseVerFile) {
+    foreach ($line in Get-Content -Path $releaseVerFile) {
+        if ($line -match '^Version=(.*)$') { $lastVersion = $Matches[1] }
+        elseif ($line -match '^SubVersion=(.*)$') { $lastSubversion = $Matches[1] }
+    }
+    if ($lastVersion) {
+        Write-Host "Last release: version '$lastVersion', subversion '$lastSubversion'"
+    }
+}
+
+function Save-ReleaseVer {
+    param (
+        [string]$filePath,
+        [string]$version,
+        [string]$subversion
+    )
+    "Version=$version", "SubVersion=$subversion" | Set-Content -Path $filePath
+}
+
 if ($version) {
     Write-Host "Version provided as argument: $version"
 }
 else {
-    # Prompt user for new version
-    $version = Read-Host "Enter the new version (e.g., 5.7)"
+    # Prompt user for new version, suggesting the last one used if there is one
+    if ($lastVersion) {
+        $versionInput = Read-Host "Enter the new version (e.g., 5.7) [$lastVersion]"
+        $version = if ([string]::IsNullOrWhiteSpace($versionInput)) { $lastVersion } else { $versionInput }
+    }
+    else {
+        $version = Read-Host "Enter the new version (e.g., 5.7)"
+    }
     if (-not $version -match '^\d+(\.\d+)*$') {
         Write-Error "Invalid version format. Use numbers and dots only (e.g., 5.7, 6.0.1)."
         exit 1
@@ -23,9 +53,18 @@ if ($subversion) {
     Write-Host "Subversion provided as argument: $subversion"
 }
 else {
-    # Prompt user for subversion string - this is optional, press Enter to leave empty
-    $subversion = Read-Host "Enter the subversion string, or press Enter to leave empty (e.g., beta1, rc2)"
+    # Prompt user for subversion string - this is optional, press Enter to reuse
+    # the last one used (if any), or to leave it empty if there wasn't one
+    if ($lastSubversion) {
+        $subversionInput = Read-Host "Enter the subversion string, or press Enter to reuse the last value (e.g., beta1, rc2) [$lastSubversion]"
+        $subversion = if ([string]::IsNullOrWhiteSpace($subversionInput)) { $lastSubversion } else { $subversionInput }
+    }
+    else {
+        $subversion = Read-Host "Enter the subversion string, or press Enter to leave empty (e.g., beta1, rc2)"
+    }
 }
+
+Save-ReleaseVer -filePath $releaseVerFile -version $version -subversion $subversion
 
 # Files to include in the release ZIP (relative or absolute paths)
 $moduleToCreate = "Simple_Box_Creator"

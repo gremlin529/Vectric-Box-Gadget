@@ -18,7 +18,7 @@ FaceType = {
   Bottom = 1,
   Lid = 2,
   Side = 3,
-  End =4
+  End = 4
 }
 
 local unit_x = Vector2D(1,0)
@@ -26,6 +26,16 @@ local unit_y = Vector2D(0,1)
 
 -- ---------- VALIDATION HELPERS ----------
 
+function ThicknessForFaceType(faceType, thickness)
+  if (faceType == FaceJointType.None) then -- No lid or bottom, inner height isn't reduced
+    return 0
+  elseif (faceType == FaceJointType.Inset) then -- if Inset than the inner height is reduced by half the thickness of the material
+    return 0.5 * thickness
+  end 
+  -- if Flat or Fingers than the inner height is reduced by the thickness of the material
+  return thickness
+end
+  
 function faceJointTypeToString( joint )
   for k, v in pairs(FaceJointType) do
     if (v == joint) then
@@ -33,14 +43,6 @@ function faceJointTypeToString( joint )
     end
   end
   return ""
-end
-
-function enumToTypeName(enumValue)
-    if typeof(enumValue) ~= "EnumItem" then
-        error("Expected EnumItem, got " .. typeof(enumValue))
-    end
-
-    return enumValue.EnumType.Name
 end
 
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
@@ -52,7 +54,7 @@ function _tool_ok(tool)
   return (dia or 0) > 0
 end
 
-function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets)
+function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets, fingerSides)
   local obj ={}
   obj.name = name
   obj.tabs = tabs
@@ -62,7 +64,16 @@ function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jo
   obj.inset_contours = inset_contours -- used for an inset lid or bottom the contour for the rabbet
   obj.dovetail_list = dovetails
   obj.flute_sockets = flute_sockets or {}
+  obj.fingerSides = fingerSides or nil
   return obj
+end
+
+-- Apply only the linear (rotation/scale) part of a transform to a direction
+-- vector, so a pure translation leaves it unchanged.
+function TransformVector2D(xform, v)
+  local origin = xform * Point2D(0.0, 0.0)
+  local tip    = xform * Point2D(v.x, v.y)
+  return Vector2D(tip.x - origin.x, tip.y - origin.y)
 end
 
 function TransformFace(face, xform)
@@ -86,33 +97,27 @@ function TransformFace(face, xform)
     face.tabs[i] =  xform * face.tabs[i]
   end
 
+  -- Transform the finger sides
+  if (face.fingerSides ~= nil)then
+    face.fingerSides:Transform(xform)
+  end
+
+  -- Transform the flute sockets. The socket owns its points and vectors
+  -- (see AddFemaleDoveTailsAlongLine) so they must be moved explicitly.
+  -- The direction vectors only take the rotation part of the transform.
   if face.flute_sockets then
     for i = 1, #face.flute_sockets do
       local socket = face.flute_sockets[i]
 
-      -- Recalculate along from transformed points.
-      socket.along = socket.end_pt - socket.start_pt
-      socket.along:Normalize()
+      socket.start_pt = xform * socket.start_pt
+      socket.end_pt   = xform * socket.end_pt
 
-      -- Do NOT recalculate socket.out here.
-      -- ArrangeContours uses translation only, so original socket.out remains valid.
+      socket.along = TransformVector2D(xform, socket.along)
+      socket.out   = TransformVector2D(xform, socket.out)
+      socket.along:Normalize()
+      socket.out:Normalize()
     end
   end
-end
-
-function CloneFace(face)
-  local clone = {}
-  clone.contour = face.contour:Clone()
-  clone.dovetail_list = face.dovetail_list
-  clone.tabs = face.tabs
-  clone.name = face.name
-  clone.facetype = face.facetype
-  clone.jointtype = face.jointtype
-  clone.flute_sockets = face.flute_sockets
-  if (face.inset_contours ~= nil) then
-    clone.inset_contours = face.inset_contours:Clone()
-  end
-  return clone
 end
 
 function GetAllProfileContours(faces)
@@ -133,15 +138,17 @@ function GetAllProfileCadContours(faces)
   return cad_object_list
 end
 
-function GetAllMarkers(faces)
-  local markers = {}
+-- we actually want to group each side and return a list of groups
+-- that somehow we then want to add.
+-- each fingerSides on a face is a ContourGroup
+function GetAllFingerSides(faces)
+  fingerSideArray = {}
   for i=1,#faces do
-    local cur_markers = faces[i].dovetail_list
-    for j=1,#cur_markers do
-      markers[#markers+1] = cur_markers[j]
+    if (faces[i].fingerSides ~= nil) then
+      fingerSideArray[#fingerSideArray + 1] = faces[i].fingerSides:Clone()
     end
   end
-  return markers;
+  return fingerSideArray
 end
 
 function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
@@ -166,11 +173,8 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
     end
   end
 
-  AddCadListToJob(job, cad_object_list, layer_name)
-  local layer = job.LayerManager:FindLayerWithName(layer_name)
-  local selection = job.Selection
-  selection:Clear()
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
+  SelectExactObjects(job, pocket_objects)
 
   local pos_data = ToolpathPosData()
   local pocket_data = PocketParameterData()
@@ -202,40 +206,20 @@ end
 |  Adds a group of contours to a job
 |
 ]]
-function AddGroupToJob(vectric_job, group, layer_name, create_group)
-  --  create a CadObject to represent the  group 
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  if create_group then
-    local cad_object = CreateCadGroup(group);   -- and add our object to it
-    layer:AddObject(cad_object, true)
-    return
-  end
+function AddGroupToJob(job, group, layer_name)
+     --  create a CadObject to represent the  group
+   local cad_object = CreateCadGroup(group);
+   
+   -- create a layer with passed name if it doesnt already exist
+   local layer = job.LayerManager:GetLayerWithName(layer_name)
 
-  local cad_contour
-  local contour
-  local pos = group:GetHeadPosition()
-  while pos ~= nil do
-    contour, pos = group:GetNext(pos)
-    cad_contour = CreateCadContour(contour)
-    layer:AddObject(cad_contour, true)
-  end
-
+   -- and add our object to it
+   layer:AddObject(cad_object, true)
+   
+   return cad_object
 end
-
---[[  -------------- AddCadContourToJob --------------------------------------------------  
-|
-|  Adds a group of contours to a job
-|
-]]
-function AddCadContourToJob(vectric_job, cad_contour, layer_name)
-  --  create a CadObject to represent the group
-  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
-  if cad_contour and layer then
-    layer:AddObject(cad_contour, true)
-  end
-end   
-
---[[  -------------- AddCadContourToJob --------------------------------------------------  
+   
+--[[  -------------- AddCadListToJob --------------------------------------------------  
 |
 |  Adds a group of contours to a job
 |
@@ -243,13 +227,17 @@ end
 function AddCadListToJob(vectric_job, cad_list, layer_name)
 
   --  create a CadObject to represent the group
+  local added_objects = {}
   local pos = cad_list:GetHeadPosition()
   local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
   while (pos) do
     local obj
     obj, pos = cad_list:GetNext(pos)
-    layer:AddObject(obj:Clone(), true)
+    local cloned_obj = obj:Clone()
+    layer:AddObject(cloned_obj, true)
+    added_objects[#added_objects + 1] = cloned_obj
   end
+  return added_objects
 end
 
 function GetFriendlyFaceLabel(face)
@@ -517,6 +505,7 @@ function GetFriendlyFaceLabel(face)
     local outer_brc = start_point  + width*Vector2D(1,0)
     local outer_trc = outer_brc + height*Vector2D(0,1)
     local outer_tlc = start_point + height*Vector2D(0, 1)
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     -- // Width and height of interior rectangle
     local inner_width = width - 2*thickness
@@ -543,7 +532,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, 
+                                   tab_space_w, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -557,7 +547,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end1) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, 
+                                    tab_space_h, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -571,7 +562,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.side2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_w)*(-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, 
+                                    tab_space_w, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -585,7 +577,8 @@ function GetFriendlyFaceLabel(face)
     if ((create_tabs_for_missing_faces or facesToMake.end2) and bottomType == FaceJointType.Fingers) then
       LineToVector(contour, (thickness + tab_space_h)*(-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, 
+                                    tab_space_h, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(outer_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -600,18 +593,19 @@ function GetFriendlyFaceLabel(face)
       create_tabs_for_missing_faces, name, FaceType.Bottom,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets, fingerSides)
   end
 
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
-  function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
+  function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint, 
       lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name)
 
     local dovetail_markers = {}
     local tablist = {}
     local inner_start_point = start_point + Vector2D(thickness, thickness)
     local inner_width  = width - 2*thickness
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     -- inner height is the inside height of the box,
     -- or the distance before the fingers
@@ -676,10 +670,10 @@ function GetFriendlyFaceLabel(face)
       -- in this case the bottom edge has tabs and starts at thickness, thickness
       LineToVector(contour, tab_space_bottom*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
       else
-        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom, fingerSides)
       end
       contour:LineTo(inner_brc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -689,10 +683,10 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForRightFace) then
       LineToVector(contour, tab_space_side*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if with_tails then
-        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side )
+      if dovetailJoint then
+        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side)
+        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side, fingerSides)
       end
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -718,10 +712,10 @@ function GetFriendlyFaceLabel(face)
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, topdovetail, -unit_x, unit_y, contour, num_flaps_top, tab_space_top)
       else
-        AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top)
+        AddFlapsAlongLine(thickness, topdovetail.min_width, tab_space_top, -unit_x, unit_y, contour, num_flaps_top, fingerSides)
       end
       contour:LineTo(inner_tlc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -731,10 +725,10 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForLeftFace) then
       LineToVector(contour, -tab_space_side*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side)
+        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side, fingerSides)
       end
       contour:LineTo(inner_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -745,17 +739,18 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides)
   end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
-  function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, with_tails, 
+  function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint, 
       lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name)
 
     local tablist = {}
     local dovetail_markers = {}
     local flute_sockets = {}
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
 
     local bottom_thickness = 0
     if (bottomType == FaceJointType.None) then
@@ -811,10 +806,10 @@ function GetFriendlyFaceLabel(face)
     else
       LineToVector(contour, (tab_space_bottom + thickness)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
-      if (with_tails) then
+      if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour, num_flaps_bottom, tab_space_bottom)
       else
-        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom)
+        AddFlapsAlongLine(thickness, bottomdovetail.min_width, tab_space_bottom, unit_x, -unit_y, contour, num_flaps_bottom, fingerSides)
       end
       contour:LineTo(inner_brc)
     end
@@ -824,7 +819,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForRightEnd) then
       LineToVector(contour,  (tab_space_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -844,7 +839,7 @@ function GetFriendlyFaceLabel(face)
       LineToVector(contour, (tab_space_top + thickness) * (-unit_x))
       AddMiddleOfLastSpanToList(contour, tablist)
 
-      if with_tails then
+      if dovetailJoint then
         AddMaleDoveTailsAlongLine(thickness,
           topdovetail,
           -unit_x,
@@ -861,7 +856,8 @@ function GetFriendlyFaceLabel(face)
           -unit_x,
           unit_y,
           contour,
-          num_flaps_top
+          num_flaps_top,
+          fingerSides
         )
       end
 
@@ -873,7 +869,7 @@ function GetFriendlyFaceLabel(face)
     if (makeTabsForLeftEnd) then
       LineToVector(contour, (tab_space_side*-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
       LineToVector(contour, (tab_space_side*-unit_y))
@@ -882,10 +878,11 @@ function GetFriendlyFaceLabel(face)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides)
   end
 
-  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, markers, flute_sockets)
+  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist, 
+                                         markers, flute_sockets, fingerSides)
     for i=1,num_tails do
       local start_pos = contour.EndPoint2D
       AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
@@ -893,14 +890,30 @@ function GetFriendlyFaceLabel(face)
         markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D)
       end
       if flute_sockets then
+        -- Take our own copies. The points must not alias the contour and the
+        -- vectors must not alias the shared unit_x / unit_y globals, because
+        -- TransformFace rotates them in place when a face is nested rotated.
+        local end_pos = contour.EndPoint2D
         flute_sockets[#flute_sockets + 1] = {
-          start_pt  = start_pos,
-          end_pt    = contour.EndPoint2D,
-          along     = along,
-          out       = out,
+          start_pt  = Point2D(start_pos.x, start_pos.y),
+          end_pt    = Point2D(end_pos.x, end_pos.y),
+          along     = Vector2D(along.x, along.y),
+          out       = Vector2D(out.x, out.y),
           thickness = thickness,
           angle     = dovetail.angle
         }
+      end
+      if fingerSides then
+        -- add the first side of the finger to the fingerSides contour group
+        local end_vector = thickness*out
+        local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+        local fingerSide = MakeLine(start_pos, end_pt)
+        fingerSides:AddTail(fingerSide)
+        -- now add the second side of the finger to the fingerSides contour group
+        local second_side_start = Point2D(end_pt.x + dovetail.min_width*along.x, end_pt.y + dovetail.min_width*along.y)
+        local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+        local secondFingerSide = MakeLine(second_side_start, second_side_end)
+        fingerSides:AddTail(secondFingerSide)
       end
       LineToVector(contour, space_dist*along)
     end
@@ -915,9 +928,9 @@ function GetFriendlyFaceLabel(face)
 
   end
 
-  function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps)
+  function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps, fingerSides)
     for i=1,num_flaps do
-      AddFemaleDoveTail(flap_height, flap_width, out, along, contour)
+      AddFemaleDoveTail(flap_height, flap_width, out, along, contour, fingerSides)
       LineToVector(contour, space_dist*along)
     end
   end
@@ -938,7 +951,20 @@ function GetFriendlyFaceLabel(face)
   end
 
 -- Add a flap
-  function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour)
+  function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour, fingerSides)
+    if fingerSides then 
+      -- add the first side of the finger to the fingerSides contour group
+      local start_pos = contour.EndPoint2D
+      local end_vector = thickness*perp_vec
+      local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+      local fingerSide = MakeLine(start_pos, end_pt)
+      fingerSides:AddTail(fingerSide)
+      -- now add the second side of the finger to the fingerSides contour group
+      local second_side_start = Point2D(end_pt.x + tab_width*along_vec.x, end_pt.y + tab_width*along_vec.y)
+      local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+      local secondFingerSide = MakeLine(second_side_start, second_side_end)
+      fingerSides:AddTail(secondFingerSide)
+    end
     LineToVector(contour, thickness*perp_vec)
     LineToVector(contour, tab_width*along_vec)
     LineToVector(contour, thickness*(-perp_vec))
@@ -973,9 +999,10 @@ function GetFriendlyFaceLabel(face)
     return result
   end
 
-  -- MakeInsetCountours will return a contour group of up which
-  -- defines the rabbet for inset lids or bottoms taking into account
-  -- if there are any missing faces which should not be rabbetted
+  --[[ MakeInsetCountours will return a contour group of up which
+  |    defines the rabbet for inset lids or bottoms taking into account
+  |    if there are any missing faces which should not be rabbetted
+  ]]
   function MakeInsetContours(width, height, thickness, start_point, facesToMake, 
       create_tabs_for_missing_faces, name, facetype,
       inner_width, inner_height)
@@ -1130,6 +1157,8 @@ function GetFriendlyFaceLabel(face)
     local tab_space_w = (inner_width - num_flaps_w*tab_width) / (num_flaps_w + 1)
     local tab_space_h = (inner_height - num_flaps_h*tab_width) / (num_flaps_h + 1)
 
+    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
+
     local contour = Contour(0.0)
     if (not noLidTabs) then
       contour:AppendPoint(start_point)
@@ -1141,7 +1170,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_x, unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, unit_x, unit_y, contour, num_flaps_w, fingerSides)
         end
         contour:LineTo(outer_brc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1159,7 +1188,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, unit_y, -unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, unit_y, -unit_x, contour, num_flaps_h, fingerSides)
         end
         contour:LineTo(outer_trc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1177,7 +1206,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_x, -unit_y, contour, num_flaps_w, tab_space_w, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_w, -unit_x, -unit_y, contour, num_flaps_w, fingerSides)
         end
         contour:LineTo(outer_tlc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1195,7 +1224,7 @@ function GetFriendlyFaceLabel(face)
         if use_dovetails then
           AddFemaleDoveTailsAlongLine(thickness, dovetail, -unit_y, unit_x, contour, num_flaps_h, tab_space_h, dovetail_markers, flute_sockets)
         else
-          AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h)
+          AddFlapsAlongLine(thickness, tab_width, tab_space_h, -unit_y, unit_x, contour, num_flaps_h, fingerSides)
         end
         contour:LineTo(outer_blc)
         AddMiddleOfLastSpanToList(contour, tablist)
@@ -1227,16 +1256,20 @@ function GetFriendlyFaceLabel(face)
       create_tabs_for_missing_faces, name, FaceType.Lid,
       inner_width, inner_height)
 
-    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets)
+    return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets, fingerSides)
   end
 
 
---[[  -------------- ArrangeContours --------------------------------------------------  
+--[[  -------------- ArrangeContours --------------------------------------------------
 |
-| Arrange the contours
-| NEW: Always lays out ALL faces, even if they extend beyond the
-|      current job size. This lets the user adjust the job size
-|      afterwards instead of aborting with an error.
+|  Best-effort single-sheet layout, using the same shelf packing and rotation
+|  as ArrangeContoursToSheets, but restricted to one sheet. Faces are placed
+|  largest first, trying both the original and a 90 degree rotated orientation
+|  so pieces backfill gaps rather than wasting space.
+|
+|  A face that doesn't fit within the material at all (even rotated) is still
+|  stacked above the rest and returned rather than aborting, so it overhangs
+|  the sheet and the user can adjust the job size or move it afterwards.
 |
 ]]
   function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin)
@@ -1247,43 +1280,338 @@ function GetFriendlyFaceLabel(face)
       return transformed_faces
     end
 
-    -- Simple row/column layout
-    local x_cursor   = edge_margin
-    local y_cursor   = edge_margin
-    local row_height = 0
+    local usable_right = job_width - edge_margin
+    local usable_top   = job_height - edge_margin
 
+    -- Place the biggest faces first so the small ones can backfill around them.
+    -- This only changes the order we place in; the faces are returned in their
+    -- original order so everything downstream is unaffected.
+    local order = {}
     for i = 1, #faces do
-      local face   = faces[i]
+      local bounds = faces[i].contour.BoundingBox2D
+      order[#order + 1] = {
+        index = i,
+        long  = math.max(bounds.XLength, bounds.YLength),
+        short = math.min(bounds.XLength, bounds.YLength)
+      }
+    end
+
+    table.sort(order, function(a, b)
+      if a.long ~= b.long then return a.long > b.long end
+      if a.short ~= b.short then return a.short > b.short end
+      return a.index < b.index
+    end)
+
+    local sheet = { shelves = {} }
+
+    for i = 1, #order do
+      local face = faces[order[i].index]
       local bounds = face.contour.BoundingBox2D
-      local width  = bounds.XLength
+      local width = bounds.XLength
       local height = bounds.YLength
 
-      -- If we would run past the row width, wrap to a new row.
-      -- NOTE: we do NOT abort if we run past the job height; vectors
-      --       are still created, even if they extend outside the material.
-      if (x_cursor > edge_margin)
-      and (x_cursor + width + clearance_gap) > (job_width - edge_margin) then
-        x_cursor   = edge_margin
-        y_cursor   = y_cursor + row_height + clearance_gap
-        row_height = 0
+      local x, y, shelf = SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet, height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
       end
 
-      -- Position so the face's lower-left corner sits at (x_cursor, y_cursor)
-      local dx = x_cursor - bounds.MinX
-      local dy = y_cursor - bounds.MinY
-      local xform = TranslationMatrix2D(Vector2D(dx, dy))
-      TransformFace(face, xform)
-
-      transformed_faces[#transformed_faces + 1] = face
-
-      x_cursor   = x_cursor + width + clearance_gap
-      if height > row_height then
-        row_height = height
+      if x == nil then
+        -- Nothing fits within the material, even rotated. Stack it above
+        -- everything else and let it overhang rather than failing.
+        local new_y = edge_margin
+        if #sheet.shelves > 0 then
+          local top = sheet.shelves[#sheet.shelves]
+          new_y = top.y + top.height + clearance_gap
+        end
+        shelf = { y = new_y, height = height, x_cursor = edge_margin + width + clearance_gap }
+        sheet.shelves[#sheet.shelves + 1] = shelf
+        x, y = edge_margin, new_y
+        rotated = false
       end
+
+      local placed_width  = rotated and height or width
+      local placed_height = rotated and width or height
+
+      PlaceFaceAt(face, x, y, rotated)
+
+      shelf.x_cursor = x + placed_width + clearance_gap
+      if placed_height > shelf.height then
+        shelf.height = placed_height
+      end
+    end
+
+    for i = 1, #faces do
+      transformed_faces[#transformed_faces + 1] = faces[i]
     end
 
     return transformed_faces
   end
+
+
+--[[  -------------- ArrangeContoursToSheets ------------------------------------------
+|
+|  Sheet Management layout. Assigns each face to a sheet and positions it, then
+|  returns the faces (in their original order) and the number of sheets required.
+|
+|  Shelf packing: each sheet holds a list of shelves (rows) running bottom to top.
+|  Faces are placed largest first, and for each face every open sheet is tried in
+|  turn - earliest sheet first, and in both the original and a 90 degree rotated
+|  orientation - so a face will backfill a gap on an earlier sheet rather than
+|  forcing a new one. A new sheet is only opened when nothing fits anywhere.
+|
+|  As with ArrangeContours, a face that is too big for the material is still laid
+|  out (overhanging its sheet) rather than aborting, so the user can adjust the
+|  job size afterwards.
+|
+]]
+
+-- Try to fit a width x height box on a sheet, starting a new shelf if that is
+-- what it takes. Returns x, y and the shelf it landed on, or nil if it will not
+-- fit. The caller advances the shelf's cursor once the face is actually placed.
+function SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+  local shelves = sheet.shelves
+
+  for i = 1, #shelves do
+    local shelf = shelves[i]
+    -- Only the topmost shelf is allowed to grow taller; anything below it has
+    -- a shelf sitting on top of it and would overlap.
+    local vertical_fit
+    if i == #shelves then
+      vertical_fit = (shelf.y + height) <= usable_top
+    else
+      vertical_fit = height <= shelf.height
+    end
+
+    if vertical_fit and ((shelf.x_cursor + width) <= usable_right) then
+      return shelf.x_cursor, shelf.y, shelf
+    end
+  end
+
+  -- No existing shelf works, so start a new one above the topmost.
+  local new_y = edge_margin
+  if #shelves > 0 then
+    local top = shelves[#shelves]
+    new_y = top.y + top.height + clearance_gap
+  end
+
+  if ((new_y + height) <= usable_top) and ((edge_margin + width) <= usable_right) then
+    local shelf = { y = new_y, height = 0, x_cursor = edge_margin }
+    shelves[#shelves + 1] = shelf
+    return shelf.x_cursor, shelf.y, shelf
+  end
+
+  return nil
+end
+
+-- RotationMatrix2D's angle argument isn't documented as radians or degrees, and
+-- getting it wrong would silently skew every rotated part instead of turning it.
+-- Work it out once by rotating a throwaway 2 x 1 contour and checking whether
+-- its bounding box actually swapped over.
+local g_quarter_turn = nil
+
+function QuarterTurnAngle()
+  if g_quarter_turn ~= nil then
+    return g_quarter_turn
+  end
+
+  local probe = Contour(0.0)
+  probe:AppendPoint(Point2D(0.0, 0.0))
+  probe:LineTo(Point2D(2.0, 0.0))
+  probe:LineTo(Point2D(2.0, 1.0))
+  probe:Transform(RotationMatrix2D(Point2D(0.0, 0.0), math.pi / 2.0))
+
+  if math.abs(probe.BoundingBox2D.XLength - 1.0) < 0.001 then
+    g_quarter_turn = math.pi / 2.0
+  else
+    g_quarter_turn = 90.0
+  end
+
+  return g_quarter_turn
+end
+
+-- Move a face so the lower left of its bounding box sits at (x, y), rotating it
+-- 90 degrees first if asked.
+function PlaceFaceAt(face, x, y, rotated)
+  if rotated then
+    local bounds = face.contour.BoundingBox2D
+    local pivot = Point2D(bounds.MinX, bounds.MinY)
+    TransformFace(face, RotationMatrix2D(pivot, QuarterTurnAngle()))
+  end
+
+  local bounds = face.contour.BoundingBox2D
+  TransformFace(face, TranslationMatrix2D(Vector2D(x - bounds.MinX, y - bounds.MinY)))
+end
+
+function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
+  local transformed_faces = {}
+  if #faces == 0 then
+    return transformed_faces, 1
+  end
+
+  local usable_right = job_width - edge_margin
+  local usable_top   = job_height - edge_margin
+
+  -- Place the biggest faces first so the small ones can backfill around them.
+  -- This only changes the order we place in; the faces are returned in their
+  -- original order so everything downstream is unaffected.
+  local order = {}
+  for i = 1, #faces do
+    local bounds = faces[i].contour.BoundingBox2D
+    order[#order + 1] = {
+      index = i,
+      long  = math.max(bounds.XLength, bounds.YLength),
+      short = math.min(bounds.XLength, bounds.YLength)
+    }
+  end
+
+  table.sort(order, function(a, b)
+    if a.long ~= b.long then return a.long > b.long end
+    if a.short ~= b.short then return a.short > b.short end
+    return a.index < b.index
+  end)
+
+  local sheets = {}
+
+  local function AddSheet()
+    sheets[#sheets + 1] = { shelves = {} }
+    return sheets[#sheets]
+  end
+
+  AddSheet()
+
+  for i = 1, #order do
+    local face = faces[order[i].index]
+    local bounds = face.contour.BoundingBox2D
+    local width = bounds.XLength
+    local height = bounds.YLength
+
+    local placed = false
+
+    -- Sheet major, so earlier sheets fill up before a later one is used.
+    for sheet_num = 1, #sheets do
+      local sheet = sheets[sheet_num]
+
+      local x, y, shelf = SheetClaimSpace(sheet,width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet,height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
+      end
+
+      if x ~= nil then
+        local placed_width  = rotated and height or width
+        local placed_height = rotated and width or height
+
+        face.sheet_number = sheet_num
+        PlaceFaceAt(face, x, y, rotated)
+
+        shelf.x_cursor = x + placed_width + clearance_gap
+        if placed_height > shelf.height then
+          shelf.height = placed_height
+        end
+
+        placed = true
+        break
+      end
+    end
+
+    if not placed then
+      -- Nothing fits, which for a face larger than the material is expected.
+      -- Give it a sheet of its own and let it overhang rather than failing.
+      -- Reuse the last sheet if nothing has landed on it yet.
+      local sheet = sheets[#sheets]
+      if #sheet.shelves > 0 then
+        sheet = AddSheet()
+      end
+      sheet.shelves[1] = { y = edge_margin, height = height,
+                           x_cursor = edge_margin + width + clearance_gap }
+
+      face.sheet_number = #sheets
+      PlaceFaceAt(face, edge_margin, edge_margin, false)
+    end
+  end
+
+  for i = 1, #faces do
+    transformed_faces[#transformed_faces + 1] = faces[i]
+  end
+
+  return transformed_faces, #sheets
+end -- ArrangeContoursToSheets
+
+function SheetFindId(job, sheet_name)
+  local sheet_manager = job.SheetManager
+  local sheet_ids = sheet_manager:GetSheetIds()
+  for id in sheet_ids do
+    if sheet_manager:GetSheetName(id) == sheet_name then
+      return id
+    end
+  end
+  return nil
+end
+
+function SetSheet(job, sheet_name)
+  local id = SheetFindId(job, sheet_name)
+  if id == nil then
+    DisplayMessageBox("Could not find sheet: " .. tostring(sheet_name))
+    return false
+  end
+  job.SheetManager.ActiveSheetId = id
+  return true
+end
+
+function SheetEnsureExists(job, sheet_number)
+  local sheet_name = "Sheet " .. tostring(sheet_number)
+  local sheet_manager = job.SheetManager
+  local existing_id = SheetFindId(job, sheet_name)
+  if existing_id ~= nil then
+    sheet_manager.ActiveSheetId = existing_id
+    return true
+  end
+
+  local source_sheet_id = SheetFindId(job, "Sheet 1")
+  if source_sheet_id == nil then
+    DisplayMessageBox("Sheet 1 was not found. Cannot create " .. sheet_name .. ".")
+    return false
+  end
+
+  local material_block = MaterialBlock()
+  sheet_manager:CreateSheets(
+    1,
+    source_sheet_id,
+    Box2D(Point2D(0, 0), Point2D(material_block.Width, material_block.Height))
+  )
+
+  local new_id = SheetFindId(job, sheet_name)
+  if new_id ~= nil then
+    sheet_manager.ActiveSheetId = new_id
+    return true
+  end
+
+  DisplayMessageBox("Unable to create " .. sheet_name .. ".")
+  return false
+end
+
+function SelectExactObjects(job, objects)
+  local selection = job.Selection
+  selection:Clear()
+  local selected = false
+  if objects ~= nil then
+    for i = 1, #objects do
+      if objects[i] ~= nil then
+        selection:Add(objects[i], true, true)
+        selected = true
+      end
+    end
+  end
+  if selected then
+    selection:GroupSelectionFinished()
+  end
+  return selected
+end
 
 --[[  -------------- ComputeDogBones --------------------------------------------------  
 |
@@ -1475,21 +1803,29 @@ function GetFriendlyFaceLabel(face)
 
   FLUTE_LAYER_NAME = "Fluting Vectors"
 
-  function CreateOpenLine(layer, x1, y1, x2, y2)
+  function CreateOpenLine(flutingGroup, x1, y1, x2, y2)
     local contour = Contour(0.0)
     contour:AppendPoint(Point2D(x1, y1))
     contour:LineTo(Point2D(x2, y2))
-    local cad = CreateCadContour(contour)
-    layer:AddObject(cad, true)
-    return cad
+    flutingGroup:AddTail(contour)
   end
 
-  function AddFlutingVectorsForSocket(layer, socket, toolDiameter)
+  function AddFlutingVectorsForSocket(flutingGroup, socket, tool)
     local thickness      = socket.thickness
     local angle          = socket.angle
     local flute_length   = thickness / math.tan(angle) + 0.02
-    local flute_fit_offset = 0.1
-    local flute_spacing  = toolDiameter / 2 -- I think this should be 1/2 the bit size...
+
+    -- The vector's centerline needs to sit in from the tab's true edge by the
+    -- tool's own radius, so the tool's cutting edge (not its center) is what
+    -- actually lines up with that edge. A fixed offset (as before) only lines
+    -- up for one particular tool size: too large an offset for a smaller tool
+    -- stops the cut short of the true edge, leaving it un-relieved (socket
+    -- too small for the tab to fit); too small an offset for a larger tool
+    -- overshoots past it.
+    local tool_radius = 0.5 * ConvertUnitsFrom(tool.ToolDia or 0, tool, MaterialBlock())
+    local flute_fit_offset = math.max(0, tool_radius - 0.02)
+    -- local flute_spacing  = tool.ToolDia / 2 -- I think this should be 1/2 the bit size...
+    local flute_spacing = tool.Stepover -- Use the stepover instead of tool diameter for spacing
 
     local along = socket.along
     local out   = socket.out
@@ -1500,26 +1836,32 @@ function GetFriendlyFaceLabel(face)
     while t <= thickness + 0.0001 do
       local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
       local left_start = left_wall - (flute_length * along)
-      CreateOpenLine(layer, left_start.x, left_start.y, left_wall.x, left_wall.y)
+      CreateOpenLine(flutingGroup, left_start.x, left_start.y, left_wall.x, left_wall.y)
 
       local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
       local right_start = right_wall + (flute_length * along)
-      CreateOpenLine(layer, right_start.x, right_start.y, right_wall.x, right_wall.y)
+      CreateOpenLine(flutingGroup, right_start.x, right_start.y, right_wall.x, right_wall.y)
 
       t = t + flute_spacing
     end
   end
 
-  function AddFlutingVectorsForFaces(job, faces, layer_name, toolDiameter)
+  function AddFlutingVectorsForFaces(job, faces, layer_name, tool)
+    local added_objects = {}
     local layer = job.LayerManager:GetLayerWithName(layer_name)
     for i = 1, #faces do
       local face = faces[i]
       if face.flute_sockets then
+        local flutingGroup = ContourGroup(true)
         for j = 1, #face.flute_sockets do
-          AddFlutingVectorsForSocket(layer, face.flute_sockets[j], toolDiameter)
-        end
-      end
-    end
+          AddFlutingVectorsForSocket(flutingGroup, face.flute_sockets[j], tool)
+        end -- for j
+        local cadObjectGroup = CreateCadGroup(flutingGroup)
+        layer:AddObject(cadObjectGroup, true)
+        added_objects[#added_objects + 1] = cadObjectGroup
+      end -- if face.flute_sockets
+    end -- for i
+    return added_objects
   end
 
 --[[  ----------------- CreateFlutingToolpath -----------------  
@@ -1790,20 +2132,6 @@ function GetFriendlyFaceLabel(face)
     return cad_contour
   end
 
-  function GetContours(cad_object_list)
-    local vdcontours = ContourGroup(true)
-    local pos, obj
-    pos = cad_object_list:GetHeadPosition()
-    while (pos) do
-      obj, pos = cad_object_list:GetNext(pos)
-      local ctr = obj:GetContour()
-      if ctr then
-        vdcontours:AddTail(ctr:Clone())
-      end
-    end
-    return vdcontours
-  end
-
 -- Create tabbed versions of the vdcontours by creating 
 -- a cad contour version of each contour and transferring all
 -- tabs
@@ -1829,17 +2157,6 @@ function GetFriendlyFaceLabel(face)
 
     end
     return cad_obj_list
-  end
-
-  function AddToSelection(cadobjlist, job)
-    local selection_list = job.Selection
-    selection_list:Clear()
-    local pos = cadobjlist:GetHeadPosition()
-    local obj
-    while (pos) do
-      obj, pos = cadobjlist:GetNext(pos)
-      selection_list:Add(obj, true, false)
-    end
   end
 
 --[[  ---------------- SelectVectorsOnLayer ----------------  
@@ -1884,13 +2201,12 @@ function GetFriendlyFaceLabel(face)
         if contour.IsOpen and select_open then
           selection:Add(object, true, true)
           objects_selected = true
-        else if select_closed then
+        elseif select_closed then
           selection:Add(object, true, true)
-          objects_selected = true
-        end            
-      end
-    end
-  end  
+          objects_selected = true     
+        end -- contour was NOT nil, test if Open or Closed
+    end -- while pos ~= nil do
+  end  -- function SelectVectorsOnLayer
   -- to avoid excessive redrawing etc  we added vectors to the selection in 'batch' mode
   -- tell selection we have now finished updating
   if objects_selected then
@@ -1899,7 +2215,67 @@ function GetFriendlyFaceLabel(face)
   return objects_selected   
 end   
 
-function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, layer_name)
+--[[  ---------------- CreateFingerSideToolpath ----------------
+| Uses the vectors on the current layer and creates a ToolpathManager
+| using the roundover bit to round the edge so that they will fit into 
+| the finger slots on the other piece. This is only used for the box joint case 
+| when no dogbones are created
+]]
+
+function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth, exact_objects)
+
+  if not _tool_ok(roundover_tool) then
+    DisplayMessageBox("Finger Side Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local profile_data = ProfileParameterData()
+  profile_data.CutDepth = roundover_cut_depth
+  profile_data.StartDepth = 0.0
+  profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+  profile_data.UseTabs = false
+
+  local ramping_data = RampingData()
+  ramping_data.DoRamping = false
+  ramping_data.RampAngle = 30.0
+  ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
+
+  local lead_data = LeadInOutData()
+
+  local pos_data = ToolpathPosData()
+
+  local geometry_selector = GeometrySelector()
+
+    -- Select the current sheet objects when supplied; otherwise preserve the original layer selection.
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(fingerSideLayerName)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
+
+  local toolpath_manager = ToolpathManager()
+  local toolpath = toolpath_manager:CreateProfilingToolpath(
+    "Finger Roundover",
+    roundover_tool,
+    profile_data,
+    ramping_data,
+    lead_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true
+  )
+
+  if toolpath == nil then
+    DisplayMessageBox("Error creating roundover toolpath.")
+  end
+end
+
+
+function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects)
 
   if not _tool_ok(tool) then
     DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
@@ -1926,13 +2302,15 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
 
   local geometry_selector = GeometrySelector()
 
-  -- AddToSelection(cad_contours, job)
-
-  -- Select all on a layer
-  local selection = job.Selection
-  selection:Clear()
-  local layer = job.LayerManager:FindLayerWithName(layer_name)
-  SelectVectorsOnLayer(layer, selection, true, true, true)
+  -- Select the current sheet objects when supplied; otherwise select objects on the provided layer
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(layer_name)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
 
   local toolpath_manager = ToolpathManager()
   local toolpath = toolpath_manager:CreateProfilingToolpath(
@@ -1948,156 +2326,14 @@ function CreateCutoutToolpath(cad_contours, tool, job, thickness, tab_length, la
   )
 
   if toolpath == nil then
-    DisplayMessageBox("Error creating toolpath.")
+    DisplayMessageBox("Error creating cutout toolpath.")
   end
 end
 
---[[  -------------- CalculateRails --------------------------------------------------  
-|
-|  Calculate a list of rails along which we will run our tool
-|  Returns a ContourGroup corresponding to this rail
-|
-]]
-function CalculateRails
-  (
-    side_rail,   -- contour which represents side of dovetial
-    angle,       -- angle
-    on_left,     -- if true then we create rails to left of side_rail
-    offset,      -- Allowance
-    tool,        -- tool used
-    start_z,     -- depth start cutting
-    cut_z        -- depth finish cutting 
-  )
-  local is_dodgy = false
-  if side_rail.StartPoint2D:IsCoincident(Point2D(53, 25), 1) then
-    is_dodgy = true
-  end
-  local side_length = side_rail.Length
-  local blk_material = MaterialBlock()
-  local converted_Stepover = ConvertUnitsFrom(tool.Stepover,tool,blk_material)
-  local num_stripes = math.ceil(side_length/ converted_Stepover )
-  local stripe_shift = (side_length) / num_stripes
-  local horizontal_distance = (math.abs(start_z - cut_z) / math.tan(angle))
-  local along_rail = (side_rail.EndPoint2D - side_rail.StartPoint2D):Normalize()
-  local contours = {}
 
-  -- The normal vector points along the direction we expect
-  local normal_vec = (side_rail.EndPoint2D - side_rail.StartPoint2D):NormalTo()
-  normal_vec:Normalize()
-  normal_vec = (horizontal_distance)*normal_vec
-  if (on_left) then
-    normal_vec = -normal_vec
-  end
-
-  -- iterate over the stripes getting start and end points
-  local contour_group = ContourGroup(true)
-  for i = 1, num_stripes do
-    local start_pt = Point3D(side_rail.StartPoint2D  + (i - 1)*stripe_shift*along_rail, start_z)
-    local end_pt = Point3D(start_pt.x + normal_vec.x, start_pt.y + normal_vec.y, cut_z)
-    local contour = MakeLine(start_pt, end_pt)
-    contour_group:AddTail(contour)
-  end
-
-  return contour_group
-end
-
---[[  -------------- CalculateToolpathContour --------------------------------------------------  
-|
-|  From a list of rails calculate the toolpath contour
-|
-]]
-function CalculateToolpathContour
-  (
-    rails,        -- a contour group corresponding to one set of rails
-    rad_angle,    -- angle in radians
-    z_depth,      -- z height of cut depth
-    pos_data
-  )
-
-  local toolpath_contour = Contour(0.0)
-
-  if rails.IsEmpty then 
-    return
-  end
-
-  -- Add start point at safe z height above start point of first rail
-  local start_pt = Point3D(rails:GetHead().StartPoint2D, pos_data.SafeZ)
-  local lift_z = rails:GetHead().StartPoint3D.z + pos_data.StartZGap
-  toolpath_contour:AppendPoint(start_pt)
-
-  local do_backwards = false
-  local contour_pos = rails:GetHeadPosition()
-  local rail
-  while contour_pos ~= nil do
-    rail, contour_pos = rails:GetNext(contour_pos)
-
-    if do_backwards then
-      toolpath_contour:LineTo(rail.EndPoint3D)
-      toolpath_contour:LineTo(rail.StartPoint3D)
-    else
-      toolpath_contour:LineTo(rail.StartPoint3D)
-      toolpath_contour:LineTo(rail.EndPoint3D)
-    end
-    do_backwards = not do_backwards
-  end
-
--- lift to safe z
-  local current_pos = toolpath_contour.EndPoint2D
-  toolpath_contour:LineTo(Point3D(current_pos, pos_data.SafeZ))
-
-  return toolpath_contour
-end
-
---[[  -------------- CalculateSideRails --------------------------------------------------  
-|
-|  Calculate the side rails of our contours
-|
-]]
-function CalculateSideRails
-  (
-    vectors,    -- vectors for which we hope to construct side rails
-    depth,      -- depth of the dovetial
-    side_rails, -- side rails
-    is_on_left,  -- list indexing whether a given side rail has its dove tail on its right
-    tool_diam,
-    rad_angle,
-    thickness,
-    allowance
-  )
-
-  for i=1, #vectors do
-    local contour = vectors[i]
-    local right_contour_normal = contour:GetFirstSpan():StartVector(true):NormalTo()
-    local contour_vec = contour:GetFirstSpan():StartVector(true)
-    local horizontal_offset = thickness/ math.tan(rad_angle)
-
-
-    local start_start_point = vectors[i].StartPoint2D 
-    - (horizontal_offset + allowance)*contour_vec + 
-    0.5*tool_diam*contour_vec 
-    + allowance*right_contour_normal
-
-    local start_end_point = start_start_point  - (depth+ 2*allowance)*right_contour_normal
-    local start_contour = Contour(0.0)
-    start_contour:AppendPoint(start_start_point)
-    start_contour:LineTo(start_end_point)
-    side_rails[#side_rails + 1] = start_contour
-    is_on_left[#is_on_left +1] = false -- the start side rail has its dove tail on its right
-
-    local end_start_point = vectors[i].EndPoint2D 
-    - 0.5*tool_diam*contour_vec 
-    + (horizontal_offset + allowance)*contour_vec +
-    allowance*right_contour_normal
-    local end_end_point = end_start_point - (depth + 2*allowance)*right_contour_normal
-    local end_contour = Contour(0.0)
-    end_contour:AppendPoint(end_start_point)
-    end_contour:LineTo(end_end_point)
-    side_rails[#side_rails + 1] = end_contour
-    is_on_left[#is_on_left +1] = true -- the end side rail has its dove tail on its left  
-  end
-
-end
-
+-- [[  -------------- ConvertUnitsFrom --------------------------------------------------
+--        Ensure the value is in the correct units for the tool and block material
+--        
 function ConvertUnitsFrom(value, tool, blockmaterial)
 
   if (tool.InMM == blockmaterial.InMM) then
@@ -2110,105 +2346,3 @@ function ConvertUnitsFrom(value, tool, blockmaterial)
 
   return value * 25.4     -- caller is in inches but we want mm   
 end
-
-function CreateDoveTailToolpath(markers, dovetail, tool, allowance, warn_user)
-
-  if not _tool_ok(tool) then
-    DisplayMessageBox("Dovetail Toolpath: please select a valid tool before continuing.")
-    return false
-  end
-
-  -- Calculate side rails
-  local side_rails = {}
-  local is_on_left = {}
-
-  -- Convert tool diameter using the tool passed in (no global 'options'!)
-  local mtl_block = MaterialBlock()
-  local dia = ConvertUnitsFrom(tool.ToolDia, tool, mtl_block)
-
-  CalculateSideRails(
-    markers,
-    dovetail.depth,
-    side_rails,
-    is_on_left,
-    dia,
-    dovetail.angle,
-    math.abs(dovetail.cut_z - dovetail.start_z),
-    allowance
-  )
-
-  if #side_rails == 0 then
-    DisplayMessageBox("Unable to create dovetails.")
-    return false
-  end
-
-  -- Build the toolpath contour from rails
-  local contour_group = ContourGroup(true)
-  local pos_data = ToolpathPosData()
-
-  for i = 1, #side_rails do
-    local rails = CalculateRails(
-      side_rails[i],
-      dovetail.angle,
-      is_on_left[i],
-      allowance,
-      tool,
-      dovetail.start_z,
-      dovetail.cut_z
-    )
-
-    local contour = CalculateToolpathContour(
-      rails,
-      dovetail.angle,
-      dovetail.cut_z,
-      pos_data
-    )
-
-    if contour ~= nil then
-      contour_group:AddTail(contour)
-    end
-  end
-
-  -- Emit external toolpath
-  if contour_group.IsEmpty then
-    DisplayMessageBox("No dovetails created.")
-    return false
-  end
-
-  local toolpath_options = ExternalToolpathOptions()
-  toolpath_options.StartDepth = dovetail.start_z
-  toolpath_options.CreatePreview = true
-
-  -- Name the toolpath clearly
-  local tp_name = "Dovetail (External)"
-
-  local toolpath = ExternalToolpath(
-    tp_name,
-    tool,
-    pos_data,
-    toolpath_options,
-    contour_group
-  )
-
-  if toolpath:Error() then
-    DisplayMessageBox("Error creating toolpath.")
-    return true
-  end
-
-  local toolpath_manager = ToolpathManager()
-  toolpath_manager:AddExternalToolpath(toolpath)
-
--- *** NEW: warning message ***
--- Show the warning only if requested
-  if warn_user then
-    DisplayMessageBox(
-      "Dovetail Toolpath Notice:\n\n"
-      .. "This Dovetail Toolpath is created as an *External Toolpath* by the Gadget.\n"
-      .. "External toolpaths CANNOT be recalculated in VCarve/Aspire.\n\n"
-      .. "If user moves the cectors (e.g., center on material) and needs this Toolpath Again:\n"
-      .. "  • The User will Need to Re-Run this Gadget after proper planning is achieved.\n\n"
-      .. "Tip: Plan vector placement before running the Box Creator Gadget."
-    )
-  end
-end
-

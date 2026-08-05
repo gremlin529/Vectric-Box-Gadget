@@ -17,8 +17,8 @@
       <img src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
-      <p>This gadget creates two layers of vectors. The layer called box is the actual physical outlines, and the layer called cutout is the one the toolpath is created with.</p>
-      <p>The measurements specifies the external dimensions of the box.</p>
+      <p>This gadget creates a box of the specified external dimensions.</p>
+      <p>There are several layers created depending on the options selected. Please hover over any option to see a description.</p>
     </div>
   </div>
 
@@ -56,16 +56,16 @@
           </div>
           <div class="field-row">
             <label for="SideTabWidthField" id="SideJointLabel">Side joints</label>
-            <input title="width of the dovetail or tab to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+            <input title="Width of the finger to machine" type="text" id="SideTabWidthField" placeholder="Width of Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
           <div id="showHideTopBottomJoints" style="display: none">
             <div class="field-row" id="showHideLidJointWidth">
               <label for="TopTabWidthField">Lid joints</label>
-              <input title="Width of the lids tab or dovetail" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input title="Width of the lid fingers" type="text" id="TopTabWidthField" placeholder="Width of Lid Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
             <div class="field-row" id="showHideBottomJointWidth">
               <label for="BottomTabWidthField">Bottom joints</label>
-              <input title="Width of the bottom tabs or dovetails" type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input title="Width of the bottom fingers" type="text" id="BottomTabWidthField" placeholder="Width of Bottom Joint" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
 
           </div>
@@ -88,35 +88,17 @@
             <label for="ClampingMargin">Clamping Margin</label>
             <input title="Margin on the edge for clamping the workpiece" type="text" id="ClampingMargin" placeholder="Clamping Margin" type="number" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
+          <div class="checkbox-row" id="showHideDogbones">
+            <input type="checkbox" class="LuaButton" id="CreateDogbones" onclick="updateRoundoverToolVisibility()" />
+            <label title="When unchecked will not create the dogbones. Warning! parts will require additional processing for joints to work" for="CreateDogbones">Create dogbones</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" class="LuaButton" id="UseSingleSheet" />
+            <label title="When checked, fits as many pieces as possible onto a single sheet instead of creating additional sheets. Pieces that still don't fit will be placed outside the sheet boundary." for="UseSingleSheet">Fit to single sheet</label>
+          </div>
         </div>
       </div>
 
-      <!-- Faces to machine -->
-      <div class="faces-panel">
-        <div class="sub-panel-title">Faces To Machine</div>
-        <div class="face-checkbox" id="MakeLidCheckItem"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton" />Lid</label></div>
-        <div class="face-checkbox" id="MakeBottomCheckItem"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
-        <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
-        <div class="face-checkbox"><label title="If unchecked then fingers to connect to faces which are not created will not be created"><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ── Tool picker ─────────────────────────────────────────────────── -->
-  <div class="tool-bar clearfix">
-    <div class="tool-bar-left">
-      <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Select Tool" />
-      <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
-    </div>
-    <div class="tool-bar-right">
-      <label class="no-toolpath-label">
-        <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" />
-        No toolpath (create vectors only)
-      </label>
     </div>
   </div>
 
@@ -128,7 +110,7 @@
         <div class="type-panel-header">Joint Type</div>
         <div class="type-option clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" />Tabs</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/tabs.png" alt="Finger joint preview" />
@@ -136,7 +118,7 @@
         </div>
         <div class="type-option-last clearfix">
           <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" />Dovetail</label>
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" onclick="onJointTypeChanged()" />Dovetail</label>
           </div>
           <div class="type-option-preview">
             <img src="Images/dovetails.png" alt="Dovetail joint preview" />
@@ -182,6 +164,53 @@
 
   </div>
 
+  <!-- ── Tools ─────────────────────────────────────────────────────────── -->
+  <div class="section-header">Tools</div>
+  <div class="card">
+    <div class="card-body clearfix">
+
+      <div class="tool-bar clearfix">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Cutting" title="The tool used for cutting out the box and fluting the dovetails" />
+          <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
+        </div>
+        <div class="tool-bar-right">
+          <label class="no-toolpath-label">
+            <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" title="Only create the vectors"/>
+            <label title="Only create the vectors">No toolpath</label>
+          </label>
+        </div>
+      </div>
+
+      <!-- Roundover tool picker (box joints without dogbones only) -->
+      <div class="tool-bar clearfix" id="showHideRoundoverTool" style="display: none; margin-bottom: 0;">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="RoundoverToolChooseButton" id="RoundoverToolChooseButton" value="Roundover" title="The tool used for rounding over the finger edges. It is recommended to use a tool with a radius half the diameter of the cutting bit."/>
+          <span id="RoundoverToolNameField">&#8212; No Tool Selected &#8212;</span>
+        </div>
+        <div class="tool-bar-right">
+          <label for="RoundoverCutDepthField" class="cut-depth-label">Cut Depth</label>
+          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input" placeholder="Cut Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Faces to machine ─────────────────────────────────────────────── -->
+  <div class="section-header">Faces To Machine</div>
+  <div class="card">
+    <div class="card-body clearfix">
+      <div class="face-checkbox" id="MakeLidCheckItem"><label  title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
+      <div class="face-checkbox" id="MakeBottomCheckItem"><label title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
+      <div class="face-checkbox"><label title="If unchecked then fingers to connect to faces which are not created will not be created"><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
+    </div>
+  </div>
+
   <!-- ── Footer: OK / options / Cancel ──────────────────────────────── -->
   <div class="footer-bar clearfix">
     <div class="footer-ok-button">
@@ -189,7 +218,7 @@
     </div>
     <div class="footer-options">
       <div class="clearfix" style="margin-bottom: 4px;">
-        <div class="footer-option-item" style="float: left;">
+        <div class="footer-option-item" style="float: left; line-height: 26px;">
           <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable dark mode</label>
         </div>
         <div class="footer-option-item" style="float: right;">
@@ -300,6 +329,26 @@
 	  if (elSideJoint) {elSideJoint.innerHTML=checkbox.checked?"Side Joints":"All Joints"}
   }
 
+  // Dogbones only apply to box (finger) joints, not dovetail joints.
+  function onJointTypeChanged() {
+    var boxRadio = document.getElementById("TabTypeRadio1");
+    var dogboneRow = document.getElementById("showHideDogbones");
+    if (dogboneRow) { dogboneRow.style.display = (boxRadio && boxRadio.checked) ? "block" : "none"; }
+    updateRoundoverToolVisibility();
+  }
+
+  // The finger roundover tool only applies to box (finger) joints that are not using dogbones.
+  function updateRoundoverToolVisibility() {
+    var boxRadio = document.getElementById("TabTypeRadio1");
+    var dogbones = document.getElementById("CreateDogbones");
+    var roundoverRow = document.getElementById("showHideRoundoverTool");
+    if (roundoverRow) {
+      var isBoxJoint = boxRadio && boxRadio.checked;
+      var noDogbones = !(dogbones && dogbones.checked);
+      roundoverRow.style.display = (isBoxJoint && noDogbones) ? "block" : "none";
+    }
+  }
+
   function onZoomLevelChanged(select) {
     var val = select.options[select.selectedIndex].value;
     document.body.style.zoom = (val === "Auto") ? dpiToZoom() : val;
@@ -330,6 +379,8 @@
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }
+
+    onJointTypeChanged();
   }, 100);
 
 </script>
