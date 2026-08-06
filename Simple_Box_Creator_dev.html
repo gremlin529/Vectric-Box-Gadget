@@ -201,13 +201,14 @@
   <div class="section-header">Faces To Machine</div>
   <div class="card">
     <div class="card-body clearfix">
-      <div class="face-checkbox" id="MakeLidCheckItem"><label  title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
-      <div class="face-checkbox" id="MakeBottomCheckItem"><label title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
+      <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
-      <div class="face-checkbox"><label title="If unchecked then fingers to connect to faces which are not created will not be created"><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
+      <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
+        <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
     </div>
   </div>
 
