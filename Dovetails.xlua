@@ -1,0 +1,553 @@
+-- VECTRIC LUA SCRIPT
+-- Dovetails.xlua
+--
+-- Dovetail/finger-joint edge geometry (male and female tails, plain flaps),
+-- the dogbone-fillet machinery for box-joint corners, and the fluting vectors
+
+  function AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist,
+                                         markers, flute_sockets, fingerSides)
+    for i=1,num_tails do
+      local start_pos = contour.EndPoint2D
+      AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
+      if (markers) then
+        markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D)
+      end
+      if flute_sockets then
+        -- Take our own copies. The points must not alias the contour and the
+        -- vectors must not alias the shared unit_x / unit_y globals, because
+        -- TransformFace rotates them in place when a face is nested rotated.
+        local end_pos = contour.EndPoint2D
+        flute_sockets[#flute_sockets + 1] = {
+          start_pt  = Point2D(start_pos.x, start_pos.y),
+          end_pt    = Point2D(end_pos.x, end_pos.y),
+          along     = Vector2D(along.x, along.y),
+          out       = Vector2D(out.x, out.y),
+          thickness = thickness,
+          angle     = dovetail.angle
+        }
+      end
+      if fingerSides then
+        -- add the first side of the finger to the fingerSides contour group
+        local end_vector = thickness*out
+        local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+        local fingerSide = MakeLine(start_pos, end_pt)
+        fingerSides:AddTail(fingerSide)
+        -- now add the second side of the finger to the fingerSides contour group
+        local second_side_start = Point2D(end_pt.x + dovetail.min_width*along.x, end_pt.y + dovetail.min_width*along.y)
+        local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+        local secondFingerSide = MakeLine(second_side_start, second_side_end)
+        fingerSides:AddTail(secondFingerSide)
+      end
+      LineToVector(contour, space_dist*along)
+    end
+  end
+
+-- Add male dovetails along this line
+  function AddMaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails, space_dist)
+    for i=1,num_tails do
+      AddMaleDoveTail(thickness, dovetail.max_width, out, along, dovetail.angle, contour)
+      LineToVector(contour, space_dist*along)
+    end
+
+  end
+
+  function AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps, fingerSides)
+    for i=1,num_flaps do
+      AddFemaleDoveTail(flap_height, flap_width, out, along, contour, fingerSides)
+      LineToVector(contour, space_dist*along)
+    end
+  end
+
+  function AddMaleDoveTail(thickness, max_dovetail_width, out, along, angle, contour)
+    local along_dist  = (thickness/ math.tan(angle))
+    local diag_vector = (-along_dist)*along + thickness*out
+    LineToVector(contour, diag_vector)
+    LineToVector(contour, max_dovetail_width*along)
+    local and_back = (-along_dist)*along  - thickness*out
+    LineToVector(contour, and_back)
+  end
+
+-- Add a flap
+  function AddFemaleDoveTail(thickness, tab_width, perp_vec, along_vec, contour, fingerSides)
+    if fingerSides then
+      -- add the first side of the finger to the fingerSides contour group
+      local start_pos = contour.EndPoint2D
+      local end_vector = thickness*perp_vec
+      local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+      local fingerSide = MakeLine(start_pos, end_pt)
+      fingerSides:AddTail(fingerSide)
+      -- now add the second side of the finger to the fingerSides contour group
+      local second_side_start = Point2D(end_pt.x + tab_width*along_vec.x, end_pt.y + tab_width*along_vec.y)
+      local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+      local secondFingerSide = MakeLine(second_side_start, second_side_end)
+      fingerSides:AddTail(secondFingerSide)
+    end
+    LineToVector(contour, thickness*perp_vec)
+    LineToVector(contour, tab_width*along_vec)
+    LineToVector(contour, thickness*(-perp_vec))
+  end
+
+--[[  -------------- ComputeDogBones --------------------------------------------------
+|
+| Compute the markers for where dog bones should be placed on preradiused contours
+|
+]]
+  function ComputeDogBones(contour_group, radius, do_ccw)
+    circles = {}
+    line_markers = {}
+    local ctr_pos = contour_group:GetHeadPosition()
+    local contour
+    while ctr_pos ~= nil do
+      contour, ctr_pos = contour_group:GetNext(ctr_pos)
+      if (contour.IsCCW == do_ccw) then
+        local span
+        local span_pos = contour:GetHeadPosition()
+        local prev_span = contour:GetLastSpan()
+        while span_pos ~= nil do
+          span, span_pos = contour:GetNext(span_pos)
+
+          if (SpanIsArc(span, radius)) then
+            local centre = Point3D()
+            local arc_span = CastSpanToArcSpan(span)
+            arc_span:RadiusAndCentre(centre)
+            circles[#circles + 1]  = centre
+            local span_out_end = GetEndPointArcBisector(arc_span, radius, centre, arc_span:ArcMidPoint() )
+            line_markers[#line_markers + 1] = MakeLine(centre, span_out_end)
+          end
+          prev_span = span
+        end
+      end
+    end
+
+    return circles, line_markers
+  end
+
+--[[  -------------- CreateDogboneProfile --------------------------------------------------
+|
+| Create the dogboned profile
+| offset_radius = tool_radius - allowance
+]]
+  function CreateDogboneProfile(contour_group, offset_radius)
+
+    local rounded_contours = OffsetOutIn(contour_group, offset_radius)
+    local circles, markers = ComputeDogBones(rounded_contours, offset_radius, true)
+
+    -- Fill bins with markers
+    local bounding_box = rounded_contours.BoundingBox2D
+    local box_xlength = bounding_box.XLength
+    local min_x  = bounding_box.MinX - 0.1*box_xlength
+    local max_x =  bounding_box.MaxX  + 0.1*box_xlength
+    box_xlength = max_x - min_x
+
+    local box_ylength = bounding_box.YLength
+    local min_y  = bounding_box.MinY - 0.1*box_ylength
+    local max_y =  bounding_box.MaxY  + 0.1*box_ylength
+    box_ylength = max_y - min_y
+
+
+    local bin_data = {}
+    bin_data.min_x = min_x
+    bin_data.min_y = min_y
+    bin_data.dim = math.ceil(math.sqrt(#markers))
+    bin_data.grid_x = box_xlength / bin_data.dim
+    bin_data.grid_y = box_ylength /bin_data.dim
+    local bin_array = InitializeBins(bin_data.dim)
+    FillBins(markers, bin_data, bin_array)
+
+    -- Offset the contours out
+    local offset_contours = contour_group:Offset(offset_radius, offset_radius, 1, true)
+    local filleted_contour_group = ContourGroup(true)
+    local current_contour
+    local pos = offset_contours:GetHeadPosition()
+    while pos~= nil do
+      current_contour, pos = offset_contours:GetNext(pos)
+      local filleted_contour = AddFillets(current_contour, markers, offset_radius, bin_array, bin_data, true)
+      if filleted_contour ~= nil then
+        filleted_contour_group:AddTail(filleted_contour)
+      end
+    end
+
+    return filleted_contour_group
+  end
+
+--[[  -------------- BinKey --------------------------------------------------
+|
+| Return which bin the point should be in
+|
+]]
+  function BinKey(point,bin_data)
+    local i = math.floor((point.x - bin_data.min_x) / bin_data.grid_x)
+    local j = math.floor((point.y - bin_data.min_y) / bin_data.grid_y)
+
+    if ( (i+1 > bin_data.dim) or  (j+1 > bin_data.dim)) then
+      return nil
+    end
+    return i + 1, j + 1 -- We add 1 because using lua-style 0 index matrices
+  end
+
+--[[  -------------- InitializeBins --------------------------------------------------
+|
+| Initialize the bins
+|
+]]
+  function InitializeBins(dim)
+    local mt = {}
+    for i = 1, dim do
+      mt[i] = {}
+      for j = 1, dim do
+        mt[i][j] = {}
+      end
+    end
+    return mt
+  end
+
+--[[  -------------- PlaceMarkerInbin --------------------------------------------------
+|
+| Place a marker in its rightful bin
+|
+]]
+  function PlaceMarkerInBin(marker, bin_data, bin_array)
+    local i, j = BinKey(marker.StartPoint2D, bin_data)
+    if i ~= nil and j ~= nil then
+      (bin_array[i][j])[#(bin_array[i][j]) + 1] = marker
+    end
+  end
+
+--[[  -------------- FillBins --------------------------------------------------
+|
+| Fill all bins
+|
+]]
+  function FillBins(markers, bin_data, bin_array)
+    for i= 1, #markers do
+      if IsSpan(markers[i]) then
+        PlaceMarkerInBin(markers[i], bin_data, bin_array)
+      end
+    end
+  end
+
+--[[  -------------- HasMatchingMarker --------------------------------------------------
+|
+| Has matching marker
+|
+]]
+  function HasMatchingMarker(point, bin_data, bin_array)
+    local i,j = BinKey(point, bin_data)
+    if (i == nil) then
+      return nil
+    end
+    local this_bin = bin_array[i][j]
+    if this_bin == nil then
+      return nil
+    end
+
+    for m = 1, #this_bin do
+      local marker = this_bin[m]
+      if marker.StartPoint2D:IsCoincident(point, 0.01) then
+        return marker
+      end
+    end
+    return nil
+  end
+
+--[[  -------------- Fluting Vectors --------------------------------------------------
+|
+|  Generate the open-line vectors that guide a V-bit to cut the dovetail flutes.
+|  Each "socket" entry in face.flute_sockets represents one female dovetail slot.
+|  AddFlutingVectorsForSocket() draws two lines per height step along that slot
+|  so the operator can use them as a "trace" toolpath drive.
+|
+]]
+
+  FLUTE_LAYER_NAME = "Fluting Vectors"
+
+  function CreateOpenLine(flutingGroup, x1, y1, x2, y2)
+    local contour = Contour(0.0)
+    contour:AppendPoint(Point2D(x1, y1))
+    contour:LineTo(Point2D(x2, y2))
+    flutingGroup:AddTail(contour)
+  end
+
+  function AddFlutingVectorsForSocket(flutingGroup, socket, tool)
+    local thickness      = socket.thickness
+    local angle          = socket.angle
+    local flute_length   = thickness / math.tan(angle) + 0.02
+
+    -- The vector's centerline needs to sit in from the tab's true edge by the
+    -- tool's own radius, so the tool's cutting edge (not its center) is what
+    -- actually lines up with that edge. A fixed offset (as before) only lines
+    -- up for one particular tool size: too large an offset for a smaller tool
+    -- stops the cut short of the true edge, leaving it un-relieved (socket
+    -- too small for the tab to fit); too small an offset for a larger tool
+    -- overshoots past it.
+    local tool_radius = 0.5 * ConvertUnitsFrom(tool.ToolDia or 0, tool, MaterialBlock())
+    local flute_fit_offset = math.max(0, tool_radius - 0.02)
+    -- local flute_spacing  = tool.ToolDia / 2 -- I think this should be 1/2 the bit size...
+    local flute_spacing = tool.Stepover -- Use the stepover instead of tool diameter for spacing
+
+    local along = socket.along
+    local out   = socket.out
+    along:Normalize()
+    out:Normalize()
+
+    local t = 0.0
+    while t <= thickness + 0.0001 do
+      local left_wall  = socket.start_pt + (flute_fit_offset * along) + (t * out)
+      local left_start = left_wall - (flute_length * along)
+      CreateOpenLine(flutingGroup, left_start.x, left_start.y, left_wall.x, left_wall.y)
+
+      local right_wall  = socket.end_pt - (flute_fit_offset * along) + (t * out)
+      local right_start = right_wall + (flute_length * along)
+      CreateOpenLine(flutingGroup, right_start.x, right_start.y, right_wall.x, right_wall.y)
+
+      t = t + flute_spacing
+    end
+  end
+
+  function AddFlutingVectorsForFaces(job, faces, layer_name, tool)
+    local added_objects = {}
+    local layer = job.LayerManager:GetLayerWithName(layer_name)
+    for i = 1, #faces do
+      local face = faces[i]
+      if face.flute_sockets then
+        local flutingGroup = ContourGroup(true)
+        for j = 1, #face.flute_sockets do
+          AddFlutingVectorsForSocket(flutingGroup, face.flute_sockets[j], tool)
+        end -- for j
+        local cadObjectGroup = CreateCadGroup(flutingGroup)
+        layer:AddObject(cadObjectGroup, true)
+        added_objects[#added_objects + 1] = cadObjectGroup
+      end -- if face.flute_sockets
+    end -- for i
+    return added_objects
+  end
+
+--[[  ----------------- CreateFlutingToolpath -----------------
+|
+|   Create a drilling toolpath within the program for the currently selected vectors
+|  Parameters:
+|    name,               -- Name for toolpath
+|    start_depth         -- Start depth for toolpath below surface of material
+|    cut_depth           -- cut depth for toolpath
+|    tool_dia            -- diameter of tool to use
+|    tool_stepdown       -- stepdown for tool
+|    tool_in_mm          -- true if tool size and stepdown are in mm
+|
+|  Return Values:
+|     true if toolpath created OK else false
+|
+]]
+
+
+  function CreateFlutingToolpath( name , start_depth, cut_depth, tool, tool_dia)
+
+    -- Create object used to set home position and safez gap above material surface
+    local pos_data = ToolpathPosData()
+
+    --  pos_data:SetHomePosition(0, 0, 5.0)
+    --  pos_data.SafeZGap = 5.0
+
+    -- Create  object used to pass fluting options
+    local fluting_data = FlutingParameterData()
+    -- start depth for toolpath
+    fluting_data.StartDepth = start_depth
+
+    -- cut depth for toolpath this is depth below start depth
+    fluting_data.CutDepth = cut_depth
+
+    -- type of fluting FULL_LENGTH, RAMP_START or RAMP_START_END
+    fluting_data.FluteType = FlutingParameterData.FULL_LENGTH
+
+    -- type of ramping RAMP_LINEAR, RAMP_SMOOTH
+    fluting_data.RampType = FlutingParameterData.RAMP_LINEAR
+
+    -- if true use ratio field for controling ramp length else absolute length value
+    fluting_data.UseRampRatio = false
+
+    -- length of ramp as ratio of flute length(range 0 - 1.0) (for start and end - ratio is of half length)
+    fluting_data.RampRatio = 0.2
+
+    -- length to ramp over - if UseRampRatio == false
+    fluting_data.RampLength = 15
+
+    -- if true in Aspire, project toolpath onto composite model
+    fluting_data.ProjectToolpath = false
+
+    -- Create object which can used to automatically select geometry on layers etc
+    local geometry_selector = GeometrySelector()
+
+    -- if this is true we create 2d toolpaths previews in 2d view, if false we dont
+    local create_2d_previews = true
+
+    -- if this is true we will display errors and warning to the user
+    local display_warnings = true
+
+    -- Create our toolpath
+
+    local toolpath_manager = ToolpathManager()
+
+    local toolpath_id = toolpath_manager:CreateFlutingToolpath(
+      name,
+      tool,
+      fluting_data,
+      pos_data,
+      geometry_selector,
+      create_2d_previews,
+      display_warnings
+    )
+
+    if toolpath_id  == nil  then
+      DisplayMessageBox("Error creating toolpath")
+      return false
+    end
+
+    return true
+
+  end
+
+--[[  -------------- OffsetOutIn --------------------------------------------------
+|
+| Return the result of offsetting the contour group out and then back in again
+|
+]]
+  function OffsetOutIn(contour_group, radius)
+    local out_group = contour_group:Offset(radius, radius, 1, true)
+    local in_group = out_group:Offset(-radius, -radius, 1, true)
+    return in_group
+  end
+
+--[[  -------------- SpanIsArc --------------------------------------------------
+|
+| Return true if span is arc
+|
+]]
+  function SpanIsArc(span, radius)
+    if not span.IsArcType then
+      return false
+    end
+    local centre = Point3D()
+    local arc_span = CastSpanToArcSpan(span)
+    local span_radius = arc_span:RadiusAndCentre(centre)
+    if math.abs(span_radius - radius) > 0.005 then
+      return false
+    end
+    return true
+  end
+
+--[[  -------------- utAngleRad2d --------------------------------------------------
+|
+| utility function computing angle swept out by rays
+|
+]]
+  function utAngleRad2d( x1, y1, x2, y2, x3, y3)
+    local value;
+    local x = ( x1 - x2 ) * ( x3 - x2 ) + ( y1 - y2 ) * ( y3 - y2 )
+    local y = ( x1 - x2 ) * ( y3 - y2 ) - ( y1 - y2 ) * ( x3 - x2 )
+
+    if ( x == 0.0 and y == 0.0 ) then
+      value = 0.0
+    else
+      value = math.atan2 ( y, x )
+      if ( value < 0.0 ) then
+        value = value + 2.0 * math.pi
+      end
+    end
+    return value;
+  end
+
+--[[  -------------- GetInternalAngleArc --------------------------------------------------
+|
+| Get the internal angle arc
+|
+]]
+  function GetInternalAngleArc(arc_span, arc_centre)
+
+    local start_pt = arc_span.StartPoint2D
+    local end_pt   = arc_span.EndPoint2D
+
+    -- get included angle of arc, function assumes CCW arc so reverse direction if CW ...
+    local  arc_angle
+    if arc_span.IsClockwise then
+      arc_angle = utAngleRad2d(end_pt.x,end_pt.y, arc_centre.x, arc_centre.y,start_pt.x, start_pt.y)
+    else
+      arc_angle = utAngleRad2d(start_pt.x,start_pt.y, arc_centre.x, arc_centre.y, end_pt.x, end_pt.y)
+    end
+
+    return arc_angle
+  end
+
+--[[  -------------- GetEndPointArcBisector --------------------------------------------------
+|
+| Get the end point of the bisector which cuts arc in half and meets at point on tangents
+|
+]]
+  function GetEndPointArcBisector(arc_span, radius, start_point, mid_point)
+    local internal_angle = GetInternalAngleArc(arc_span, start_point)
+    local corner_angle =  math.pi - internal_angle
+    local offset_distance = (radius / math.sin(0.5*corner_angle)) - radius
+    local offset_vector = mid_point - start_point
+    offset_vector:Normalize()
+
+    local offset_point = start_point  + offset_distance*offset_vector
+    return offset_point
+  end
+
+--[[  -------------- IsSpan --------------------------------------------------
+|
+| Return true if the contour is just a single line span
+|
+]]
+  function IsSpan(ctr)
+    if (ctr.Count == 1) and ctr:GetFirstSpan().IsLineType then
+      return true
+    else
+      return false
+    end
+  end
+
+  --[[  -------------- CloneSpan --------------------------------------------------
+|
+| Clone the given span
+|
+]]
+  function CloneSpan(span)
+    if span.IsLineType then
+      return LineSpan(span.StartPoint2D, span.EndPoint2D)
+    elseif span.IsArcType then
+      local arc_span = CastSpanToArcSpan(span)
+      return ArcSpan(span.StartPoint2D, span.EndPoint2D, arc_span.Bulge)
+    elseif span.IsBezierType then
+      local bspan = CastSpanToBezierSpan(span)
+      return BezierSpan(bspan.StartPoint2D,
+        bspan.EndPoint2D,
+        span:GetControlPointPosition(0),
+        span:GetControlPointPosition(1))
+    end
+  end
+
+--[[  -------------- AddFillets --------------------------------------------------
+|
+| Add filletes to the given contour
+|
+]]
+  function AddFillets(contour, markers, radius, bin_array, bin_data, is_ccw)
+    if contour.IsCCW == is_ccw then
+      local return_contour = Contour(0.0)
+      local span_pos = contour:GetHeadPosition()
+      local span
+      while span_pos ~= nil do
+        span, span_pos = contour:GetNext(span_pos)
+        return_contour:AppendSpan(CloneSpan(span))
+        local marker_line  = HasMatchingMarker(span.EndPoint2D, bin_data, bin_array)
+        if marker_line ~= nil then
+          return_contour:LineTo(marker_line.EndPoint2D)
+          return_contour:LineTo(marker_line.StartPoint2D)
+        end
+
+      end
+      return return_contour
+    else
+      return nil
+    end
+
+  end

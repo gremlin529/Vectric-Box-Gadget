@@ -1,0 +1,595 @@
+-- VECTRIC LUA SCRIPT
+-- Helpers.xlua
+--
+-- Generic helper functions used across the other modules: unit/tool validation,
+-- contour/line construction primitives, job/layer/selection utilities, part
+-- labeling (the stick-font DrawWriter), and the finger-side/cutout toolpaths.
+
+function _is_nonneg(x) return type(x)=="number" and x>=0 end
+
+function _tool_ok(tool)
+  if not tool then return false end
+  local blk = MaterialBlock()
+  local dia = ConvertUnitsFrom(tool.ToolDia or 0, tool, blk)
+  return (dia or 0) > 0
+end
+
+-- [[  -------------- ConvertUnitsFrom --------------------------------------------------
+--        Ensure the value is in the correct units for the tool and block material
+--
+function ConvertUnitsFrom(value, tool, blockmaterial)
+
+  if (tool.InMM == blockmaterial.InMM) then
+    return value
+  end
+
+  if (tool.InMM) then
+    return value / 25.4  -- caller is in mm but we want inches
+  end
+
+  return value * 25.4     -- caller is in inches but we want mm
+end
+
+-- Extend the end point of the contour by the given vector
+  function LineToVector(contour, vector)
+    local current_pos = contour.EndPoint2D
+    contour:LineTo(current_pos + vector)
+  end
+
+--[[  -------------- MakeLine --------------------------------------------------
+|
+|  Make a straight line contour between two points
+|
+]]
+  function MakeLine
+    (
+      start_pt, -- start point
+      end_pt    -- end point
+    )
+    local contour = Contour(0.0)
+    contour:AppendPoint(start_pt)
+    contour:LineTo(end_pt)
+    return contour
+  end
+
+  function AddMiddleOfLastSpanToList(contour, pt_list)
+    local last_span = contour:GetLastSpan()
+    pt_list[#pt_list + 1] = last_span.StartPoint2D + 0.5*(last_span.EndPoint2D - last_span.StartPoint2D)
+  end
+
+--[[  -------------- AddGroupToJob --------------------------------------------------
+|
+|  Adds a group of contours to a job
+|
+]]
+function AddGroupToJob(job, group, layer_name)
+     --  create a CadObject to represent the  group
+   local cad_object = CreateCadGroup(group);
+
+   -- create a layer with passed name if it doesnt already exist
+   local layer = job.LayerManager:GetLayerWithName(layer_name)
+
+   -- and add our object to it
+   layer:AddObject(cad_object, true)
+
+   return cad_object
+end
+
+--[[  -------------- AddCadListToJob --------------------------------------------------
+|
+|  Adds a group of contours to a job
+|
+]]
+function AddCadListToJob(vectric_job, cad_list, layer_name)
+
+  --  create a CadObject to represent the group
+  local added_objects = {}
+  local pos = cad_list:GetHeadPosition()
+  local layer = vectric_job.LayerManager:GetLayerWithName(layer_name)
+  while (pos) do
+    local obj
+    obj, pos = cad_list:GetNext(pos)
+    local cloned_obj = obj:Clone()
+    layer:AddObject(cloned_obj, true)
+    added_objects[#added_objects + 1] = cloned_obj
+  end
+  return added_objects
+end
+
+function SelectExactObjects(job, objects)
+  local selection = job.Selection
+  selection:Clear()
+  local selected = false
+  if objects ~= nil then
+    for i = 1, #objects do
+      if objects[i] ~= nil then
+        selection:Add(objects[i], true, true)
+        selected = true
+      end
+    end
+  end
+  if selected then
+    selection:GroupSelectionFinished()
+  end
+  return selected
+end
+
+--[[  ---------------- SelectVectorsOnLayer ----------------
+|
+|   Add all the vectors on the layer to the selection
+|     layer,            -- layer we are selecting vectors on
+|     selection         -- selection object
+|     select_closed     -- if true  select closed objects
+|     select_open       -- if true  select open objects
+|     select_groups     -- if true select grouped vectors (irrespective of open / closed state of member objects)
+|  Return Values:
+|     true if selected one or more vectors
+|
+]]
+  function SelectVectorsOnLayer(layer, selection, select_closed, select_open, select_groups)
+
+    local objects_selected = false
+    local warning_displayed = false
+
+    local pos = layer:GetHeadPosition()
+    while pos ~= nil do
+      local object
+      object, pos = layer:GetNext(pos)
+      local contour = object:GetContour()
+      if contour == nil then
+        if (object.ClassName == "vcCadObjectGroup") and select_groups then
+          selection:Add(object, true, true)
+          objects_selected = true
+        else
+          if not warning_displayed then
+            local message = "Object(s) without contour information found on layer - ignoring"
+            if not select_groups then
+              message = message ..
+              "\r\n\r\n" ..
+              "If layer contains grouped vectors these must be ungrouped for this script"
+            end
+            DisplayMessageBox(message)
+            warning_displayed = true
+          end
+        end
+      else  -- contour was NOT nil, test if Open or Closed
+        if contour.IsOpen and select_open then
+          selection:Add(object, true, true)
+          objects_selected = true
+        elseif select_closed then
+          selection:Add(object, true, true)
+          objects_selected = true
+        end -- contour was NOT nil, test if Open or Closed
+    end -- while pos ~= nil do
+  end  -- function SelectVectorsOnLayer
+  -- to avoid excessive redrawing etc  we added vectors to the selection in 'batch' mode
+  -- tell selection we have now finished updating
+  if objects_selected then
+    selection:GroupSelectionFinished()
+  end
+  return objects_selected
+end
+
+function GetFriendlyFaceLabel(face)
+  local lookup = { BottomFace = "BOTTOM", SideFace1 = "SIDE 1", SideFace2 = "SIDE 2", EndFace1 = "END 1", EndFace2 = "END 2", Lid = "LID" }
+  if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
+  end
+
+  function GetFaceLabelHeight(face, thickness)
+    local box = face.contour.BoundingBox2D local min_dim = math.min(box.XLength, box.YLength)
+    local h = math.max(thickness * 0.35, min_dim * 0.08) h = math.min(h, min_dim * 0.16) if h < 0.20 then h = 0.20
+    end
+    return h
+  end
+
+  function GetFaceLabelPoint(face, text_height, label, ang)
+    local box = face.contour.BoundingBox2D
+
+    local cx = box.MinX + (0.5 * box.XLength)
+    local cy = box.MinY + (0.5 * box.YLength)
+
+    -- estimate label width for DrawWriter stick font
+    local est_width = string.len(label) * text_height * 0.75
+
+    if ang == 90.0 then
+      -- vertical text: shift downward by half estimated width
+      return Point2D(cx, cy - (est_width * 0.5))
+    else
+      -- horizontal text: shift left by half estimated width
+      return Point2D(cx - (est_width * 0.5), cy)
+    end
+  end
+
+  function GetFaceLabelAngle(face)
+    local box = face.contour.BoundingBox2D
+
+    if box.YLength > box.XLength then
+      return 90.0
+    end
+
+    return 0.0
+  end
+
+  function DrawWriter(what, where, size, lay, ang)
+    local group
+
+    local function Polar2D_Local(pt, ang2, dis)
+      return Point2D(
+        (pt.X + dis * math.cos(math.rad(ang2))),
+        (pt.Y + dis * math.sin(math.rad(ang2)))
+      )
+    end
+
+    local function MonoFont(job, pt, letter, scl, lay2, ang2)
+      scl = (scl * 0.5)
+
+      local pA0  = pt
+      local pA2  = Polar2D_Local(pt, ang2 + 90.0, 0.5000 * scl)
+      local pA3  = Polar2D_Local(pt, ang2 + 90.0, 0.7500 * scl)
+      local pA4  = Polar2D_Local(pt, ang2 + 90.0, 1.0000 * scl)
+      local pA5  = Polar2D_Local(pt, ang2 + 90.0, 1.2500 * scl)
+      local pA6  = Polar2D_Local(pt, ang2 + 90.0, 1.5000 * scl)
+      local pA8  = Polar2D_Local(pt, ang2 + 90.0, 2.0000 * scl)
+
+      local pB0  = Polar2D_Local(pt, ang2 + 0.0, 0.2500 * scl)
+      local pB3  = Polar2D_Local(pt, ang2 + 71.5651, 0.7906 * scl)
+      local pB4  = Polar2D_Local(pt, ang2 + 75.9638, 1.0308 * scl)
+      local pB8  = Polar2D_Local(pt, ang2 + 82.8750, 2.0156 * scl)
+
+      local pC0  = Polar2D_Local(pt, ang2 + 0.0, 0.5000 * scl)
+      local pC8  = Polar2D_Local(pt, ang2 + 75.9640, 2.0616 * scl)
+
+      local pD0  = Polar2D_Local(pt, ang2 + 0.0, 0.6250 * scl)
+      local pD4  = Polar2D_Local(pt, ang2 + 57.9946, 1.1792 * scl)
+      local pD8  = Polar2D_Local(pt, ang2 + 72.6460, 2.0954 * scl)
+
+      local pE0  = Polar2D_Local(pt, ang2 + 0.0, 0.7500 * scl)
+      local pE2  = Polar2D_Local(pt, ang2 + 33.6901, 0.9014 * scl)
+      local pE3  = Polar2D_Local(pt, ang2 + 45.0000, 1.0607 * scl)
+
+      local pF0  = Polar2D_Local(pt, ang2 + 0.0, 1.0000 * scl)
+      local pF3  = Polar2D_Local(pt, ang2 + 36.8699, 1.2500 * scl)
+      local pF4  = Polar2D_Local(pt, ang2 + 45.0000, 1.4142 * scl)
+      local pF8  = Polar2D_Local(pt, ang2 + 63.4349, 2.2361 * scl)
+
+      local pG0  = Polar2D_Local(pt, ang2 + 0.0, 1.2500 * scl)
+      local pG1  = Polar2D_Local(pt, ang2 + 11.3099, 1.2748 * scl)
+      local pG2  = Polar2D_Local(pt, ang2 + 21.8014, 1.3463 * scl)
+      local pG3  = Polar2D_Local(pt, ang2 + 30.9638, 1.4577 * scl)
+      local pG4  = Polar2D_Local(pt, ang2 + 38.6598, 1.6008 * scl)
+      local pG5  = Polar2D_Local(pt, ang2 + 45.0000, 1.7678 * scl)
+      local pG6  = Polar2D_Local(pt, ang2 + 50.1944, 1.9526 * scl)
+      local pG7  = Polar2D_Local(pt, ang2 + 54.4623, 2.1506 * scl)
+      local pG8  = Polar2D_Local(pt, ang2 + 57.9946, 2.3585 * scl)
+
+      local pH0  = Polar2D_Local(pt, ang2 + 0.0, 1.5000 * scl)
+
+      local function AddLine(a, b)
+        local c = Contour(0.0)
+        c:AppendPoint(a)
+        c:LineTo(b)
+        group:AddTail(c)
+      end
+
+      local function AddPoly(points)
+        local c = Contour(0.0)
+        c:AppendPoint(points[1])
+        for ii = 2, #points do
+          c:LineTo(points[ii])
+        end
+        group:AddTail(c)
+      end
+
+      if letter == 32 then
+        return pH0
+
+      elseif letter == 45 then
+        AddLine(pA4, pG4)
+        return pH0
+
+      elseif letter == 46 then
+        AddPoly({pA2, pB0, pC0, pD0, pA2})
+        return pD0
+
+      elseif letter == 48 then
+        AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+        return pH0
+
+      elseif letter == 49 then
+        AddLine(pD8, pD0)
+        return pH0
+
+      elseif letter == 50 then
+        AddPoly({pA6, pA8, pF8, pG6, pA0, pG0})
+        return pH0
+
+      elseif letter == 65 or letter == 97 then
+        AddPoly({pA0, pD8, pG0, pF3, pB3, pA0})
+        return pH0
+
+      elseif letter == 66 or letter == 98 then
+        AddPoly({pA0, pA8, pF8, pG7, pG5, pF4, pG3, pG1, pF0, pA0})
+        return pH0
+
+      elseif letter == 68 or letter == 100 then
+        AddPoly({pA0, pA8, pF8, pG6, pG2, pF0, pA0})
+        return pH0
+
+      elseif letter == 69 or letter == 101 then
+        AddPoly({pG0, pA0, pA8, pF8})
+        AddLine(pA4, pD4)
+        return pH0
+
+      elseif letter == 73 or letter == 105 then
+        AddLine(pD0, pD8)
+        return pE0
+
+      elseif letter == 76 or letter == 108 then
+        AddPoly({pA8, pA0, pG0})
+        return pH0
+
+      elseif letter == 77 or letter == 109 then
+        AddPoly({pA0, pA8, pD4, pG8, pG0})
+        return pH0
+
+      elseif letter == 78 or letter == 110 then
+        AddPoly({pA0, pA8, pG0, pG8})
+        return pH0
+
+      elseif letter == 79 or letter == 111 then
+        AddPoly({pB0, pA2, pA6, pB8, pF8, pG6, pG2, pF0, pB0})
+        return pH0
+
+      elseif letter == 83 or letter == 115 then
+        AddPoly({pG5, pG6, pF8, pB8, pA6, pA5, pG3, pG2, pF0, pB0, pA2, pA3})
+        return pH0
+
+      elseif letter == 84 or letter == 116 then
+        AddLine(pA8, pG8)
+        AddLine(pD8, pD0)
+        return pH0
+
+      elseif letter == 88 or letter == 120 then
+        AddLine(pA0, pG8)
+        AddLine(pA8, pG0)
+        return pH0
+
+      else
+        -- simple fallback box for unsupported characters
+        AddPoly({pA0, pA8, pG8, pG0, pA0})
+        return pH0
+      end
+    end
+
+    local function AddGroupToJob_Local(job, group2, layer_name)
+      local cad_object = CreateCadGroup(group2)
+      local layer = job.LayerManager:GetLayerWithName(layer_name)
+      layer:AddObject(cad_object, true)
+      return cad_object
+    end
+
+    local job = VectricJob()
+    if not job.Exists then
+      DisplayMessageBox("Error in DrawWriter: No job loaded")
+      return false
+    end
+
+    local strlen = string.len(what)
+    local i = 1
+    local ptx = where
+    group = ContourGroup(true)
+
+    while i <= strlen do
+      local ch = string.byte(string.sub(what, i, i))
+      if (ch >= 97) and (ch <= 122) then
+        ptx = MonoFont(job, ptx, ch, (size * 0.75), lay, ang)
+        ptx = Polar2D_Local(ptx, ang, size * 0.05)
+      else
+        ptx = MonoFont(job, ptx, ch, size, lay, ang)
+        ptx = Polar2D_Local(ptx, ang, size * 0.07)
+      end
+      i = i + 1
+    end
+
+    AddGroupToJob_Local(job, group, lay)
+    return true
+  end
+
+  function AddPartsLabelsToJob(job, faces, layer_name, thickness)
+    if not job or not faces or #faces == 0 then
+      return false
+    end
+
+    local layer = job.LayerManager:GetLayerWithName(layer_name)
+    if not layer then
+      DisplayMessageBox("Unable to find label layer: " .. tostring(layer_name))
+      return false
+    end
+
+    for i = 1, #faces do
+      local face = faces[i]
+      local label = GetFriendlyFaceLabel(face)
+      local text_height = GetFaceLabelHeight(face, thickness)
+      local ang = GetFaceLabelAngle(face)
+      local pt = GetFaceLabelPoint(face, text_height, label, ang)
+
+      DrawWriter(label, pt, text_height, layer_name, ang)
+    end
+
+    return true
+  end
+
+-- Transfer tabs from one cad contour to another
+-- Only want to do this if for example have offset
+-- one cad contour from another
+  function TransferTabs(cad_contour_a, cad_contour_b)
+    -- clone because problem with constness on tabs
+
+    local tabs_a = cad_contour_a:GetToolpathTabs()
+    local contour_a = cad_contour_a:GetContour()
+    local pos = tabs_a:GetHeadPosition()
+    while pos do
+      local tab
+      tab, pos = tabs_a:GetNext(pos)
+      local point = tab:Position(contour_a)
+      cad_contour_b:InsertToolpathTabAtPoint(point)
+    end
+  end
+
+  function AddTabsToContour(cad_contour, pt_list)
+    if (pt_list) then
+      for i=1,#pt_list do
+        cad_contour:InsertToolpathTabAtPoint(pt_list[i])
+      end
+    else
+      DisplayMessageBox("No tabs to add.")
+    end
+  end
+
+  function MakeCadAndAddTabs(contour, tab_list)
+    local cad_contour = CreateCadContour(contour)
+    AddTabsToContour(cad_contour, tab_list)
+    return cad_contour
+  end
+
+-- Create tabbed versions of the vdcontours by creating
+-- a cad contour version of each contour and transferring all
+-- tabs
+  function CreateTabbedCadContours(vdcontours, cadcontours)
+    local cad_obj_list = CadObjectList(true)
+    local pos, vdctr, cdctr
+    vcpos = cadcontours:GetHeadPosition()
+    while vcpos do
+      vcctr, vcpos = cadcontours:GetNext(vcpos)
+      local vcbox = vcctr:GetBoundingBox()
+
+      -- find the vd contour whose bounding centre is nearest ours
+      vdpos = vdcontours:GetHeadPosition()
+      while vdpos do
+        vdctr, vdpos = vdcontours:GetNext(vdpos)
+        local vdbox = vdctr.BoundingBox2D
+        if (vdbox:IsInside(vcbox)) then
+          local cad_ctr = CreateCadContour(vdctr)
+          TransferTabs(CastCadObjectToCadContour(vcctr), cad_ctr)
+          cad_obj_list:AddTail(cad_ctr)
+        end
+      end
+
+    end
+    return cad_obj_list
+  end
+
+--[[  ---------------- CreateFingerSideToolpath ----------------
+| Uses the vectors on the current layer and creates a ToolpathManager
+| using the roundover bit to round the edge so that they will fit into
+| the finger slots on the other piece. This is only used for the box joint case
+| when no dogbones are created
+]]
+
+function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth, exact_objects)
+
+  if not _tool_ok(roundover_tool) then
+    DisplayMessageBox("Finger Side Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local profile_data = ProfileParameterData()
+  profile_data.CutDepth = roundover_cut_depth
+  profile_data.StartDepth = 0.0
+  profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+  profile_data.UseTabs = false
+
+  local ramping_data = RampingData()
+  ramping_data.DoRamping = false
+  ramping_data.RampAngle = 30.0
+  ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
+
+  local lead_data = LeadInOutData()
+
+  local pos_data = ToolpathPosData()
+
+  local geometry_selector = GeometrySelector()
+
+    -- Select the current sheet objects when supplied; otherwise preserve the original layer selection.
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(fingerSideLayerName)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
+
+  local toolpath_manager = ToolpathManager()
+  local toolpath = toolpath_manager:CreateProfilingToolpath(
+    "Finger Roundover",
+    roundover_tool,
+    profile_data,
+    ramping_data,
+    lead_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true
+  )
+
+  if toolpath == nil then
+    DisplayMessageBox("Error creating roundover toolpath.")
+  end
+end
+
+
+function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects)
+
+  if not _tool_ok(tool) then
+    DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local profile_data = ProfileParameterData()
+  profile_data.CutDepth = thickness
+  profile_data.StartDepth = 0.0
+  profile_data.ProfileSide = ProfileParameterData.PROFILE_ON
+  -- profile_data.CutDirection = ProfileParameterData.CONVENTIONAL_DIRECTION
+  profile_data.UseTabs = false                                       --- Changed true to false markjones
+  profile_data.TabThickness = math.min(0.25*thickness, 0.25)
+  profile_data.TabLength = tab_length
+
+  local ramping_data = RampingData()
+  ramping_data.DoRamping = false                                     --- Changed true to false markjones
+  ramping_data.RampAngle = 30.0
+  ramping_data.RampConstaint = RampingData.CONSTRAIN_ANGLE
+
+  local lead_data = LeadInOutData()
+
+  local pos_data = ToolpathPosData()
+
+  local geometry_selector = GeometrySelector()
+
+  -- Select the current sheet objects when supplied; otherwise select objects on the provided layer
+  if exact_objects ~= nil then
+    SelectExactObjects(job, exact_objects)
+  else
+    local selection = job.Selection
+    selection:Clear()
+    local layer = job.LayerManager:FindLayerWithName(layer_name)
+    SelectVectorsOnLayer(layer, selection, true, true, true)
+  end
+
+  local toolpath_manager = ToolpathManager()
+  local toolpath = toolpath_manager:CreateProfilingToolpath(
+    "Cut Out",
+    tool,
+    profile_data,
+    ramping_data,
+    lead_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true
+  )
+
+  if toolpath == nil then
+    DisplayMessageBox("Error creating cutout toolpath.")
+  end
+end

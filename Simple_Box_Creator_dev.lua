@@ -63,7 +63,10 @@ local librayModule
 
 -- MotazA 16/9/2020 check if job Exists 
 function main(script_path)
-  libraryModule =assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\Helpers.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\Dovetails.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\SheetArrangement.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
 
   local job = VectricJob()
   local mtl_block = MaterialBlock()
