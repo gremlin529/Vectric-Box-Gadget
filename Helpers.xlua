@@ -7,6 +7,24 @@
 
 function _is_nonneg(x) return type(x)=="number" and x>=0 end
 
+function truncate(num, decimals)
+  if type(num) ~= "number" or type(decimals) ~= "number" then
+    error("Both arguments must be numbers")
+  end
+  if decimals < 0 then
+    error("Decimal places must be non-negative")
+  end
+
+  local factor = 10 ^ decimals
+  -- math.floor for truncating toward negative infinity
+  -- For truncating toward zero, use conditional logic
+  if num >= 0 then
+    return math.floor(num * factor) / factor
+  else
+    return math.ceil(num * factor) / factor
+  end
+end
+
 function _tool_ok(tool)
   if not tool then return false end
   local blk = MaterialBlock()

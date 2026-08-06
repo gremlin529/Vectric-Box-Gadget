@@ -79,6 +79,7 @@ $filesToRelease = @(
     "Helpers.xlua",
     "Dovetails.xlua",
     "SheetArrangement.xlua",
+    "DisplayDialog.xlua",
     "stylesheets",
     "images"
 )

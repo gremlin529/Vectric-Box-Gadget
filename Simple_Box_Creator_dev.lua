@@ -58,15 +58,21 @@ g_finger_side_layer_name = "Finger Roundover"
 g_box_layer_name = "Box"
 g_labels_layer_name = "Labels"
 g_cutout_layer_name = "CutOut"
+g_doveTailAngleDegrees = 60
 
 local librayModule
 
 -- MotazA 16/9/2020 check if job Exists 
+---
+--- Main Function for Gadget 
+---
+---@param script_path any
 function main(script_path)
   libraryModule = assert(loadfile(script_path .. "\\Helpers.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\Dovetails.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\SheetArrangement.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\DisplayDialog.xlua"))(libraryModule)
 
   local job = VectricJob()
   local mtl_block = MaterialBlock()
@@ -127,18 +133,18 @@ function main(script_path)
   local dovetails = ContourGroup(true)
 
   local sideDoveTail = {}
-  sideDoveTail.angle = math.rad(60)
-  sideDoveTail.min_width = 1.5
+  sideDoveTail.angle = math.rad(g_doveTailAngleDegrees)
+  sideDoveTail.min_width = 1.5 -- not sure why this is called min_width it's actually the width of the dovetail.
   sideDoveTail.depth = options.thickness
 
   -- added by Gremlin to allow for separate widths on bottom vs side tabs
   local bottomDoveTail = {}   
-  bottomDoveTail.angle = math.rad(60)
+  bottomDoveTail.angle = math.rad(g_doveTailAngleDegrees)
   bottomDoveTail.min_width = 1.5
   bottomDoveTail.depth = options.thickness
 
   local lidDoveTail = {}   
-  lidDoveTail.angle = math.rad(60)
+  lidDoveTail.angle = math.rad(g_doveTailAngleDegrees)
   lidDoveTail.min_width = 1.5
   lidDoveTail.depth = options.thickness
 
@@ -220,7 +226,41 @@ function main(script_path)
     computedFacesToMake.bottom = false
   end
 
--- Make the bottom face
+  local faces = CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, computedFacesToMake)
+
+  -- Arrange the contours across as many sheets as required.
+  -- All existing geometry and machining rules below remain unchanged;
+  -- they are simply applied to one sheet's faces at a time.
+  local converted_tool_diameter = 0.25
+  if _tool_ok(options.tool) then
+    converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+  end
+
+  local required_sheets
+  faces, required_sheets = LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
+  if not required_sheets then
+    return false
+  end
+
+  CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter)
+
+  SetSheet(job, "Sheet 1")
+
+  SaveDefaultsToRegistry(options, false)
+  job:Refresh2DView()
+  return true
+
+end -- main
+
+--[[  -------------- CreateBoxFaces --------------------------------------------------
+|
+|  Build the box faces (bottom, sides, ends, lid) selected by the dialog options.
+|  Returns the list of faces, still positioned at their own local origins -
+|  layout onto sheets happens separately in LayoutFacesOnSheets.
+|
+]]
+function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, computedFacesToMake)
+  -- Make the bottom face
   local cad_list = CadObjectList(true)
 -- local dovetail_markers = {}
   local faces = {}
@@ -229,11 +269,11 @@ function main(script_path)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     -- the bottom face is only the bottom so we didn't need to add
     -- a separate value to it, just pass it the bottom value
-    local bottom_face = MakeBottomFaceContour(options.width, 
-      options.depth, 
-      options.thickness, 
-      options.start_point, 
-      bottomDoveTail, 
+    local bottom_face = MakeBottomFaceContour(options.width,
+      options.depth,
+      options.thickness,
+      options.start_point,
+      bottomDoveTail,
       options.dovetailJoint,  -- if true then create dovetails
       options.bottomType,
       computedFacesToMake,
@@ -246,13 +286,13 @@ function main(script_path)
   if computedFacesToMake.side1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local sideface1 = MakeSideFace(options.width,
-      options.height, 
-      options.thickness, 
-      options.start_point, 
-      sideDoveTail, 
+      options.height,
+      options.thickness,
+      options.start_point,
+      sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint, 
+      options.dovetailJoint,
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -265,13 +305,13 @@ function main(script_path)
   if computedFacesToMake.side2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local sideface2 = MakeSideFace(options.width,
-      options.height, 
-      options.thickness, 
-      options.start_point, 
-      sideDoveTail, 
+      options.height,
+      options.thickness,
+      options.start_point,
+      sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint, 
+      options.dovetailJoint,
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -284,14 +324,14 @@ function main(script_path)
   -- -- -- Make ends
   if computedFacesToMake.end1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local endface1 = MakeEndFace(options.depth, 
-      options.height, 
+    local endface1 = MakeEndFace(options.depth,
+      options.height,
       options.thickness,
-      options.start_point, 
+      options.start_point,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint, 
+      options.dovetailJoint,
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -303,14 +343,14 @@ function main(script_path)
 
   if computedFacesToMake.end2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local endface2 = MakeEndFace(options.depth, 
-      options.height, 
+    local endface2 = MakeEndFace(options.depth,
+      options.height,
       options.thickness,
-      options.start_point, 
+      options.start_point,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint, 
+      options.dovetailJoint,
       options.lidType,
       options.bottomType,
       computedFacesToMake,
@@ -336,14 +376,20 @@ function main(script_path)
     faces[#faces + 1] = lid
   end
 
-  -- Arrange the contours across as many sheets as required.
-  -- All existing geometry and machining rules below remain unchanged;
-  -- they are simply applied to one sheet's faces at a time.
-  local converted_tool_diameter = 0.25
-  if _tool_ok(options.tool) then
-    converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
-  end
+  return faces
+end -- CreateBoxFaces
 
+--[[  -------------- LayoutFacesOnSheets --------------------------------------------------
+|
+|  Arrange the given faces across as many material sheets as required (or onto a
+|  single sheet if options.useSingleSheet is set), then make sure each sheet the
+|  layout used actually exists in the job's Sheet Manager.
+|
+|  Returns the (now positioned) faces and the number of sheets used, or nil, nil
+|  if a required sheet could not be created.
+|
+]]
+function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local required_sheets = 1
@@ -360,10 +406,21 @@ function main(script_path)
 
   for sheet_num = 1, required_sheets do
     if not SheetEnsureExists(job, sheet_num) then
-      return false
+      return nil
     end
   end
 
+  return faces, required_sheets
+end
+
+--[[  -------------- CreateBoxToolpaths --------------------------------------------------
+|
+|  Walk each sheet in turn, adding the profile/cutout geometry, part labels, and
+|  finger-side/fluting vectors for that sheet's faces, then (unless the user asked
+|  to skip toolpaths) create the pocket, fluting and cutout toolpaths for it.
+|
+]]
+function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter)
   local offset_radius = 0.5 * converted_tool_diameter - options.allowance
 
   for sheet_num = 1, required_sheets do
@@ -433,7 +490,7 @@ function main(script_path)
       if (not options.no_toolpath) then
         if jointsOnSheet[FaceJointType.Inset] then
           assert(((computedFacesToMake.lid and options.lidType == FaceJointType.Inset) or
-          (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)), 
+          (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)),
            "Expected that if there are inset joints on this sheet, then at least one of the lid or bottom faces should be present and have an inset joint type.")
           CreateInsetPocketToolpath(job, options, sheet_faces, options.tool, "Pockets")
         end
@@ -457,642 +514,7 @@ function main(script_path)
     end -- if #sheet_faces > 0 then
   end -- for sheet_num = 1, required_sheets do
 
-  SetSheet(job, "Sheet 1")
-
-  SaveDefaultsToRegistry(options, false)
-  job:Refresh2DView()
   return true
-
-end
-
--- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail 
-function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-  local html_path = "file:" .. script_path .. "\\" .. g_html_file
-  local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
-
-  dialog:AddLabelField("GadgetTitle", g_title)
-  dialog:AddLabelField("GadgetVersion", g_version)
-
-  -- Add Geometry fields
-  dialog:AddDoubleField("WidthField", options.width)
-  dialog:AddDoubleField("DepthField", options.depth)
-  dialog:AddDoubleField("HeightField", options.height)
-  dialog:AddDoubleField("SideTabWidthField", options.sideOrAllTabWidth)
-  dialog:AddDoubleField("BottomTabWidthField", options.bottomTabWidth)
-  dialog:AddDoubleField("TopTabWidthField", options.lidTabWidth)
-  dialog:AddCheckBox("AllJointWidths", options.useAllJointWidths)
-
-  dialog:AddDoubleField("AllowanceField", options.allowance)
-  dialog:AddDoubleField("PartSpacingField", options.partSpacing)
-  dialog:AddDoubleField("ClampingMargin", options.clampingMargin)
-
-  dialog:AddCheckBox("DarkMode", options.dark_mode)
-  dialog:AddCheckBox("LabelFaces", options.label_faces)
-
-  -- dialog:AddDoubleField("DovetailAngleField", sideDoveTail.angle)
-
-  dialog:AddDropDownList("ZoomLevel", options.ZoomLevel)
-
-  dialog:AddCheckBox("MakeLid", options.facesToMake.lid)
-  dialog:AddCheckBox("MakeBottom", options.facesToMake.bottom)
-  dialog:AddCheckBox("MakeSide1", options.facesToMake.side1)
-  dialog:AddCheckBox("MakeSide2", options.facesToMake.side2)
-  dialog:AddCheckBox("MakeEnd1", options.facesToMake.end1)
-  dialog:AddCheckBox("MakeEnd2", options.facesToMake.end2)
-  dialog:AddCheckBox("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
-
-  -- Add Tool picker
-  -- Add toolpath name field
-  dialog:AddLabelField("ToolNameField", "")
-  dialog:AddToolPicker("ToolChooseButton", "ToolNameField", options.default_toolid)
-  dialog:AddToolPickerValidToolType("ToolChooseButton", Tool.END_MILL)
-  dialog:AddCheckBox("NoToolpath", options.no_toolpath)
-  dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
-  dialog:AddCheckBox("UseSingleSheet", options.useSingleSheet)
-
-  -- Roundover tool picker (only used for box joints with no dogbones, see HTML/JS visibility)
-  dialog:AddLabelField("RoundoverToolNameField", "")
-  dialog:AddToolPicker("RoundoverToolChooseButton", "RoundoverToolNameField", options.roundover_default_toolid)
-  dialog:AddToolPickerValidToolType("RoundoverToolChooseButton", Tool.FORM_TOOL)
-  dialog:AddDoubleField("RoundoverCutDepthField", options.roundover_cut_depth)
-
--- Tab Type: 1 = Finger Joint, 2 = Dovetail Joint
-  local tab_default_index
-  if options.dovetailJoint then
-    tab_default_index = 2  -- last time user chose dovetails
-  else
-    tab_default_index = 1  -- last time user chose finger joints
-  end
-
-  dialog:AddRadioGroup("TabTypeRadio", tab_default_index)
-
-  local topString = faceJointTypeToString(options.lidType)
-  dialog:AddDropDownList("LidTypeSelect", topString)
-
-  local bottomString = faceJointTypeToString(options.bottomType)
-  dialog:AddDropDownList("BottomTypeSelect", bottomString)
-
-  local units_string = "Inches"
-  if options.tool.InMM then
-    units_string = "MM"
-  end
-
-  dialog:AddTextField("UnitsLabel", units_string)
-
-  -- Helpers for the geometry-validation messages below: given the inner
-  -- dimension(s) a joint width has to divide into, suggest a width that
-  -- would actually work, so the error message tells the user what to try
-  -- instead of just what's wrong.
-
-  -- Largest width that still fits at least one flap across every given
-  -- inner dimension (used when the current width is too big).
-  local function SuggestSmallerJointWidth(inner_dims)
-    local max_width = math.huge
-    for _, inner_dim in ipairs(inner_dims) do
-      max_width = math.min(max_width, 0.5 * inner_dim)
-    end
-    return truncate(math.max(max_width - 0.001, 0), 3)
-  end
-
-  -- Smallest width above current_width that leaves at least required_space
-  -- of clearance across every given inner dimension (used when the current
-  -- width is too small, or the tool won't fit between the joints). Searches
-  -- using the same formula the validator itself uses below, so the
-  -- suggestion is guaranteed self-consistent.
-  local function SuggestLargerJointWidth(current_width, inner_dims, required_space)
-    local step = options.InMM and 0.1 or 0.005
-    local max_search_width = 0
-    for _, inner_dim in ipairs(inner_dims) do
-      max_search_width = math.max(max_search_width, inner_dim)
-    end
-    max_search_width = 2 * max_search_width
-
-    local w = current_width
-    while w <= max_search_width do
-      w = w + step
-      local fits = true
-      for _, inner_dim in ipairs(inner_dims) do
-        local num_flaps = math.floor(0.5 * inner_dim / w)
-        if num_flaps < 1 then
-          fits = false
-          break
-        end
-        local tab_space = (inner_dim - num_flaps * w) / (num_flaps + 1)
-        if tab_space <= required_space then
-          fits = false
-          break
-        end
-      end
-      if fits then
-        return truncate(w, 3)
-      end
-    end
-    return nil
-  end
-
-  local validator = function(dialog)
-    -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-    local double_thickness = options.thickness * 2
-    if options.width <= double_thickness then
-      DisplayMessageBox(string.format("The box width %.3f is too small for material thickness %.3f.", options.width, options.thickness))
-      return false
-    end
-    if options.depth <= double_thickness then
-      DisplayMessageBox(string.format("The box depth %.3f is too small for material thickness %.3f.", options.depth, options.thickness))
-      return false
-    end
-    if options.height <= double_thickness then
-      DisplayMessageBox(string.format("The box height %.3f is too small for material thickness %.3f.", options.height, options.thickness))
-      return false
-    end
-
-    -- Tool must be chosen and valid (only when creating toolpaths)
-    if not options.no_toolpath then
-      if not _tool_ok(options.tool) then
-        DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid End Mill.")
-        return false
-      end
-    end
-
-    -- Roundover tool + cut depth are only required for box joints with no dogbones (mirrors HTML/JS visibility)
-    local roundover_needed = (not options.no_toolpath) and (not options.dovetailJoint) and (not options.create_dogbones)
-    if roundover_needed then
-      if not _tool_ok(options.roundover_tool) then
-        DisplayMessageBox("No roundover tool selected or tool diameter is invalid.\n\nClick 'Select Roundover Tool' and pick a valid tool.")
-        return false
-      end
-      if not _is_nonneg(options.roundover_cut_depth) or options.roundover_cut_depth <= 0 then
-        DisplayMessageBox("Roundover cut depth must be greater than 0.")
-        return false
-      end
-      if options.roundover_cut_depth > (options.tool.ToolDia/2) then
-        DisplayMessageBox("Make sure your roundover bit and depth are correct for your cutting tool.\nUsually the roundover cut depth should be less than or equal to half the diameter of the cutting tool.\n\nI have created the requested toolpaths but these could be wrong.")
-      end
-    end
-
-    -- At least one face must be selected
-    local at_least_one =
-      options.facesToMake.lid or options.facesToMake.bottom or options.facesToMake.side1 or
-      options.facesToMake.side2 or options.facesToMake.end1 or options.facesToMake.end2
-    if not at_least_one then
-      DisplayMessageBox("Select at least one face to create (Lid / Bottom / Sides / Ends).")
-      return false
-    end
-
-    -- Edge margin must be non-negative
-    if not _is_nonneg(options.clampingMargin) then
-      DisplayMessageBox("Edge margin must be ≥ 0.")
-      return false
-    end
-
-    local inner_width = options.width - double_thickness
-    local inner_depth = options.depth - double_thickness
-
-    -- the inner height needs to be computed
-    -- based on options for lid and bottom
-    local inner_height = options.height - ThicknessForFaceType(options.lidType, options.thickness) - ThicknessForFaceType(options.bottomType, options.thickness)
-
-    -- Gremlin added join size seperations overall
-    local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomDoveTail.min_width)
-    local total_tab_space_w_bottom = (inner_width - num_flaps_w_bottom*bottomDoveTail.min_width)
-    local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomDoveTail.min_width)
-    local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomDoveTail.min_width)
-
-    if (options.bottomType == FaceJointType.Fingers) then
-      if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
-        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        local suggestion_text = string.format(" Try a joint width of %.3f or smaller.", suggested)
-        if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner width is %.3f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
-        else
-          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner width is %.3f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
-        end
-        return false
-      end
-
-      if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
-        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        local suggestion_text = string.format(" Try a joint width of %.3f or smaller.", suggested)
-        if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.3f is too big given boxes bottom given the inner depth is %.3f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
-        else
-          DisplayMessageBox(string.format("The bottom joint width %.3f is too big given box inner depth is %.3f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
-        end
-        return false
-      end
-    end
-
-    local num_flaps_w_lid = math.floor((0.5*inner_width) / lidDoveTail.min_width)
-    local total_tab_space_w_lid = (inner_width - num_flaps_w_lid*lidDoveTail.min_width)
-    local num_flaps_d_lid = math.floor((0.5*inner_depth) / lidDoveTail.min_width)
-    local total_tab_space_d_lid = (inner_depth - num_flaps_d_lid*lidDoveTail.min_width)
-
-    -- check the joint widths only when making a tabbed lid
-    if (options.lidType == FaceJointType.Fingers) then
-      if (num_flaps_w_lid < 1) or (total_tab_space_w_lid < 0) then
-        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner width is %.3f. Try a joint width of %.3f or smaller.", lidDoveTail.min_width, inner_width, suggested))
-        return false
-      end
-      if (num_flaps_d_lid < 1) or (total_tab_space_d_lid < 0) then
-        local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        DisplayMessageBox(string.format("The lid joint width %.3f is too big given box inner depth is %.3f. Try a joint width of %.3f or smaller.", lidDoveTail.min_width, inner_depth, suggested))
-        return false
-      end
-    end
-
-    local num_flaps_h = math.floor((0.5*inner_height) / sideDoveTail.min_width)
-    local total_tab_space_h = (inner_height - num_flaps_h*sideDoveTail.min_width)
-
-    if (num_flaps_h < 1) or (total_tab_space_h < 0) then
-      local suggested = SuggestSmallerJointWidth({inner_height})
-      DisplayMessageBox(string.format("The side joint width %.3f is too big given box inner height is %.3f. Try a joint width of %.3f or smaller.", sideDoveTail.min_width, inner_height, suggested))
-      return false
-    end
-
-    -- Check if tool will fit
-    local mtl_block = MaterialBlock()
-    local converted_tool_diameter = 0.25
-    if _tool_ok(options.tool) then
-      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
-    end
-
-    local dia = converted_tool_diameter
-    if options.allowance > 0 then
-      dia = dia - 2 * options.allowance
-    end
-
-    if (dia <= 0) then
-      DisplayMessageBox("The allowance is too large given the tool diameter.\n\nThe allowance must be less than half the tool diameter.")
-      return false
-    end
-    
-    local tab_space_w_bottom = total_tab_space_w_bottom / (num_flaps_w_bottom + 1)
-    local tab_space_d_bottom = total_tab_space_d_bottom / (num_flaps_d_bottom + 1)
-    local tab_space_w_lid = total_tab_space_w_lid / (num_flaps_w_lid + 1)
-    local tab_space_d_lid = total_tab_space_d_lid / (num_flaps_d_lid + 1)
-    local tab_space_h = total_tab_space_h / (num_flaps_h + 1)
-
-    if options.dovetailJoint then
-      local min_space = sideDoveTail.max_width - sideDoveTail.min_width
-      -- Gremlin added bottomDoveTail seperation from side which
-      local bottom_min_space = bottomDoveTail.max_width - bottomDoveTail.min_width
-      local top_min_space = lidDoveTail.max_width - lidDoveTail.min_width
-
-      -- A mathematically exact fit is not sufficient for Vectric's offset engine.
-      -- Keep 0.010 inch (0.254 mm) extra clearance so near-tangent CutOut
-      -- offsets do not create an invalid or incomplete toolpath. Computed up
-      -- here (rather than just before it's first needed below) so the
-      -- "too small" checks right after can also use it to suggest a width
-      -- that will actually let the tool fit, not just clear the dovetails.
-      local toolpath_safety_clearance = options.InMM and 0.254 or 0.010
-      local required_side_space = min_space + dia + toolpath_safety_clearance
-      local required_bottom_space = bottom_min_space + dia + toolpath_safety_clearance
-      local required_lid_space = top_min_space + dia + toolpath_safety_clearance
-
-      -- make sure dovetails don't overlap
-      if (options.bottomType == FaceJointType.Fingers) and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
-        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The joint width is too small for the bottom." .. suggestion_text)
-        return false
-      end
-
-      if (tab_space_h <= min_space) then
-        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The joint width is too small for the side." .. suggestion_text)
-        return false
-      end
-
-      if (options.lidType == FaceJointType.Fingers) then
-        if (tab_space_w_lid <= top_min_space) or (tab_space_d_lid <= top_min_space) then
-          local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
-          local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-          DisplayMessageBox("The joint width is too small for the lid." .. suggestion_text)
-          return false
-        end
-      end
-
-      if (tab_space_h <= required_side_space) then
-        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
-        return false
-      end
-      if (tab_space_w_bottom <= bottom_min_space) or
-         (tab_space_d_bottom <= bottom_min_space) or
-         ((options.bottomType == FaceJointType.Fingers) and
-           ((tab_space_w_bottom <= (required_bottom_space)) or (tab_space_d_bottom <= (required_bottom_space)))) then
-        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
-        return false
-      end
-
-      if (tab_space_w_lid <= top_min_space) or
-         (tab_space_d_lid <= top_min_space) or
-         ((options.lidType == FaceJointType.Fingers) and
-           ((tab_space_w_lid <= (required_lid_space)) or (tab_space_d_lid <= (required_lid_space)))) then
-        local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
-        return false
-      end
-    else
-      -- Gremlin added bottomDoveTail seperation from side
-      tab_space_w_bottom = math.min(tab_space_w_bottom, bottomDoveTail.min_width)
-      tab_space_d_bottom = math.min(tab_space_d_bottom, bottomDoveTail.min_width)
-      tab_space_w_lid = math.min(tab_space_w_lid, lidDoveTail.min_width)
-      tab_space_d_lid = math.min(tab_space_d_lid, lidDoveTail.min_width)
-      tab_space_h = math.min(tab_space_h, sideDoveTail.min_width)
-      if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then
-        local suggested = SuggestLargerJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, dia)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
-        return false
-      end
-      if (tab_space_h <= dia) then
-        local suggested = SuggestLargerJointWidth(sideDoveTail.min_width, {inner_height}, dia)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
-        return false
-      end
-      if (options.useAllJointWidths and options.lidType == FaceJointType.Fingers and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
-        if (tab_space_w_lid <= dia) or (tab_space_d_lid <= dia) then
-          local suggested = SuggestLargerJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, dia)
-          local suggestion_text = suggested and string.format(" Try a joint width of %.3f or larger.", suggested) or ""
-          DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
-          return false
-        end
-      end
-    end
-
-    return true
-  end
-
-  if GetBuildVersion() >= 9.513 then
-    dialog:OnValidate(validator)  
-    local success = dialog:ShowDialog()
-
-    if not success then
-      ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-      SaveDefaultsToRegistry(options, true) -- the user hit cancel but save the window settings anyways
-      return false
-    end
-  else  
-    repeat
-      local success = dialog:ShowDialog()
-
-      if not success then
-        return false
-      end
-    until validator(dialog)    
-  end
-
-  -- Gremlin added joint width seperation
-  -- this is actually getting called twice, once here and once in the
-  -- validator logic, is that correct?
-  ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-
-  return true
-end
-
--- Gremlin added joint width seperation for sides top and bottom
--- This function will read the options out of the dialog
-function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-  -- Read back data from the form
-  options.width     = dialog:GetDoubleField("WidthField")
-  options.depth     = dialog:GetDoubleField("DepthField")
-  options.height    = dialog:GetDoubleField("HeightField")
-  options.sideOrAllTabWidth  = dialog:GetDoubleField("SideTabWidthField")
-  sideDoveTail.min_width = options.sideOrAllTabWidth
-  -- Gremlin added joint width seperation for sides top and bottom
-  options.useAllJointWidths = dialog:GetCheckBox("AllJointWidths")
-  options.bottomTabWidth = dialog:GetDoubleField("BottomTabWidthField")
-  options.lidTabWidth = dialog:GetDoubleField("TopTabWidthField")
-
-  options.dark_mode     = dialog:GetCheckBox("DarkMode")
-  options.label_faces   = dialog:GetCheckBox("LabelFaces")
-  options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
-
-  options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
-  options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
-  options.useSingleSheet = dialog:GetCheckBox("UseSingleSheet")
-  options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
-  options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
-  options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
-  options.facesToMake.side2    = dialog:GetCheckBox("MakeSide2")
-  options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
-  options.facesToMake.end2     = dialog:GetCheckBox("MakeEnd2")
-  options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
-
-
-  -- Set up the dovetail widths based on if we're using separate widths for each piece
-  -- or not, use sidedovetail size for everything if not.
-  if not options.useAllJointWidths then
-    bottomDoveTail.min_width = sideDoveTail.min_width
-    lidDoveTail.min_width = sideDoveTail.min_width
-  else
-    bottomDoveTail.min_width = options.bottomTabWidth
-    lidDoveTail.min_width = options.lidTabWidth
-  end 
-
-  sideDoveTail.max_width = sideDoveTail.min_width + (2 * options.thickness / math.tan(sideDoveTail.angle))
-  bottomDoveTail.max_width = bottomDoveTail.min_width + (2* options.thickness/ math.tan(bottomDoveTail.angle))
-  lidDoveTail.max_width = lidDoveTail.min_width + (2 * options.thickness / math.tan(lidDoveTail.angle))
-
-  options.allowance   = dialog:GetDoubleField("AllowanceField")
-  options.partSpacing = dialog:GetDoubleField("PartSpacingField")
-  options.clampingMargin = dialog:GetDoubleField("ClampingMargin")
-  if not options.clampingMargin or options.clampingMargin <= 0 then
-    options.clampingMargin = 0.75
-  end
-
-
-  local tab_index = dialog:GetRadioIndex("TabTypeRadio")
-  if tab_index == 1 then
-    options.dovetailJoint = false   -- Box joints
-  else
-    options.dovetailJoint = true    -- Dovetail joints
-  end
-
-  local lid_type = dialog:GetDropDownListValue("LidTypeSelect")
-  options.lidType = FaceJointType[lid_type]
-
-  local bottom_type = dialog:GetDropDownListValue("BottomTypeSelect")
-  options.bottomType = FaceJointType[bottom_type]
-
-
-  -- Get from tool picker
-  options.tool = dialog:GetTool("ToolChooseButton")
-
-  -- Roundover tool + cut depth
-  options.roundover_tool = dialog:GetTool("RoundoverToolChooseButton")
-  options.roundover_cut_depth = dialog:GetDoubleField("RoundoverCutDepthField")
-
-  ------------------------------------------------------------------
-  -- NEW: clamp Joint Width (SideTabWidthField) to
-  --      max(existing_width, calculated_min_for_tool)
-  ------------------------------------------------------------------
-  if _tool_ok(options.tool) then
-    local mtl_block = MaterialBlock()
-    local raw_dia   = ConvertUnitsFrom(options.tool.ToolDia or 0, options.tool, mtl_block)
-
-    -- Apply Allowance the same way as in your validator
-    local effective_dia = raw_dia
-    if options.allowance and options.allowance > 0 then
-      effective_dia = effective_dia - 2 * options.allowance
-      if effective_dia < 0 then
-        effective_dia = 0
-      end
-    end
-
-    -- This is the "calculated minimum" joint width for this tool
-    local calculated_min = effective_dia
-
-    if calculated_min and calculated_min > 0 then
-      local current_width = options.sideOrAllTabWidth or sideDoveTail.min_width
-      local new_width     = math.max(current_width, calculated_min)
-
-      if new_width ~= current_width then
-        options.sideOrAllTabWidth   = new_width
-        sideDoveTail.min_width = new_width
-
-        -- Push it back into the dialog so user sees the update
-        if dialog.SetDoubleField ~= nil then
-          dialog:SetDoubleField("SideTabWidthField", new_width)
-        end
-      end
-    end
-  end
-  ------------------------------------------------------------------
-
-  options.window_width  = dialog.WindowWidth
-  options.window_height = dialog.WindowHeight
-end
-
-function SaveDefaultsToRegistry(options, justwindowinfo)
-  local registry = Registry("BoxCreator_" .. g_version)
-
-  -- UX defaults
-  registry:SetDouble("WindowWidth", options.window_width)
-  registry:SetDouble("WindowHeight", options.window_height)
-  registry:SetBool("DarkMode", options.dark_mode)
-  registry:SetBool("LabelFaces", options.label_faces)
-  registry:SetString("ZoomLevel", options.ZoomLevel)
-
-  if justwindowinfo then
-    return
-  end
-
-  -- Box dimension settings
-  registry:SetDouble("Width", options.width)
-  registry:SetDouble("Height", options.height)
-  registry:SetDouble("Depth", options.depth)
-  registry:SetBool("InMM", options.InMM)
-  registry:SetDouble("JointWidth", options.sideOrAllTabWidth)
-  registry:SetDouble("BottomJointWidth", options.bottomTabWidth)     -- Added by Gremlin
-  registry:SetDouble("TopJointWidth", options.lidTabWidth)         -- Added by Gremlin
-  registry:SetBool("AllJointWidths", options.useAllJointWidths)           -- Added by Gremlin
-
-  registry:SetDouble("Allowance", options.allowance)                 -- Added by Sharkcutup
-  registry:SetDouble("PartsSpacing", options.partSpacing)
-  registry:SetDouble("EdgeMargin", options.clampingMargin)              -- Added by Sharkcutup
-
-  registry:SetBool("CutDovetails", options.dovetailJoint)
-  registry:SetDouble("LidType", options.lidType)
-  registry:SetDouble("BottomType", options.bottomType)
-
-  if options.tool ~= nil then
-    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
-  end
-
-  registry:SetBool("NoToolpath", options.no_toolpath)
-  registry:SetBool("CreateDogbones", options.create_dogbones)
-  registry:SetBool("SingleSheetBestEffort", options.useSingleSheet)
-
-  registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
-  if options.roundover_tool ~= nil then
-    options.roundover_tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "Roundover")
-  end
-
-  -- Machining settings
-  registry:SetBool("MakeLid", options.facesToMake.lid)
-  registry:SetBool("MakeBottom", options.facesToMake.bottom)
-  registry:SetBool("MakeSide1", options.facesToMake.side1)
-  registry:SetBool("MakeSide2", options.facesToMake.side2)
-  registry:SetBool("MakeEnd1", options.facesToMake.end1)
-  registry:SetBool("MakeEnd2", options.facesToMake.end2)
-  registry:SetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
-
-end
-
--- Gremlin added bottomDoveTail separation from side which is just dovetail
-function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDoveTail)
-  local registry =  Registry("BoxCreator_" .. g_version)
-
-  options.window_width = registry:GetDouble("WindowWidth", options.window_width)
-  options.window_height = registry:GetDouble("WindowHeight", options.window_height)
-
-  options.width = registry:GetDouble("Width", options.width)
-  options.height = registry:GetDouble("Height", options.height)
-  options.depth = registry:GetDouble("Depth", options.depth)
-  options.InMM = registry:GetBool("InMM", options.InMM)
-  options.sideOrAllTabWidth = registry:GetDouble("JointWidth", options.sideOrAllTabWidth)
-  options.bottomTabWidth = registry:GetDouble("BottomJointWidth", options.sideOrAllTabWidth)  --Added by Gremlin
-  options.lidTabWidth = registry:GetDouble("TopJointWidth", options.sideOrAllTabWidth)      --Added by Gremlin
-  options.useAllJointWidths = registry:GetBool("AllJointWidths", options.useAllJointWidths)  -- Added by Gremlin
-
-  options.allowance = registry:GetDouble("Allowance", options.allowance)           -- Added by Sharkcutup
-  options.partSpacing = registry:GetDouble("PartsSpacing", options.partSpacing)
-  options.clampingMargin = registry:GetDouble("EdgeMargin", options.clampingMargin)      -- Added by Sherkcutup
-
-  -- sideDoveTail.min_width = options.sideOrAllTabWidth
-  -- bottomDoveTail.min_width = options.bottomTabWidth -- Added by Gremlin
-  -- lidDoveTail.min_width = options.lidTabWidth -- Added by Gremlin
-  options.dovetailJoint = registry:GetBool("CutDovetails", options.dovetailJoint)
-  options.lidType = registry:GetDouble("LidType", options.lidType)
-  options.bottomType = registry:GetDouble("BottomType", options.bottomType)
-  options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
-
-  options.roundover_cut_depth = registry:GetDouble("RoundoverCutDepth", options.roundover_cut_depth)
-  options.roundover_default_toolid = ToolDBId("BoxCreator_"..g_version, "Roundover")
-
-  options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
-  options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
-  options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
-  options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
-  options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
-  options.useSingleSheet = registry:GetBool("SingleSheetBestEffort", options.useSingleSheet)
-
-  options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
-  options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)
-  options.facesToMake.side1 = registry:GetBool("MakeSide1", options.facesToMake.side1)
-  options.facesToMake.side2 = registry:GetBool("MakeSide2", options.facesToMake.side2)
-  options.facesToMake.end1 = registry:GetBool("MakeEnd1", options.facesToMake.end1)
-  options.facesToMake.end2 = registry:GetBool("MakeEnd2", options.facesToMake.end2)
-  options.create_tabs_for_missing_faces = registry:GetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
-
-end
-
-function truncate(num, decimals)
-  if type(num) ~= "number" or type(decimals) ~= "number" then
-    error("Both arguments must be numbers")
-  end
-  if decimals < 0 then
-    error("Decimal places must be non-negative")
-  end
-
-  local factor = 10 ^ decimals
-  -- math.floor for truncating toward negative infinity
-  -- For truncating toward zero, use conditional logic
-  if num >= 0 then
-    return math.floor(num * factor) / factor
-  else
-    return math.ceil(num * factor) / factor
-  end
 end
 
 -- function OnToolPicker_ToolChooseButton(dialog) 
