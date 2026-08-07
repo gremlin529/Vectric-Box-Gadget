@@ -283,7 +283,7 @@
     local tool_radius = 0.5 * ConvertUnitsFrom(tool.ToolDia or 0, tool, MaterialBlock())
     local flute_fit_offset = math.max(0, tool_radius - 0.02)
     -- local flute_spacing  = tool.ToolDia / 2 -- I think this should be 1/2 the bit size...
-    local flute_spacing = tool.Stepover -- Use the stepover instead of tool diameter for spacing
+    local flute_spacing = ConvertUnitsFrom(tool.Stepover or 0, tool, MaterialBlock()) -- Use the stepover instead of tool diameter for spacing
 
     local along = socket.along
     local out   = socket.out
