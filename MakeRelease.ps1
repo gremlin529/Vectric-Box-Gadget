@@ -76,6 +76,10 @@ $filesToRelease = @(
     $mainLuaFile,
     $mainHTMLFile,
     "CreateFaces.xlua",
+    "Helpers.xlua",
+    "Dovetails.xlua",
+    "SheetArrangement.xlua",
+    "DisplayDialog.xlua",
     "stylesheets",
     "images"
 )

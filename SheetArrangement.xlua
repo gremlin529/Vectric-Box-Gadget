@@ -1,0 +1,340 @@
+-- VECTRIC LUA SCRIPT
+-- SheetArrangement.xlua
+--
+-- Shelf-packing layout of faces onto one or more material sheets, plus the
+-- sheet-manager glue (finding/creating/activating a "Sheet N" in the job).
+
+--[[  -------------- ArrangeContours --------------------------------------------------
+|
+|  Best-effort single-sheet layout, using the same shelf packing and rotation
+|  as ArrangeContoursToSheets, but restricted to one sheet. Faces are placed
+|  largest first, trying both the original and a 90 degree rotated orientation
+|  so pieces backfill gaps rather than wasting space.
+|
+|  A face that doesn't fit within the material at all (even rotated) is still
+|  stacked above the rest and returned rather than aborting, so it overhangs
+|  the sheet and the user can adjust the job size or move it afterwards.
+|
+]]
+  function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin)
+
+    local transformed_faces = {}
+
+    if #faces == 0 then
+      return transformed_faces
+    end
+
+    local usable_right = job_width - edge_margin
+    local usable_top   = job_height - edge_margin
+
+    -- Place the biggest faces first so the small ones can backfill around them.
+    -- This only changes the order we place in; the faces are returned in their
+    -- original order so everything downstream is unaffected.
+    local order = {}
+    for i = 1, #faces do
+      local bounds = faces[i].contour.BoundingBox2D
+      order[#order + 1] = {
+        index = i,
+        long  = math.max(bounds.XLength, bounds.YLength),
+        short = math.min(bounds.XLength, bounds.YLength)
+      }
+    end
+
+    table.sort(order, function(a, b)
+      if a.long ~= b.long then return a.long > b.long end
+      if a.short ~= b.short then return a.short > b.short end
+      return a.index < b.index
+    end)
+
+    local sheet = { shelves = {} }
+
+    for i = 1, #order do
+      local face = faces[order[i].index]
+      local bounds = face.contour.BoundingBox2D
+      local width = bounds.XLength
+      local height = bounds.YLength
+
+      local x, y, shelf = SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet, height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
+      end
+
+      if x == nil then
+        -- Nothing fits within the material, even rotated. Stack it above
+        -- everything else and let it overhang rather than failing.
+        local new_y = edge_margin
+        if #sheet.shelves > 0 then
+          local top = sheet.shelves[#sheet.shelves]
+          new_y = top.y + top.height + clearance_gap
+        end
+        shelf = { y = new_y, height = height, x_cursor = edge_margin + width + clearance_gap }
+        sheet.shelves[#sheet.shelves + 1] = shelf
+        x, y = edge_margin, new_y
+        rotated = false
+      end
+
+      local placed_width  = rotated and height or width
+      local placed_height = rotated and width or height
+
+      PlaceFaceAt(face, x, y, rotated)
+
+      shelf.x_cursor = x + placed_width + clearance_gap
+      if placed_height > shelf.height then
+        shelf.height = placed_height
+      end
+    end
+
+    for i = 1, #faces do
+      transformed_faces[#transformed_faces + 1] = faces[i]
+    end
+
+    return transformed_faces
+  end
+
+
+--[[  -------------- ArrangeContoursToSheets ------------------------------------------
+|
+|  Sheet Management layout. Assigns each face to a sheet and positions it, then
+|  returns the faces (in their original order) and the number of sheets required.
+|
+|  Shelf packing: each sheet holds a list of shelves (rows) running bottom to top.
+|  Faces are placed largest first, and for each face every open sheet is tried in
+|  turn - earliest sheet first, and in both the original and a 90 degree rotated
+|  orientation - so a face will backfill a gap on an earlier sheet rather than
+|  forcing a new one. A new sheet is only opened when nothing fits anywhere.
+|
+|  As with ArrangeContours, a face that is too big for the material is still laid
+|  out (overhanging its sheet) rather than aborting, so the user can adjust the
+|  job size afterwards.
+|
+]]
+
+-- Try to fit a width x height box on a sheet, starting a new shelf if that is
+-- what it takes. Returns x, y and the shelf it landed on, or nil if it will not
+-- fit. The caller advances the shelf's cursor once the face is actually placed.
+function SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+  local shelves = sheet.shelves
+
+  for i = 1, #shelves do
+    local shelf = shelves[i]
+    -- Only the topmost shelf is allowed to grow taller; anything below it has
+    -- a shelf sitting on top of it and would overlap.
+    local vertical_fit
+    if i == #shelves then
+      vertical_fit = (shelf.y + height) <= usable_top
+    else
+      vertical_fit = height <= shelf.height
+    end
+
+    if vertical_fit and ((shelf.x_cursor + width) <= usable_right) then
+      return shelf.x_cursor, shelf.y, shelf
+    end
+  end
+
+  -- No existing shelf works, so start a new one above the topmost.
+  local new_y = edge_margin
+  if #shelves > 0 then
+    local top = shelves[#shelves]
+    new_y = top.y + top.height + clearance_gap
+  end
+
+  if ((new_y + height) <= usable_top) and ((edge_margin + width) <= usable_right) then
+    local shelf = { y = new_y, height = 0, x_cursor = edge_margin }
+    shelves[#shelves + 1] = shelf
+    return shelf.x_cursor, shelf.y, shelf
+  end
+
+  return nil
+end
+
+-- RotationMatrix2D's angle argument isn't documented as radians or degrees, and
+-- getting it wrong would silently skew every rotated part instead of turning it.
+-- Work it out once by rotating a throwaway 2 x 1 contour and checking whether
+-- its bounding box actually swapped over.
+local g_quarter_turn = nil
+
+function QuarterTurnAngle()
+  if g_quarter_turn ~= nil then
+    return g_quarter_turn
+  end
+
+  local probe = Contour(0.0)
+  probe:AppendPoint(Point2D(0.0, 0.0))
+  probe:LineTo(Point2D(2.0, 0.0))
+  probe:LineTo(Point2D(2.0, 1.0))
+  probe:Transform(RotationMatrix2D(Point2D(0.0, 0.0), math.pi / 2.0))
+
+  if math.abs(probe.BoundingBox2D.XLength - 1.0) < 0.001 then
+    g_quarter_turn = math.pi / 2.0
+  else
+    g_quarter_turn = 90.0
+  end
+
+  return g_quarter_turn
+end
+
+-- Move a face so the lower left of its bounding box sits at (x, y), rotating it
+-- 90 degrees first if asked.
+function PlaceFaceAt(face, x, y, rotated)
+  if rotated then
+    local bounds = face.contour.BoundingBox2D
+    local pivot = Point2D(bounds.MinX, bounds.MinY)
+    TransformFace(face, RotationMatrix2D(pivot, QuarterTurnAngle()))
+  end
+
+  local bounds = face.contour.BoundingBox2D
+  TransformFace(face, TranslationMatrix2D(Vector2D(x - bounds.MinX, y - bounds.MinY)))
+end
+
+function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
+  local transformed_faces = {}
+  if #faces == 0 then
+    return transformed_faces, 1
+  end
+
+  local usable_right = job_width - edge_margin
+  local usable_top   = job_height - edge_margin
+
+  -- Place the biggest faces first so the small ones can backfill around them.
+  -- This only changes the order we place in; the faces are returned in their
+  -- original order so everything downstream is unaffected.
+  local order = {}
+  for i = 1, #faces do
+    local bounds = faces[i].contour.BoundingBox2D
+    order[#order + 1] = {
+      index = i,
+      long  = math.max(bounds.XLength, bounds.YLength),
+      short = math.min(bounds.XLength, bounds.YLength)
+    }
+  end
+
+  table.sort(order, function(a, b)
+    if a.long ~= b.long then return a.long > b.long end
+    if a.short ~= b.short then return a.short > b.short end
+    return a.index < b.index
+  end)
+
+  local sheets = {}
+
+  local function AddSheet()
+    sheets[#sheets + 1] = { shelves = {} }
+    return sheets[#sheets]
+  end
+
+  AddSheet()
+
+  for i = 1, #order do
+    local face = faces[order[i].index]
+    local bounds = face.contour.BoundingBox2D
+    local width = bounds.XLength
+    local height = bounds.YLength
+
+    local placed = false
+
+    -- Sheet major, so earlier sheets fill up before a later one is used.
+    for sheet_num = 1, #sheets do
+      local sheet = sheets[sheet_num]
+
+      local x, y, shelf = SheetClaimSpace(sheet,width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet,height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
+      end
+
+      if x ~= nil then
+        local placed_width  = rotated and height or width
+        local placed_height = rotated and width or height
+
+        face.sheet_number = sheet_num
+        PlaceFaceAt(face, x, y, rotated)
+
+        shelf.x_cursor = x + placed_width + clearance_gap
+        if placed_height > shelf.height then
+          shelf.height = placed_height
+        end
+
+        placed = true
+        break
+      end
+    end
+
+    if not placed then
+      -- Nothing fits, which for a face larger than the material is expected.
+      -- Give it a sheet of its own and let it overhang rather than failing.
+      -- Reuse the last sheet if nothing has landed on it yet.
+      local sheet = sheets[#sheets]
+      if #sheet.shelves > 0 then
+        sheet = AddSheet()
+      end
+      sheet.shelves[1] = { y = edge_margin, height = height,
+                           x_cursor = edge_margin + width + clearance_gap }
+
+      face.sheet_number = #sheets
+      PlaceFaceAt(face, edge_margin, edge_margin, false)
+    end
+  end
+
+  for i = 1, #faces do
+    transformed_faces[#transformed_faces + 1] = faces[i]
+  end
+
+  return transformed_faces, #sheets
+end -- ArrangeContoursToSheets
+
+function SheetFindId(job, sheet_name)
+  local sheet_manager = job.SheetManager
+  local sheet_ids = sheet_manager:GetSheetIds()
+  for id in sheet_ids do
+    if sheet_manager:GetSheetName(id) == sheet_name then
+      return id
+    end
+  end
+  return nil
+end
+
+function SetSheet(job, sheet_name)
+  local id = SheetFindId(job, sheet_name)
+  if id == nil then
+    DisplayMessageBox("Could not find sheet: " .. tostring(sheet_name))
+    return false
+  end
+  job.SheetManager.ActiveSheetId = id
+  return true
+end
+
+function SheetEnsureExists(job, sheet_number)
+  local sheet_name = "Sheet " .. tostring(sheet_number)
+  local sheet_manager = job.SheetManager
+  local existing_id = SheetFindId(job, sheet_name)
+  if existing_id ~= nil then
+    sheet_manager.ActiveSheetId = existing_id
+    return true
+  end
+
+  local source_sheet_id = SheetFindId(job, "Sheet 1")
+  if source_sheet_id == nil then
+    DisplayMessageBox("Sheet 1 was not found. Cannot create " .. sheet_name .. ".")
+    return false
+  end
+
+  local material_block = MaterialBlock()
+  sheet_manager:CreateSheets(
+    1,
+    source_sheet_id,
+    Box2D(Point2D(0, 0), Point2D(material_block.Width, material_block.Height))
+  )
+
+  local new_id = SheetFindId(job, sheet_name)
+  if new_id ~= nil then
+    sheet_manager.ActiveSheetId = new_id
+    return true
+  end
+
+  DisplayMessageBox("Unable to create " .. sheet_name .. ".")
+  return false
+end
