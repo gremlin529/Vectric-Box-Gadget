@@ -31,9 +31,13 @@ To do this follow these steps
 9. Now you should have a code editor opened and can edit and view the lua file for the script and the html and stylesheets for the html
 
 10. to create a new branch to make changes in type something like `git switch -c <user>/<branchname>` where the name is something descriptive about what you are doing for instance I might have used `git switch -c gremlin/bottomtabs`
+    
+11. Now you can work on the code as you'd like making edits and such, at anytime you can create a commit back to your branch (look up the commands `git commit` and `git push` or most editors will do this for you. It's a good idea to compare the changes before you push the commit to ensure that there's no inadvertent changes included. 
 
 It would be a good idea to watch or look up some basic tutorials on working with GIT if you don't have the experience, but using VS Code you can push code up to your branch and then from the github ux create a pull request to reintegrate that code back into the project
 
 ## How Releases work
 
 I have created a powershell script called MakeRelease.ps1 which when run will take a version number it will generate the proper files to release a version of the gadget and places it in the releases directory where it can also be pushed for review. In doing this it will do all the work of renaming the files from _dev version to the running version for you.
+
+It will create a `.vgadget` file in the releases directory which can then be uploaded on the git-hub releases tab for the project. It's recommended you create beta releases out of the branch they're created in with an appropriate label e.g. `12_1_beta1` Once a release is ready to finalise you can create a pull request to bring it back to main using the Git-hub ui. This pull request should be reviewed again to make sure you 
