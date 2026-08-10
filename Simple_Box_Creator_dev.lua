@@ -103,6 +103,7 @@ function main(script_path)
   options.clampingMargin = 0.75             --- edge margin default
 
   options.dovetailJoint = false             --- if false means we're making box joints, true dovetails
+  options.dovetailAngleDegrees = g_doveTailAngleDegrees --- angle of the dovetail joint in degrees, only used/shown when dovetailJoint is true
   options.lidType = FaceJointType.Inset -- default lid type is inset
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
@@ -149,6 +150,13 @@ function main(script_path)
   lidDoveTail.depth = options.thickness
 
   LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDoveTail)
+
+  -- Registry may have loaded a saved dovetail angle, so refresh the angle
+  -- used by each dovetail table (min_width/max_width are refreshed later,
+  -- once the dialog has actually run, in ReadOptionsFromDialog).
+  sideDoveTail.angle = math.rad(options.dovetailAngleDegrees)
+  bottomDoveTail.angle = math.rad(options.dovetailAngleDegrees)
+  lidDoveTail.angle = math.rad(options.dovetailAngleDegrees)
 
   -- Check to see if the previous set of dimensions were in Inches and now we're in mm or viceversa
   -- and do the appropriate conversions if needed so we display reasonable values
