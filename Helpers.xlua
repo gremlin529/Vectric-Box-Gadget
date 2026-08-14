@@ -5,9 +5,12 @@
 -- contour/line construction primitives, job/layer/selection utilities, part
 -- labeling (the stick-font DrawWriter), and the finger-side/cutout toolpaths.
 
-function _is_nonneg(x) return type(x)=="number" and x>=0 end
+function IsNonNeg(x) return type(x)=="number" and x>=0 end
 
-function truncate(num, decimals)
+---Truncates a number to a specified number of decimal places.
+---@param num number number to truncate
+---@param decimals number number of decimal places to truncate to
+function Truncate(num, decimals)
   if type(num) ~= "number" or type(decimals) ~= "number" then
     error("Both arguments must be numbers")
   end
@@ -25,7 +28,7 @@ function truncate(num, decimals)
   end
 end
 
-function _tool_ok(tool)
+function Tool_ok(tool)
   if not tool then return false end
   local blk = MaterialBlock()
   local dia = ConvertUnitsFrom(tool.ToolDia or 0, tool, blk)
@@ -506,7 +509,7 @@ function GetFriendlyFaceLabel(face)
 
 function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roundover_cut_depth, exact_objects)
 
-  if not _tool_ok(roundover_tool) then
+  if not Tool_ok(roundover_tool) then
     DisplayMessageBox("Finger Side Toolpath: Please select a valid tool before continuing.")
     return false
   end
@@ -559,7 +562,7 @@ end
 
 function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects)
 
-  if not _tool_ok(tool) then
+  if not Tool_ok(tool) then
     DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
     return false
   end

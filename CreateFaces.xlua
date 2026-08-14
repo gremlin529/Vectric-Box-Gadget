@@ -36,7 +36,7 @@ function ThicknessForFaceType(faceType, thickness)
   return thickness
 end
 
-function faceJointTypeToString( joint )
+function FaceJointTypeToString( joint )
   for k, v in pairs(FaceJointType) do
     if (v == joint) then
       return k
@@ -133,7 +133,7 @@ end
 -- that somehow we then want to add.
 -- each fingerSides on a face is a ContourGroup
 function GetAllFingerSides(faces)
-  fingerSideArray = {}
+  local fingerSideArray = {}
   for i=1,#faces do
     if (faces[i].fingerSides ~= nil) then
       fingerSideArray[#fingerSideArray + 1] = faces[i].fingerSides:Clone()
@@ -144,7 +144,7 @@ end
 
 function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
 
-  if not _tool_ok(tool) then
+  if not Tool_ok(tool) then
     DisplayMessageBox("Pocket Toolpath: Please select a valid tool before continuing.")
     return false
   end
@@ -156,8 +156,9 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
     if (cur_face.jointtype == FaceJointType.Inset) then
       local pos = cur_face.inset_contours:GetHeadPosition()
       while pos ~= nil do
+        local contour
         contour, pos = cur_face.inset_contours:GetNext(pos)
-        cad_contour = CreateCadContour(contour)
+        local cad_contour = CreateCadContour(contour)
         cad_object_list:AddTail(cad_contour)
       end
 

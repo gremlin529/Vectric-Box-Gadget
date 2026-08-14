@@ -48,17 +48,17 @@
 -- need addressing first
 -- require("strict")
 
-g_version = "dev"                                                 
-g_subVersion = "development"                                      
-g_title = "Simple Box"
-g_width = 890
-g_height = 962                                               
-g_html_file = "Simple_Box_Creator_" .. g_version .. ".html"       
-g_finger_side_layer_name = "Finger Roundover"
-g_box_layer_name = "Box"
-g_labels_layer_name = "Labels"
-g_cutout_layer_name = "CutOut"
-g_doveTailAngleDegrees = 60
+G_version = "dev"                                                 
+G_subVersion = "development"                                      
+G_title = "Simple Box"
+G_width = 890
+G_height = 962                                               
+G_htmlFile = "Simple_Box_Creator_" .. G_version .. ".html"       
+G_fingerSideLayerName = "Finger Roundover"
+G_boxLayerName = "Box"
+G_labelsLayerName = "Labels"
+G_cutoutLayerName = "CutOut"
+G_doveTailAngleDegrees = 60
 
 local librayModule
 
@@ -67,8 +67,9 @@ local librayModule
 --- Main Function for Gadget 
 ---
 ---@param script_path any
+---@diagnostic disable-next-line: lowercase-global
 function main(script_path)
-  libraryModule = assert(loadfile(script_path .. "\\Helpers.xlua"))(libraryModule)
+  local libraryModule = assert(loadfile(script_path .. "\\Helpers.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\Dovetails.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\SheetArrangement.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
@@ -103,7 +104,7 @@ function main(script_path)
   options.clampingMargin = 0.75             --- edge margin default
 
   options.dovetailJoint = false             --- if false means we're making box joints, true dovetails
-  options.dovetailAngleDegrees = g_doveTailAngleDegrees --- angle of the dovetail joint in degrees, only used/shown when dovetailJoint is true
+  options.dovetailAngleDegrees = G_doveTailAngleDegrees --- angle of the dovetail joint in degrees, only used/shown when dovetailJoint is true
   options.lidType = FaceJointType.Inset -- default lid type is inset
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.label_faces   = true        --- default to labelling face vectors
@@ -116,8 +117,8 @@ function main(script_path)
   options.dark_mode     = true        --- default to dark mode on
 
 
-  options.window_width = g_width
-  options.window_height = g_height
+  options.window_width = G_width
+  options.window_height = G_height
 
   options.facesToMake = {}
 
@@ -134,18 +135,18 @@ function main(script_path)
   local dovetails = ContourGroup(true)
 
   local sideDoveTail = {}
-  sideDoveTail.angle = math.rad(g_doveTailAngleDegrees)
+  sideDoveTail.angle = math.rad(G_doveTailAngleDegrees)
   sideDoveTail.min_width = 1.5 -- not sure why this is called min_width it's actually the width of the dovetail.
   sideDoveTail.depth = options.thickness
 
   -- added by Gremlin to allow for separate widths on bottom vs side tabs
   local bottomDoveTail = {}   
-  bottomDoveTail.angle = math.rad(g_doveTailAngleDegrees)
+  bottomDoveTail.angle = math.rad(G_doveTailAngleDegrees)
   bottomDoveTail.min_width = 1.5
   bottomDoveTail.depth = options.thickness
 
   local lidDoveTail = {}   
-  lidDoveTail.angle = math.rad(g_doveTailAngleDegrees)
+  lidDoveTail.angle = math.rad(G_doveTailAngleDegrees)
   lidDoveTail.min_width = 1.5
   lidDoveTail.depth = options.thickness
 
@@ -162,16 +163,16 @@ function main(script_path)
   -- and do the appropriate conversions if needed so we display reasonable values
   if (options.InMM ~= job.InMM) then
     local multiplier = job.InMM and 25.4 or (1/25.4)
-    options.width = truncate(options.width * multiplier, 2)
-    options.height = truncate(options.height * multiplier, 2)
-    options.depth = truncate(options.depth * multiplier, 2)
-    options.sideOrAllTabWidth = truncate(options.sideOrAllTabWidth * multiplier, 2)
-    options.bottomTabWidth = truncate(options.bottomTabWidth * multiplier, 2)
-    options.lidTabWidth = truncate(options.lidTabWidth * multiplier, 2)
-    options.allowance = truncate(options.allowance * multiplier, 2)
-    options.clampingMargin = truncate(options.clampingMargin * multiplier, 2)
-    options.partSpacing = truncate(options.partSpacing * multiplier, 2)
-    options.roundover_cut_depth = truncate(options.roundover_cut_depth * multiplier, 2)
+    options.width = Truncate(options.width * multiplier, 2)
+    options.height = Truncate(options.height * multiplier, 2)
+    options.depth = Truncate(options.depth * multiplier, 2)
+    options.sideOrAllTabWidth = Truncate(options.sideOrAllTabWidth * multiplier, 2)
+    options.bottomTabWidth = Truncate(options.bottomTabWidth * multiplier, 2)
+    options.lidTabWidth = Truncate(options.lidTabWidth * multiplier, 2)
+    options.allowance = Truncate(options.allowance * multiplier, 2)
+    options.clampingMargin = Truncate(options.clampingMargin * multiplier, 2)
+    options.partSpacing = Truncate(options.partSpacing * multiplier, 2)
+    options.roundover_cut_depth = Truncate(options.roundover_cut_depth * multiplier, 2)
     options.InMM = job.InMM
   end
 
@@ -240,7 +241,7 @@ function main(script_path)
   -- All existing geometry and machining rules below remain unchanged;
   -- they are simply applied to one sheet's faces at a time.
   local converted_tool_diameter = 0.25
-  if _tool_ok(options.tool) then
+  if Tool_ok(options.tool) then
     converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
   end
 
@@ -465,19 +466,19 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
       end
 
-      AddCadListToJob(job, cdcontours, g_box_layer_name)
-      local cutout_objects = AddCadListToJob(job, cutout_cadcontours, g_cutout_layer_name)
+      AddCadListToJob(job, cdcontours, G_boxLayerName)
+      local cutout_objects = AddCadListToJob(job, cutout_cadcontours, G_cutoutLayerName)
 
       if not options.create_dogbones and not options.dovetailJoint then
         local finger_side_objects = {}
         for i = 1, #fingerSideContours do
           finger_side_objects[#finger_side_objects + 1] =
-            AddGroupToJob(job, fingerSideContours[i], g_finger_side_layer_name)
+            AddGroupToJob(job, fingerSideContours[i], G_fingerSideLayerName)
         end
 
         if not options.no_toolpath and jointsOnSheet[FaceJointType.Fingers] then
           CreateFingerSideToolpath(
-            g_finger_side_layer_name,
+            G_fingerSideLayerName,
             options.roundover_tool,
             job,
             options.roundover_cut_depth,
@@ -486,7 +487,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       end
 
       if options.label_faces then
-        AddPartsLabelsToJob(job, sheet_faces, g_labels_layer_name, options.thickness)
+        AddPartsLabelsToJob(job, sheet_faces, G_labelsLayerName, options.thickness)
       end
 
       local fluting_objects = nil
@@ -515,7 +516,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
           job,
           options.thickness,
           options.sideOrAllTabWidth,
-          g_cutout_layer_name,
+          G_cutoutLayerName,
           cutout_objects)
       end -- not options.no_toolpath
 

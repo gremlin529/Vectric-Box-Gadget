@@ -1,4 +1,4 @@
-# PowerShell Script: Update g_version and Create Release ZIP
+# PowerShell Script: Update G_version and Create Release ZIP
 param (
     $version = $null,
     $subversion = $null
@@ -97,24 +97,24 @@ function UpdateVersionInLuaFile {
     # Read file content
     $content = Get-Content -Path $filePath -Raw
 
-    # Replace g_version = "dev"
-    $versionPattern = 'g_version\s*=\s*"\s*dev\s*"'
+    # Replace G_version = "dev"
+    $versionPattern = 'G_version\s*=\s*"\s*dev\s*"'
     if ($content -match $versionPattern) {
-        $content = $content -replace $versionPattern, "g_version=`"$version`""
-        Write-Host "g_version updated to '$version' in '$filePath'."
+        $content = $content -replace $versionPattern, "G_version=`"$version`""
+        Write-Host "G_version updated to '$version' in '$filePath'."
     } else {
-        Write-Warning "No matching g_version line found in '$filePath'. Version not updated."
+        Write-Warning "No matching G_version line found in '$filePath'. Version not updated."
         Write-Warning "Release Not Created"
         exit 1
     }
 
-    # Replace g_subVersion = "..." with the new subversion string
-    $subVersionPattern = 'g_subVersion\s*=\s*"[^"]*"'
+    # Replace G_subVersion = "..." with the new subversion string
+    $subVersionPattern = 'G_subVersion\s*=\s*"[^"]*"'
     if ($content -match $subVersionPattern) {
-        $content = $content -replace $subVersionPattern, "g_subVersion=`"$subversion`""
-        Write-Host "g_subVersion updated to '$subversion' in '$filePath'."
+        $content = $content -replace $subVersionPattern, "G_subVersion=`"$subversion`""
+        Write-Host "G_subVersion updated to '$subversion' in '$filePath'."
     } else {
-        Write-Warning "No matching g_subVersion line found in '$filePath'. Subversion not updated."
+        Write-Warning "No matching G_subVersion line found in '$filePath'. Subversion not updated."
     }
 
     # Write updated content back to file

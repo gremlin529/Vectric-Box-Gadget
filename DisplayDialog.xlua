@@ -7,11 +7,11 @@
 
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-  local html_path = "file:" .. script_path .. "\\" .. g_html_file
-  local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", g_title, g_version, g_subVersion))
+  local html_path = "file:" .. script_path .. "\\" .. G_htmlFile
+  local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", G_title, G_version, G_subVersion))
 
-  dialog:AddLabelField("GadgetTitle", g_title)
-  dialog:AddLabelField("GadgetVersion", g_version)
+  dialog:AddLabelField("GadgetTitle", G_title)
+  dialog:AddLabelField("GadgetVersion", G_version)
 
   -- Add Geometry fields
   dialog:AddDoubleField("WidthField", options.width)
@@ -65,10 +65,10 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
   dialog:AddRadioGroup("TabTypeRadio", tab_default_index)
 
-  local topString = faceJointTypeToString(options.lidType)
+  local topString = FaceJointTypeToString(options.lidType)
   dialog:AddDropDownList("LidTypeSelect", topString)
 
-  local bottomString = faceJointTypeToString(options.bottomType)
+  local bottomString = FaceJointTypeToString(options.bottomType)
   dialog:AddDropDownList("BottomTypeSelect", bottomString)
 
   local units_string = "Inches"
@@ -90,7 +90,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     for _, inner_dim in ipairs(inner_dims) do
       max_width = math.min(max_width, 0.5 * inner_dim)
     end
-    return truncate(math.max(max_width - 0.001, 0), 2)
+    return Truncate(math.max(max_width - 0.001, 0), 2)
   end
 
   -- Whether joint width w leaves at least required_space of clearance across
@@ -136,13 +136,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if i <= steps_up then
         local w = current_width + i * step
         if JointWidthFits(w, inner_dims, required_space) then
-          return truncate(w, 2), "larger"
+          return Truncate(w, 2), "larger"
         end
       end
       if i <= steps_down then
         local w = current_width - i * step
         if w > 0 and JointWidthFits(w, inner_dims, required_space) then
-          return truncate(w, 2), "smaller"
+          return Truncate(w, 2), "smaller"
         end
       end
     end
@@ -168,7 +168,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- Tool must be chosen and valid (only when creating toolpaths)
     if not options.no_toolpath then
-      if not _tool_ok(options.tool) then
+      if not Tool_ok(options.tool) then
         DisplayMessageBox("No tool selected or tool diameter is invalid.\n\nClick 'Select Tool' and pick a valid End Mill.")
         return false
       end
@@ -177,11 +177,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     -- Roundover tool + cut depth are only required for box joints with no dogbones (mirrors HTML/JS visibility)
     local roundover_needed = (not options.no_toolpath) and (not options.dovetailJoint) and (not options.create_dogbones)
     if roundover_needed then
-      if not _tool_ok(options.roundover_tool) then
+      if not Tool_ok(options.roundover_tool) then
         DisplayMessageBox("No roundover tool selected or tool diameter is invalid.\n\nClick 'Select Roundover Tool' and pick a valid tool.")
         return false
       end
-      if not _is_nonneg(options.roundover_cut_depth) or options.roundover_cut_depth <= 0 then
+      if not IsNonNeg(options.roundover_cut_depth) or options.roundover_cut_depth <= 0 then
         DisplayMessageBox("Roundover cut depth must be greater than 0.")
         return false
       end
@@ -192,7 +192,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- Dovetail angle is only shown/used for dovetail joints (mirrors HTML/JS visibility)
     if options.dovetailJoint then
-      if not _is_nonneg(options.dovetailAngleDegrees) or options.dovetailAngleDegrees < 45 or options.dovetailAngleDegrees > 85 then
+      if not IsNonNeg(options.dovetailAngleDegrees) or options.dovetailAngleDegrees < 45 or options.dovetailAngleDegrees > 85 then
         DisplayMessageBox("Dovetail angle must be between 45 and 85 degrees.")
         return false
       end
@@ -208,7 +208,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     end
 
     -- Edge margin must be non-negative
-    if not _is_nonneg(options.clampingMargin) then
+    if not IsNonNeg(options.clampingMargin) then
       DisplayMessageBox("Edge margin must be ≥ 0.")
       return false
     end
@@ -281,7 +281,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     -- Check if tool will fit
     local mtl_block = MaterialBlock()
     local converted_tool_diameter = 0.25
-    if _tool_ok(options.tool) then
+    if Tool_ok(options.tool) then
       converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
     end
 
@@ -507,7 +507,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   -- NEW: clamp Joint Width (SideTabWidthField) to
   --      max(existing_width, calculated_min_for_tool)
   ------------------------------------------------------------------
-  if _tool_ok(options.tool) then
+  if Tool_ok(options.tool) then
     local mtl_block = MaterialBlock()
     local raw_dia   = ConvertUnitsFrom(options.tool.ToolDia or 0, options.tool, mtl_block)
 
@@ -544,8 +544,14 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.window_height = dialog.WindowHeight
 end
 
+--[[
+--- Saves the passed in options table to the registry
+---@param options table
+---@param justwindowinfo boolean
+]]
+
 function SaveDefaultsToRegistry(options, justwindowinfo)
-  local registry = Registry("BoxCreator_" .. g_version)
+  local registry = Registry("BoxCreator_" .. G_version)
 
   -- UX defaults
   registry:SetDouble("WindowWidth", options.window_width)
@@ -578,7 +584,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomType", options.bottomType)
 
   if options.tool ~= nil then
-    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "")
+    options.tool.ToolDBId:SaveDefaults("BoxCreator_"..G_version, "")
   end
 
   registry:SetBool("NoToolpath", options.no_toolpath)
@@ -587,7 +593,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
 
   registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
   if options.roundover_tool ~= nil then
-    options.roundover_tool.ToolDBId:SaveDefaults("BoxCreator_"..g_version, "Roundover")
+    options.roundover_tool.ToolDBId:SaveDefaults("BoxCreator_"..G_version, "Roundover")
   end
 
   -- Machining settings
@@ -603,7 +609,7 @@ end
 
 -- Gremlin added bottomDoveTail separation from side which is just dovetail
 function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDoveTail)
-  local registry =  Registry("BoxCreator_" .. g_version)
+  local registry =  Registry("BoxCreator_" .. G_version)
 
   options.window_width = registry:GetDouble("WindowWidth", options.window_width)
   options.window_height = registry:GetDouble("WindowHeight", options.window_height)
@@ -628,10 +634,10 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.dovetailAngleDegrees = registry:GetDouble("DovetailAngle", options.dovetailAngleDegrees)
   options.lidType = registry:GetDouble("LidType", options.lidType)
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
-  options.default_toolid = ToolDBId("BoxCreator_"..g_version, "")
+  options.default_toolid = ToolDBId("BoxCreator_"..G_version, "")
 
   options.roundover_cut_depth = registry:GetDouble("RoundoverCutDepth", options.roundover_cut_depth)
-  options.roundover_default_toolid = ToolDBId("BoxCreator_"..g_version, "Roundover")
+  options.roundover_default_toolid = ToolDBId("BoxCreator_"..G_version, "Roundover")
 
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
