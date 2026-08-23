@@ -43,6 +43,10 @@
             <label for="HeightField">Height</label>
             <input type="number" step="any" id="HeightField" placeholder="Height of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
           </div>
+          <div class="field-row" id="showHideDovetailAngle" style="display: none" title="Angle of the dovetail joint, between 45 and 85 degrees">
+            <label for="DovetailAngleField">Dovetail Angle</label>
+            <input type="number" step="any" id="DovetailAngleField" placeholder="Dovetail Angle" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+          </div>
         </div>
       </div>
 
@@ -331,10 +335,17 @@
   }
 
   // Dogbones only apply to box (finger) joints, not dovetail joints.
+  // The dovetail angle is the reverse: only shown for dovetail joints.
   function onJointTypeChanged() {
     var boxRadio = document.getElementById("TabTypeRadio1");
+    var isBoxJoint = boxRadio && boxRadio.checked;
+
     var dogboneRow = document.getElementById("showHideDogbones");
-    if (dogboneRow) { dogboneRow.style.display = (boxRadio && boxRadio.checked) ? "block" : "none"; }
+    if (dogboneRow) { dogboneRow.style.display = isBoxJoint ? "block" : "none"; }
+
+    var dovetailAngleRow = document.getElementById("showHideDovetailAngle");
+    if (dovetailAngleRow) { dovetailAngleRow.style.display = isBoxJoint ? "none" : "block"; }
+
     updateRoundoverToolVisibility();
   }
 

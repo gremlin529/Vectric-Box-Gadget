@@ -434,12 +434,12 @@
     return true
   end
 
---[[  -------------- utAngleRad2d --------------------------------------------------
+--[[  -------------- UtAngleRad2d --------------------------------------------------
 |
 | utility function computing angle swept out by rays
 |
 ]]
-  function utAngleRad2d( x1, y1, x2, y2, x3, y3)
+  function UtAngleRad2d( x1, y1, x2, y2, x3, y3)
     local value;
     local x = ( x1 - x2 ) * ( x3 - x2 ) + ( y1 - y2 ) * ( y3 - y2 )
     local y = ( x1 - x2 ) * ( y3 - y2 ) - ( y1 - y2 ) * ( x3 - x2 )
@@ -447,6 +447,8 @@
     if ( x == 0.0 and y == 0.0 ) then
       value = 0.0
     else
+  -- disabling the diagnostic as we're using lua 5.2 and math.atan2 is not deprecated in this context
+---@diagnostic disable-next-line: deprecated
       value = math.atan2 ( y, x )
       if ( value < 0.0 ) then
         value = value + 2.0 * math.pi
@@ -468,9 +470,9 @@
     -- get included angle of arc, function assumes CCW arc so reverse direction if CW ...
     local  arc_angle
     if arc_span.IsClockwise then
-      arc_angle = utAngleRad2d(end_pt.x,end_pt.y, arc_centre.x, arc_centre.y,start_pt.x, start_pt.y)
+      arc_angle = UtAngleRad2d(end_pt.x,end_pt.y, arc_centre.x, arc_centre.y,start_pt.x, start_pt.y)
     else
-      arc_angle = utAngleRad2d(start_pt.x,start_pt.y, arc_centre.x, arc_centre.y, end_pt.x, end_pt.y)
+      arc_angle = UtAngleRad2d(start_pt.x,start_pt.y, arc_centre.x, arc_centre.y, end_pt.x, end_pt.y)
     end
 
     return arc_angle
