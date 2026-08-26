@@ -1,2 +1,2 @@
 Version=12.4
-SubVersion=beta1
+SubVersion=release
