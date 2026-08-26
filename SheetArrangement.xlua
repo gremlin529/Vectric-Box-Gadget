@@ -264,18 +264,44 @@ function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, ed
     end
 
     if not placed then
-      -- Nothing fits, which for a face larger than the material is expected.
-      -- Give it a sheet of its own and let it overhang rather than failing.
-      -- Reuse the last sheet if nothing has landed on it yet.
+      -- Nothing fits on any existing sheet. Open a fresh one (reusing the
+      -- last sheet if nothing has landed on it yet) and try both
+      -- orientations there just like any other sheet - a face can still
+      -- need a 90 degree rotation to fit even on an empty sheet, e.g. when
+      -- its long edge is wider than the sheet itself.
       local sheet = sheets[#sheets]
       if #sheet.shelves > 0 then
         sheet = AddSheet()
       end
-      sheet.shelves[1] = { y = edge_margin, height = height,
-                           x_cursor = edge_margin + width + clearance_gap }
+
+      local x, y, shelf = SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
+      local rotated = false
+
+      if x == nil then
+        x, y, shelf = SheetClaimSpace(sheet, height, width, clearance_gap, edge_margin, usable_right, usable_top)
+        rotated = (x ~= nil)
+      end
+
+      if x == nil then
+        -- Doesn't fit on a blank sheet either way - genuinely too big for
+        -- the material. Stack it at the origin and let it overhang rather
+        -- than failing.
+        shelf = { y = edge_margin, height = height, x_cursor = edge_margin + width + clearance_gap }
+        sheet.shelves[#sheet.shelves + 1] = shelf
+        x, y = edge_margin, edge_margin
+        rotated = false
+      end
+
+      local placed_width  = rotated and height or width
+      local placed_height = rotated and width or height
 
       face.sheet_number = #sheets
-      PlaceFaceAt(face, edge_margin, edge_margin, false)
+      PlaceFaceAt(face, x, y, rotated)
+
+      shelf.x_cursor = x + placed_width + clearance_gap
+      if placed_height > shelf.height then
+        shelf.height = placed_height
+      end
     end
   end
 
