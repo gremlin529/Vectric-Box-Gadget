@@ -307,9 +307,23 @@ end
 
     local dovetail_markers = {}
     local tablist = {}
-    local inner_start_point = start_point + Vector2D(thickness, thickness)
-    local inner_width  = width - 2*thickness
     local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
+
+    -- When creating side 1 the left face is end 1, when creating side 2 its end 2
+    -- this is so that we can build the box with entirely one side of the wood up if desired
+    -- end2 is the right side for side1 and left for side 2
+    local makeTabsForLeftFace = create_tabs_for_missing_faces or (facesToMake.end1 and is_side1) or (facesToMake.end2 and not is_side1)
+    local makeTabsForRightFace = create_tabs_for_missing_faces or (facesToMake.end2 and is_side1) or (facesToMake.end1 and not is_side1)
+
+    -- Only inset by thickness on an end when that end is either getting tabs cut into it
+    -- or the adjoining end face actually exists to fill the gap. If the end face is missing
+    -- and no tabs are being made there, nothing fills that thickness-wide strip, so the side
+    -- needs to extend all the way out to the full width on that end instead of being inset.
+    local left_inset = makeTabsForLeftFace and thickness or 0
+    local right_inset = makeTabsForRightFace and thickness or 0
+
+    local inner_start_point = start_point + Vector2D(left_inset, thickness)
+    local inner_width  = width - left_inset - right_inset
 
     -- inner height is the inside height of the box,
     -- or the distance before the fingers
@@ -351,12 +365,6 @@ end
     local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
     local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)
     local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width)/ (num_flaps_side + 1)
-
-    -- When creating side 1 the left face is end 1, when creating side 2 its end 2
-    -- this is so that we can build the box with entirely one side of the wood up if desired
-    -- end2 is the right side for side1 and left for side 2
-    local makeTabsForLeftFace = create_tabs_for_missing_faces or (facesToMake.end1 and is_side1) or (facesToMake.end2 and not is_side1)
-    local makeTabsForRightFace = create_tabs_for_missing_faces or (facesToMake.end2 and is_side1) or (facesToMake.end1 and not is_side1)
 
     -- Create the contour
     local contour = Contour(0.0)
