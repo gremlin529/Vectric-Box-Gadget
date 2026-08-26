@@ -480,7 +480,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.partSpacing = dialog:GetDoubleField("PartSpacingField")
   options.clampingMargin = dialog:GetDoubleField("ClampingMargin")
   if not options.clampingMargin or options.clampingMargin < 0 then
-    options.clampingMargin = 0.5
+    options.clampingMargin = options.InMM and 15 or 0.5
   end
 
 
