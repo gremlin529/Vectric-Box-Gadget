@@ -400,7 +400,8 @@ end -- CreateBoxFaces
 ]]
 function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
-  local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
+  -- local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
+  local clampingMargin = options.clampingMargin or 0.5
   local required_sheets = 1
   if options.useSingleSheet then
     -- Best effort: pack everything onto Sheet 1. Pieces that don't fit are

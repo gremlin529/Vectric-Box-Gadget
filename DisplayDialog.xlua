@@ -348,20 +348,22 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
       end
-      if (tab_space_w_bottom <= bottom_min_space) or
-         (tab_space_d_bottom <= bottom_min_space) or
-         ((options.bottomType == FaceJointType.Fingers) and
-           ((tab_space_w_bottom <= (required_bottom_space)) or (tab_space_d_bottom <= (required_bottom_space)))) then
+      if (options.bottomType == FaceJointType.Fingers) and
+         ((tab_space_w_bottom <= bottom_min_space) or
+          (tab_space_d_bottom <= bottom_min_space) or
+          (tab_space_w_bottom <= required_bottom_space) or
+          (tab_space_d_bottom <= required_bottom_space)) then
         local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
         local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
 
-      if (tab_space_w_lid <= top_min_space) or
-         (tab_space_d_lid <= top_min_space) or
-         ((options.lidType == FaceJointType.Fingers) and
-           ((tab_space_w_lid <= (required_lid_space)) or (tab_space_d_lid <= (required_lid_space)))) then
+      if (options.lidType == FaceJointType.Fingers) and
+         ((tab_space_w_lid <= top_min_space) or
+          (tab_space_d_lid <= top_min_space) or
+          (tab_space_w_lid <= required_lid_space) or
+          (tab_space_d_lid <= required_lid_space)) then
         local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
         local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
@@ -477,8 +479,8 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.allowance   = dialog:GetDoubleField("AllowanceField")
   options.partSpacing = dialog:GetDoubleField("PartSpacingField")
   options.clampingMargin = dialog:GetDoubleField("ClampingMargin")
-  if not options.clampingMargin or options.clampingMargin <= 0 then
-    options.clampingMargin = 0.75
+  if not options.clampingMargin or options.clampingMargin < 0 then
+    options.clampingMargin = 0.5
   end
 
 
