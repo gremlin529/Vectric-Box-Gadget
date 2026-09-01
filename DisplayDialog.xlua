@@ -5,6 +5,8 @@
 -- rules, reading its fields back into the options table, and the registry
 -- persistence (save/load) that remembers the user's settings between runs.
 
+local G_decimalPlaces = 3  --- Number of decimal places to show in the UI for joint widths and other geometry values
+
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   local html_path = "file:" .. script_path .. "\\" .. G_htmlFile
@@ -90,7 +92,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     for _, inner_dim in ipairs(inner_dims) do
       max_width = math.min(max_width, 0.5 * inner_dim)
     end
-    return Truncate(math.max(max_width - 0.001, 0), 2)
+    return Truncate(math.max(max_width - 0.001, 0), G_decimalPlaces)
   end
 
   -- Whether joint width w leaves at least required_space of clearance across
@@ -120,6 +122,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   -- wins, so the search actually finds a fix when one exists either way.
   -- Returns the suggested width and "larger"/"smaller", or nil, nil if
   -- nothing within the search range works in either direction.
+  --
+  -- The value we hand back is always truncated to g_decimalPlaces decimals for display, so
+  -- we must verify THAT truncated value with JointWidthFits rather than the
+  -- raw stepped width - tab_space is not monotonic across flap-count
+  -- boundaries (see above), so truncating a verified-good raw width can push
+  -- it back into a non-fitting bracket. Checking the truncated value directly
+  -- guarantees the number actually shown to the user really works.
   local function SuggestWorkingJointWidth(current_width, inner_dims, required_space)
     local step = options.InMM and 0.1 or 0.005
     local max_search_width = 0
@@ -134,15 +143,15 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     for i = 1, steps do
       if i <= steps_up then
-        local w = current_width + i * step
+        local w = Truncate(current_width + i * step, G_decimalPlaces)
         if JointWidthFits(w, inner_dims, required_space) then
-          return Truncate(w, 2), "larger"
+          return w, "larger"
         end
       end
       if i <= steps_down then
-        local w = current_width - i * step
+        local w = Truncate(current_width - i * step, G_decimalPlaces)
         if w > 0 and JointWidthFits(w, inner_dims, required_space) then
-          return Truncate(w, 2), "smaller"
+          return w, "smaller"
         end
       end
     end
@@ -154,15 +163,15 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
     local double_thickness = options.thickness * 2
     if options.width <= double_thickness then
-      DisplayMessageBox(string.format("The box width %.2f is too small for material thickness %.2f.", options.width, options.thickness))
+      DisplayMessageBox(string.format("The box width %." .. G_decimalPlaces .. "f is too small for material thickness %." .. G_decimalPlaces .. "f.", options.width, options.thickness))
       return false
     end
     if options.depth <= double_thickness then
-      DisplayMessageBox(string.format("The box depth %.2f is too small for material thickness %.2f.", options.depth, options.thickness))
+      DisplayMessageBox(string.format("The box depth %." .. G_decimalPlaces .. "f is too small for material thickness %." .. G_decimalPlaces .. "f.", options.depth, options.thickness))
       return false
     end
     if options.height <= double_thickness then
-      DisplayMessageBox(string.format("The box height %.2f is too small for material thickness %.2f.", options.height, options.thickness))
+      DisplayMessageBox(string.format("The box height %." .. G_decimalPlaces .. "f is too small for material thickness %." .. G_decimalPlaces .. "f.", options.height, options.thickness))
       return false
     end
 
@@ -220,31 +229,42 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     -- based on options for lid and bottom
     local inner_height = options.height - ThicknessForFaceType(options.lidType, options.thickness) - ThicknessForFaceType(options.bottomType, options.thickness)
 
+    -- Whether the bottom/lid joint width actually matters: only when that
+    -- face uses finger joints AND fingers for it are actually being cut
+    -- somewhere (either the face itself is being made, or tabs are being cut
+    -- into the adjoining faces in its place - see CreateFaces.xlua, where
+    -- facesToMake.X == false and not create_tabs_for_missing_faces skips
+    -- cutting that joint's tabs entirely).
+    local cuttingBottomJoint = (options.bottomType == FaceJointType.Fingers) and
+      (options.facesToMake.bottom or options.create_tabs_for_missing_faces)
+    local cuttingLidJoint = (options.lidType == FaceJointType.Fingers) and
+      (options.facesToMake.lid or options.create_tabs_for_missing_faces)
+
     -- Gremlin added join size seperations overall
     local num_flaps_w_bottom = math.floor((0.5*inner_width) / bottomDoveTail.min_width)
     local total_tab_space_w_bottom = (inner_width - num_flaps_w_bottom*bottomDoveTail.min_width)
     local num_flaps_d_bottom = math.floor((0.5*inner_depth) / bottomDoveTail.min_width)
     local total_tab_space_d_bottom = (inner_depth - num_flaps_d_bottom*bottomDoveTail.min_width)
 
-    if (options.bottomType == FaceJointType.Fingers) then
+    if cuttingBottomJoint then
       if (num_flaps_w_bottom < 1) or (total_tab_space_w_bottom < 0) then
         local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        local suggestion_text = string.format(" Try a joint width of %.2f or smaller.", suggested)
+        local suggestion_text = string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", suggested)
         if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.2f is too big given boxes bottom given the inner width is %.2f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
+          DisplayMessageBox(string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
         else
-          DisplayMessageBox(string.format("The bottom joint width %.2f is too big given box inner width is %.2f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
+          DisplayMessageBox(string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text))
         end
         return false
       end
 
       if (num_flaps_d_bottom < 1) or (total_tab_space_d_bottom < 0) then
         local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        local suggestion_text = string.format(" Try a joint width of %.2f or smaller.", suggested)
+        local suggestion_text = string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", suggested)
         if (not options.useAllJointWidths) then
-          DisplayMessageBox(string.format("The joint width %.2f is too big given boxes bottom given the inner depth is %.2f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
+          DisplayMessageBox(string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
         else
-          DisplayMessageBox(string.format("The bottom joint width %.2f is too big given box inner depth is %.2f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
+          DisplayMessageBox(string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text))
         end
         return false
       end
@@ -256,15 +276,15 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     local total_tab_space_d_lid = (inner_depth - num_flaps_d_lid*lidDoveTail.min_width)
 
     -- check the joint widths only when making a tabbed lid
-    if (options.lidType == FaceJointType.Fingers) then
+    if cuttingLidJoint then
       if (num_flaps_w_lid < 1) or (total_tab_space_w_lid < 0) then
         local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        DisplayMessageBox(string.format("The lid joint width %.2f is too big given box inner width is %.2f. Try a joint width of %.2f or smaller.", lidDoveTail.min_width, inner_width, suggested))
+        DisplayMessageBox(string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_width, suggested))
         return false
       end
       if (num_flaps_d_lid < 1) or (total_tab_space_d_lid < 0) then
         local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-        DisplayMessageBox(string.format("The lid joint width %.2f is too big given box inner depth is %.2f. Try a joint width of %.2f or smaller.", lidDoveTail.min_width, inner_depth, suggested))
+        DisplayMessageBox(string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_depth, suggested))
         return false
       end
     end
@@ -274,7 +294,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     if (num_flaps_h < 1) or (total_tab_space_h < 0) then
       local suggested = SuggestSmallerJointWidth({inner_height})
-      DisplayMessageBox(string.format("The side joint width %.2f is too big given box inner height is %.2f. Try a joint width of %.2f or smaller.", sideDoveTail.min_width, inner_height, suggested))
+      DisplayMessageBox(string.format("The side joint width %." .. G_decimalPlaces .. "f is too big given box inner height is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", sideDoveTail.min_width, inner_height, suggested))
       return false
     end
 
@@ -319,24 +339,24 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local required_lid_space = top_min_space + dia + toolpath_safety_clearance
 
       -- make sure dovetails don't overlap
-      if (options.bottomType == FaceJointType.Fingers) and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
+      if cuttingBottomJoint and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
         local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, bottom_min_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The joint width is too small for the bottom." .. suggestion_text)
         return false
       end
 
       if (tab_space_h <= min_space) then
         local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, min_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The joint width is too small for the side." .. suggestion_text)
         return false
       end
 
-      if (options.lidType == FaceJointType.Fingers) then
+      if cuttingLidJoint then
         if (tab_space_w_lid <= top_min_space) or (tab_space_d_lid <= top_min_space) then
           local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, top_min_space)
-          local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+          local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
           DisplayMessageBox("The joint width is too small for the lid." .. suggestion_text)
           return false
         end
@@ -344,28 +364,28 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
       if (tab_space_h <= required_side_space) then
         local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
       end
-      if (options.bottomType == FaceJointType.Fingers) and
+      if cuttingBottomJoint and
          ((tab_space_w_bottom <= bottom_min_space) or
           (tab_space_d_bottom <= bottom_min_space) or
           (tab_space_w_bottom <= required_bottom_space) or
           (tab_space_d_bottom <= required_bottom_space)) then
         local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
 
-      if (options.lidType == FaceJointType.Fingers) and
+      if cuttingLidJoint and
          ((tab_space_w_lid <= top_min_space) or
           (tab_space_d_lid <= top_min_space) or
           (tab_space_w_lid <= required_lid_space) or
           (tab_space_d_lid <= required_lid_space)) then
         local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
         return false
       end
@@ -376,22 +396,22 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       tab_space_w_lid = math.min(tab_space_w_lid, lidDoveTail.min_width)
       tab_space_d_lid = math.min(tab_space_d_lid, lidDoveTail.min_width)
       tab_space_h = math.min(tab_space_h, sideDoveTail.min_width)
-      if (tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia) then
+      if cuttingBottomJoint and ((tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia)) then
         local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, dia)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
       if (tab_space_h <= dia) then
         local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, dia)
-        local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
       end
-      if (options.useAllJointWidths and options.lidType == FaceJointType.Fingers and (options.facesToMake.lid or options.create_tabs_for_missing_faces)) then
+      if options.useAllJointWidths and cuttingLidJoint then
         if (tab_space_w_lid <= dia) or (tab_space_d_lid <= dia) then
           local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, dia)
-          local suggestion_text = suggested and string.format(" Try a joint width of %.2f or %s.", suggested, direction) or ""
+          local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
           DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
           return false
         end
