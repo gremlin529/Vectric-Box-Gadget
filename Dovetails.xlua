@@ -87,39 +87,132 @@
     LineToVector(contour, thickness*(-perp_vec))
   end
 
---[[  -------------- ComputeDogBones --------------------------------------------------
+--[[  -------------- BuildOffsetDogboneContour --------------------------------------------------
 |
-| Compute the markers for where dog bones should be placed on preradiused contours
+| Build the outward-offset, dogboned version of one simple closed polygon
+| (all line spans - box-joint and dovetail profiles never contain arcs)
+| directly, corner by corner. No call to the CAD engine's Offset(), and no
+| separate detect-then-coincidence-match step: every corner (convex or
+| concave) gets a plain miter join computed from its own two adjacent
+| edges, and concave (reflex) corners additionally get a dogbone relief
+| spliced in right there, in the same pass.
+|
+| The Offset() API can trim away a concave corner entirely when the
+| feature next to it is narrow (attempt 1), and because even a correct
+| marker still has to coincide with whatever point Offset()'s own,
+| opaque internal join logic happens to produce nearby (attempt 2, ruled
+| out by testing with Offset() removed and still getting no dogbones).
+| Building the whole path ourselves removes both dependencies - the
+| result is self-consistent by construction.
+|
+| For a corner where the two adjacent unit edge directions are dir_in
+| (arriving) and dir_out (leaving):
+|   cross = dir_in.x*dir_out.y - dir_in.y*dir_out.x   -- turn direction
+|   dot   = dir_in.x*dir_out.x + dir_in.y*dir_out.y
+| cross < 0 is a concave/reflex vertex (for a CCW contour) - the inside
+| corner of a finger or dovetail, which needs a dogbone. cross > 0 is a
+| convex vertex - just a plain outer corner.
+|
+| The offset (mitered) corner point, for EITHER case, is:
+|   corner_angle = |atan2(cross, dot)|            -- angle between the edges
+|   bisector     = unit vector at the vertex pointing INTO the solid
+|                  material (into void for convex, into material for
+|                  concave - see the sign flip below)
+|   shift        = radius / sin(corner_angle / 2)
+|   sharp        = vertex - shift * bisector
+-- verified against the standard square-corner miter-offset formula
+-- (shift = radius*sqrt(2), landing at vertex + radius in each outward
+-- normal direction, for a 90 degree convex corner) and against the
+-- standard dogbone/T-bone formula (radius*(sqrt(2)-1) measured from the
+-- sharp corner into the material, for a 90 degree concave corner).
+|
+| The concave case additionally extends past `sharp`, further into the
+| material along the same bisector, by (shift - radius) - the classic
+| dogbone relief - then back, before continuing to the next corner.
 |
 ]]
-  function ComputeDogBones(contour_group, radius, do_ccw)
-    circles = {}
-    line_markers = {}
-    local ctr_pos = contour_group:GetHeadPosition()
-    local contour
-    while ctr_pos ~= nil do
-      contour, ctr_pos = contour_group:GetNext(ctr_pos)
-      if (contour.IsCCW == do_ccw) then
-        local span
-        local span_pos = contour:GetHeadPosition()
-        local prev_span = contour:GetLastSpan()
-        while span_pos ~= nil do
-          span, span_pos = contour:GetNext(span_pos)
+  function BuildOffsetDogboneContour(contour, radius)
+    -- Gather the polygon's vertices in order.
+    local points = {}
+    local span_pos = contour:GetHeadPosition()
+    local span
+    while span_pos ~= nil do
+      span, span_pos = contour:GetNext(span_pos)
+      points[#points + 1] = span.EndPoint2D
+    end
 
-          if (SpanIsArc(span, radius)) then
-            local centre = Point3D()
-            local arc_span = CastSpanToArcSpan(span)
-            arc_span:RadiusAndCentre(centre)
-            circles[#circles + 1]  = centre
-            local span_out_end = GetEndPointArcBisector(arc_span, radius, centre, arc_span:ArcMidPoint() )
-            line_markers[#line_markers + 1] = MakeLine(centre, span_out_end)
-          end
-          prev_span = span
+    local n = #points
+    if n < 3 then
+      return nil
+    end
+
+    -- Unit direction of edge i: points[i] -> points[i+1] (wrapping around).
+    local edge_dir = {}
+    for i = 1, n do
+      local a = points[i]
+      local b = points[(i % n) + 1]
+      local d = b - a
+      d:Normalize()
+      edge_dir[i] = d
+    end
+
+    local result = Contour(0.0)
+    local first_point_added = false
+
+    local function AddPoint(pt)
+      if not first_point_added then
+        result:AppendPoint(pt)
+        first_point_added = true
+      else
+        result:LineTo(pt)
+      end
+    end
+
+    for i = 1, n do
+      local prev_i = ((i - 2) % n) + 1
+      local vertex = points[i]
+      local dir_in = edge_dir[prev_i]
+      local dir_out = edge_dir[i]
+
+      local cross = dir_in.x*dir_out.y - dir_in.y*dir_out.x
+      local dot = dir_in.x*dir_out.x + dir_in.y*dir_out.y
+      -- disabling the diagnostic as we're using lua 5.2 and math.atan2 is not deprecated in this context
+      ---@diagnostic disable-next-line: deprecated
+      local corner_angle = math.abs(math.atan2(cross, dot))
+
+      if corner_angle < 0.0001 then
+        -- Nearly straight (collinear points) - no real corner, so there's
+        -- no well-defined miter point (it would run off to infinity as the
+        -- angle approaches zero). Just offset perpendicular to the shared
+        -- direction instead.
+        local normal = Vector2D(dir_out.y, -dir_out.x)
+        AddPoint(vertex + radius*normal)
+      else
+        -- material_sign flips the bisector to point into the solid material
+        -- for a convex vertex (cross > 0) vs. a concave one (cross < 0) -
+        -- verified numerically against known corner cases, see header.
+        local material_sign = (cross < 0) and 1 or -1
+        local bisector = Vector2D(material_sign*(dir_in.x - dir_out.x), material_sign*(dir_in.y - dir_out.y))
+        bisector:Normalize()
+
+        local shift = radius / math.sin(0.5*corner_angle)
+        local sharp = vertex + (-shift)*bisector
+
+        AddPoint(sharp)
+
+        if cross < 0 then
+          -- Concave corner: splice in the dogbone relief, poking further
+          -- into the material past the sharp corner, then back out.
+          local dogbone_tip = sharp + (shift - radius)*bisector
+          result:LineTo(dogbone_tip)
+          result:LineTo(sharp)
         end
       end
     end
 
-    return circles, line_markers
+    result:LineTo(result.StartPoint2D)
+
+    return result
   end
 
 --[[  -------------- CreateDogboneProfile --------------------------------------------------
@@ -128,42 +221,17 @@
 | offset_radius = tool_radius - allowance
 ]]
   function CreateDogboneProfile(contour_group, offset_radius)
-
-    local rounded_contours = OffsetOutIn(contour_group, offset_radius)
-    local circles, markers = ComputeDogBones(rounded_contours, offset_radius, true)
-
-    -- Fill bins with markers
-    local bounding_box = rounded_contours.BoundingBox2D
-    local box_xlength = bounding_box.XLength
-    local min_x  = bounding_box.MinX - 0.1*box_xlength
-    local max_x =  bounding_box.MaxX  + 0.1*box_xlength
-    box_xlength = max_x - min_x
-
-    local box_ylength = bounding_box.YLength
-    local min_y  = bounding_box.MinY - 0.1*box_ylength
-    local max_y =  bounding_box.MaxY  + 0.1*box_ylength
-    box_ylength = max_y - min_y
-
-
-    local bin_data = {}
-    bin_data.min_x = min_x
-    bin_data.min_y = min_y
-    bin_data.dim = math.ceil(math.sqrt(#markers))
-    bin_data.grid_x = box_xlength / bin_data.dim
-    bin_data.grid_y = box_ylength /bin_data.dim
-    local bin_array = InitializeBins(bin_data.dim)
-    FillBins(markers, bin_data, bin_array)
-
-    -- Offset the contours out
-    local offset_contours = contour_group:Offset(offset_radius, offset_radius, 1, true)
     local filleted_contour_group = ContourGroup(true)
-    local current_contour
-    local pos = offset_contours:GetHeadPosition()
-    while pos~= nil do
-      current_contour, pos = offset_contours:GetNext(pos)
-      local filleted_contour = AddFillets(current_contour, markers, offset_radius, bin_array, bin_data, true)
-      if filleted_contour ~= nil then
-        filleted_contour_group:AddTail(filleted_contour)
+
+    local ctr_pos = contour_group:GetHeadPosition()
+    local contour
+    while ctr_pos ~= nil do
+      contour, ctr_pos = contour_group:GetNext(ctr_pos)
+      if contour.IsCCW then
+        local offset_contour = BuildOffsetDogboneContour(contour, offset_radius)
+        if offset_contour ~= nil then
+          filleted_contour_group:AddTail(offset_contour)
+        end
       end
     end
 

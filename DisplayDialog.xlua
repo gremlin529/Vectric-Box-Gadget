@@ -305,12 +305,12 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
     end
 
-    local dia = converted_tool_diameter
+    local effectiveDia = converted_tool_diameter
     if options.allowance > 0 then
-      dia = dia - 2 * options.allowance
+      effectiveDia = effectiveDia - 2 * options.allowance
     end
 
-    if (dia <= 0) then
+    if (effectiveDia <= 0) then
       DisplayMessageBox("The allowance is too large given the tool diameter.\n\nThe allowance must be less than half the tool diameter.")
       return false
     end
@@ -334,9 +334,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       -- "too small" checks right after can also use it to suggest a width
       -- that will actually let the tool fit, not just clear the dovetails.
       local toolpath_safety_clearance = options.InMM and 0.254 or 0.010
-      local required_side_space = min_space + dia + toolpath_safety_clearance
-      local required_bottom_space = bottom_min_space + dia + toolpath_safety_clearance
-      local required_lid_space = top_min_space + dia + toolpath_safety_clearance
+      local required_side_space = min_space + effectiveDia + toolpath_safety_clearance
+      local required_bottom_space = bottom_min_space + effectiveDia + toolpath_safety_clearance
+      local required_lid_space = top_min_space + effectiveDia + toolpath_safety_clearance
 
       -- make sure dovetails don't overlap
       if cuttingBottomJoint and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
@@ -396,21 +396,21 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       tab_space_w_lid = math.min(tab_space_w_lid, lidDoveTail.min_width)
       tab_space_d_lid = math.min(tab_space_d_lid, lidDoveTail.min_width)
       tab_space_h = math.min(tab_space_h, sideDoveTail.min_width)
-      if cuttingBottomJoint and ((tab_space_w_bottom <= dia) or (tab_space_d_bottom <= dia)) then
-        local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, dia)
+      if cuttingBottomJoint and ((tab_space_w_bottom <= effectiveDia) or (tab_space_d_bottom <= effectiveDia)) then
+        local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, effectiveDia)
         local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
-      if (tab_space_h <= dia) then
-        local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, dia)
+      if (tab_space_h <= effectiveDia) then
+        local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, effectiveDia)
         local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
         DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
       end
       if options.useAllJointWidths and cuttingLidJoint then
-        if (tab_space_w_lid <= dia) or (tab_space_d_lid <= dia) then
-          local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, dia)
+        if (tab_space_w_lid <= effectiveDia) or (tab_space_d_lid <= effectiveDia) then
+          local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, effectiveDia)
           local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
           DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
           return false
@@ -421,23 +421,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     return true
   end
 
-  if GetBuildVersion() >= 9.513 then
-    dialog:OnValidate(validator)
-    local success = dialog:ShowDialog()
+  dialog:OnValidate(validator)
+  local success = dialog:ShowDialog()
 
-    if not success then
-      ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
-      SaveDefaultsToRegistry(options, true) -- the user hit cancel but save the window settings anyways
-      return false
-    end
-  else
-    repeat
-      local success = dialog:ShowDialog()
-
-      if not success then
-        return false
-      end
-    until validator(dialog)
+  if not success then
+    ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
+    SaveDefaultsToRegistry(options, true) -- the user hit cancel but save the window settings anyways
+    return false
   end
 
   -- Gremlin added joint width seperation

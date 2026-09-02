@@ -463,7 +463,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
         cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
       else
-        local offset_contours = vdcontours:Offset(offset_radius, offset_radius, 1, true)
+        local offset_contours = vdcontours:Offset(offset_radius, 0, 1, true)
         cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
       end
 
