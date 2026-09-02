@@ -334,12 +334,22 @@ function SetSheet(job, sheet_name)
 end
 
 -- The sheet name to use for the sheet_num'th sheet (1-based): the gadget's
--- starting sheet keeps its own name unchanged, and any additional sheets
--- needed beyond that get "-2", "-3", ... appended.
+-- starting sheet keeps its own name unchanged. For any additional sheets:
+-- if the starting name already ends in a number (e.g. "Sheet 1"), that
+-- number is simply incremented ("Sheet 2", "Sheet 3", ...) rather than
+-- tacking another one on; otherwise the sheet number is appended with a
+-- "-" instead (e.g. "Blank" -> "Blank-2").
 function SheetNameForIndex(base_name, sheet_num)
   if sheet_num <= 1 then
     return base_name
   end
+
+  local prefix, base_num_str = base_name:match("^(.-)(%d+)$")
+  if prefix then
+    local base_num = tonumber(base_num_str)
+    return prefix .. tostring(base_num - 1 + sheet_num)
+  end
+
   return base_name .. "-" .. tostring(sheet_num)
 end
 
