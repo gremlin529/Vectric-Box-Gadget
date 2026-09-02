@@ -247,6 +247,101 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     return suggested
   end
 
+  -- The best (largest) worst-case tab_space achievable across every given
+  -- inner dimension, and the joint width that achieves it - searched by
+  -- sweeping every width in a sane range, independent of angle or bit size.
+  -- Used only once neither a width change nor an angle change (nor both
+  -- together) can fix things: it answers "is any width workable at all,
+  -- and how much room does the best one leave," so that can be checked
+  -- against what a smaller bit would need.
+  local function BestAchievableTabSpace(inner_dims)
+    local step = options.InMM and 0.02 or 0.001
+    local max_search_width = 0
+    for _, inner_dim in ipairs(inner_dims) do
+      max_search_width = math.max(max_search_width, inner_dim)
+    end
+    local steps = math.floor(max_search_width / step)
+
+    local best_w, best_tab_space
+    for i = 1, steps do
+      local w = i * step
+      local worst_tab_space = math.huge
+      local valid = true
+      for _, inner_dim in ipairs(inner_dims) do
+        local num_flaps = math.floor(0.5 * inner_dim / w)
+        if num_flaps < 1 then
+          valid = false
+          break
+        end
+        local tab_space = (inner_dim - num_flaps * w) / (num_flaps + 1)
+        if tab_space < worst_tab_space then
+          worst_tab_space = tab_space
+        end
+      end
+      if valid and (not best_tab_space or worst_tab_space > best_tab_space) then
+        best_w, best_tab_space = Truncate(w, G_decimalPlaces), worst_tab_space
+      end
+    end
+
+    return best_w, best_tab_space
+  end
+
+  -- Builds the full suggestion text for a dovetail "won't fit" message,
+  -- trying progressively larger changes until something actually works:
+  --   1. a different joint width, at the CURRENT angle
+  --   2. a steeper angle, at the CURRENT joint width
+  --   3. a joint width AND a steeper angle together, if neither alone is
+  --      enough - searching for a width that works once the angle is
+  --      pushed all the way to the 85 degree cap, then reporting the
+  --      actual (possibly less extreme) angle that specific width needs
+  --   4. if not even that combination works, the largest bit diameter that
+  --      WOULD fit, with the best achievable joint width and the 85 degree
+  --      cap - i.e. "you'd need a smaller bit"
+  -- Returns the suggestion text (with a leading space, ready to append), or
+  -- "" if nothing at all was found to suggest.
+  local function BuildDovetailFitSuggestion(current_width, inner_dims, effectiveDia, toolpath_safety_clearance, required_space)
+    local suggested, direction = SuggestWorkingJointWidth(current_width, inner_dims, required_space)
+    if suggested then
+      return string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction)
+    end
+
+    local steeper_angle = SuggestSteeperAngle(current_width, inner_dims, options.thickness, effectiveDia, toolpath_safety_clearance)
+    if steeper_angle then
+      return string.format(" Keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle)
+    end
+
+    -- Neither alone works - see if width and angle together do, using the
+    -- steepest allowed angle (85 degrees) to find the most forgiving
+    -- possible required_space, then reporting the actual angle that width
+    -- needs (which may be less extreme than 85).
+    local max_angle_min_space = 2 * options.thickness / math.tan(math.rad(85))
+    local loosest_required_space = max_angle_min_space + effectiveDia + toolpath_safety_clearance
+    local combined_width = SuggestWorkingJointWidth(current_width, inner_dims, loosest_required_space)
+    if combined_width then
+      local needed_angle = SuggestSteeperAngle(combined_width, inner_dims, options.thickness, effectiveDia, toolpath_safety_clearance) or 85
+      return string.format(
+        " Try a joint width of %." .. G_decimalPlaces .. "f together with a dovetail angle of %.1f\194\176 or steeper.",
+        combined_width, needed_angle)
+    end
+
+    -- Not even the best possible width and the steepest allowed angle are
+    -- enough - the bit itself is the limiting factor. Find the largest bit
+    -- diameter that would fit, given the best achievable joint width and
+    -- the steepest allowed angle.
+    local best_width, best_tab_space = BestAchievableTabSpace(inner_dims)
+    if best_width and best_tab_space then
+      local max_effective_dia = best_tab_space - max_angle_min_space - toolpath_safety_clearance
+      if max_effective_dia > 0 then
+        local max_bit_dia = max_effective_dia + 2 * options.allowance
+        return string.format(
+          " No joint width or dovetail angle (up to 85\194\176) will let this bit fit here - try a bit %." .. G_decimalPlaces .. "f or smaller instead (with a joint width around %." .. G_decimalPlaces .. "f and a dovetail angle of 85\194\176 or steeper).",
+          max_bit_dia, best_width)
+      end
+    end
+
+    return ""
+  end
+
   local validator = function(dialog)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
@@ -439,32 +534,23 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       -- leaving the (always at least as tight) tool-fit requirement still
       -- unresolved - so only the combined check below is needed.
       if (tab_space_h <= required_side_space) then
-        local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        local steeper_angle = SuggestSteeperAngle(sideDoveTail.min_width, {inner_height}, options.thickness, effectiveDia, toolpath_safety_clearance)
-        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
-        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text .. angle_text)
+        local suggestion_text = BuildDovetailFitSuggestion(sideDoveTail.min_width, {inner_height}, effectiveDia, toolpath_safety_clearance, required_side_space)
+        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
         return false
       end
       if cuttingBottomJoint and
          ((tab_space_w_bottom <= required_bottom_space) or
           (tab_space_d_bottom <= required_bottom_space)) then
-        local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        local steeper_angle = SuggestSteeperAngle(bottomDoveTail.min_width, {inner_width, inner_depth}, options.thickness, effectiveDia, toolpath_safety_clearance)
-        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
-        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text .. angle_text)
+        local suggestion_text = BuildDovetailFitSuggestion(bottomDoveTail.min_width, {inner_width, inner_depth}, effectiveDia, toolpath_safety_clearance, required_bottom_space)
+        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
         return false
       end
 
       if cuttingLidJoint and
          ((tab_space_w_lid <= required_lid_space) or
           (tab_space_d_lid <= required_lid_space)) then
-        local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        local steeper_angle = SuggestSteeperAngle(lidDoveTail.min_width, {inner_width, inner_depth}, options.thickness, effectiveDia, toolpath_safety_clearance)
-        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
-        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text .. angle_text)
+        local suggestion_text = BuildDovetailFitSuggestion(lidDoveTail.min_width, {inner_width, inner_depth}, effectiveDia, toolpath_safety_clearance, required_lid_space)
+        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
         return false
       end
     else
