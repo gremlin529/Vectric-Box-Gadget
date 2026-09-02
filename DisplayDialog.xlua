@@ -131,31 +131,120 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   -- guarantees the number actually shown to the user really works.
   local function SuggestWorkingJointWidth(current_width, inner_dims, required_space)
     local step = options.InMM and 0.1 or 0.005
+    local tick = 10 ^ (-G_decimalPlaces)
     local max_search_width = 0
     for _, inner_dim in ipairs(inner_dims) do
       max_search_width = math.max(max_search_width, inner_dim)
     end
     max_search_width = 2 * max_search_width
 
+    -- Candidate widths to try, collected up front so the closest one that
+    -- actually works can be picked regardless of which kind of candidate
+    -- found it. Two kinds:
+    --
+    -- 1) Flap-count-boundary candidates: for every given inner dimension,
+    --    for every flap count from one less than the current count down to
+    --    1, the width just above that bracket's lower bound - i.e. the
+    --    width that gets the most tab_space out of that many, wider tails.
+    --    Reducing the flap count is usually what actually fixes a too-tight
+    --    joint (tab_space jumps, not just shrinks, at a boundary - see the
+    --    header comment above), and a uniform step below can step clean
+    --    over a bracket narrower than the step size without ever landing a
+    --    test width inside it, so these are tried explicitly rather than
+    --    left to chance.
+    -- 2) A uniform fine-grained sweep outward in both directions, exactly
+    --    as before, as a general-purpose fallback for widths that aren't
+    --    at a flap-count boundary.
+    local candidates = {}
+
+    for _, inner_dim in ipairs(inner_dims) do
+      local current_flaps = math.floor(0.5 * inner_dim / current_width)
+      for k = math.max(current_flaps - 1, 1), 1, -1 do
+        local lower_bound = inner_dim / (2 * (k + 1))
+        -- Truncate rounds toward zero, which could land exactly on (or
+        -- below) lower_bound and so fall back into the k+1 bracket; adding
+        -- one tick guarantees the candidate stays strictly inside bracket k.
+        candidates[#candidates + 1] = Truncate(lower_bound, G_decimalPlaces) + tick
+      end
+    end
+
     local steps_up = math.floor((max_search_width - current_width) / step)
     local steps_down = math.floor((current_width - step) / step)
-    local steps = math.max(steps_up, steps_down)
-
-    for i = 1, steps do
+    local fine_steps = math.max(steps_up, steps_down)
+    for i = 1, fine_steps do
       if i <= steps_up then
-        local w = Truncate(current_width + i * step, G_decimalPlaces)
-        if JointWidthFits(w, inner_dims, required_space) then
-          return w, "larger"
-        end
+        candidates[#candidates + 1] = Truncate(current_width + i * step, G_decimalPlaces)
       end
       if i <= steps_down then
-        local w = Truncate(current_width - i * step, G_decimalPlaces)
-        if w > 0 and JointWidthFits(w, inner_dims, required_space) then
-          return w, "smaller"
+        candidates[#candidates + 1] = Truncate(current_width - i * step, G_decimalPlaces)
+      end
+    end
+
+    -- Pick the candidate closest to current_width that actually works,
+    -- ties going to the larger one (matching the historical up-before-down
+    -- preference of the old step loop this replaced).
+    local best_w, best_dist
+    for _, w in ipairs(candidates) do
+      if w > 0 and JointWidthFits(w, inner_dims, required_space) then
+        local dist = math.abs(w - current_width)
+        if not best_dist or dist < best_dist or (dist == best_dist and w > best_w) then
+          best_w, best_dist = w, dist
         end
       end
     end
-    return nil, nil
+
+    if not best_w then
+      return nil, nil
+    end
+    return best_w, (best_w > current_width) and "larger" or "smaller"
+  end
+
+  -- Dovetail-only alternative to SuggestWorkingJointWidth: given the CURRENT
+  -- joint width (so the tail count/layout doesn't change at all), suggest a
+  -- steeper dovetail angle that would give the same joint enough clearance
+  -- for the bit instead. sideDoveTail/bottomDoveTail/lidDoveTail all share
+  -- one angle (see ReadOptionsFromDialog), so a *steeper* angle is the only
+  -- direction worth suggesting: it strictly shrinks min_space
+  -- (2*thickness/tan(angle)) for every dovetail type at once, so it can
+  -- only help the other two joints, never break one that was already fine.
+  -- Returns the suggested angle in degrees, or nil if no angle within the
+  -- allowed 45-85 range would be enough (the joint width has to change
+  -- instead).
+  local function SuggestSteeperAngle(current_width, inner_dims, thickness, effectiveDia, toolpath_safety_clearance)
+    local tightest_tab_space = math.huge
+    for _, inner_dim in ipairs(inner_dims) do
+      local num_flaps = math.floor(0.5 * inner_dim / current_width)
+      if num_flaps < 1 then
+        return nil -- current width doesn't even lay out a flap; not this function's problem
+      end
+      local tab_space = (inner_dim - num_flaps * current_width) / (num_flaps + 1)
+      tightest_tab_space = math.min(tightest_tab_space, tab_space)
+    end
+
+    -- margin is how much min_space (the dovetail's own base-to-tip
+    -- widening) would need to shrink by before the bit and safety
+    -- clearance fit in the remaining gap too.
+    local margin = tightest_tab_space - effectiveDia - toolpath_safety_clearance
+    if margin <= 0 then
+      return nil -- no angle helps - the bit itself doesn't fit in the gap at this width
+    end
+
+    local required_angle_deg = math.deg(math.atan(2 * thickness / margin))
+
+    -- Round up to a tenth of a degree (what the field will actually show),
+    -- then re-verify - same reasoning as SuggestWorkingJointWidth: the
+    -- rounded value is what the user will actually enter, so that's what
+    -- has to be checked, not the unrounded one.
+    local suggested = math.ceil(required_angle_deg * 10) / 10
+    if 2 * thickness / math.tan(math.rad(suggested)) >= margin then
+      suggested = suggested + 0.1
+    end
+
+    if suggested > 85 then
+      return nil -- steeper than the allowed range; the joint width has to change instead
+    end
+
+    return suggested
   end
 
   local validator = function(dialog)
@@ -338,55 +427,44 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local required_bottom_space = bottom_min_space + effectiveDia + toolpath_safety_clearance
       local required_lid_space = top_min_space + effectiveDia + toolpath_safety_clearance
 
-      -- make sure dovetails don't overlap
-      if cuttingBottomJoint and ((tab_space_w_bottom <= bottom_min_space) or (tab_space_d_bottom <= bottom_min_space)) then
-        local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, bottom_min_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        DisplayMessageBox("The joint width is too small for the bottom." .. suggestion_text)
-        return false
-      end
-
-      if (tab_space_h <= min_space) then
-        local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, min_space)
-        local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        DisplayMessageBox("The joint width is too small for the side." .. suggestion_text)
-        return false
-      end
-
-      if cuttingLidJoint then
-        if (tab_space_w_lid <= top_min_space) or (tab_space_d_lid <= top_min_space) then
-          local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, top_min_space)
-          local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-          DisplayMessageBox("The joint width is too small for the lid." .. suggestion_text)
-          return false
-        end
-      end
-
+      -- required_*_space (dovetail clearance + bit diameter + safety
+      -- margin) is always >= the dovetail-only clearance (min_space /
+      -- bottom_min_space / top_min_space) on its own, since effectiveDia and
+      -- toolpath_safety_clearance are always > 0 here (checked above) - so
+      -- any width too tight for the dovetails alone is necessarily too
+      -- tight for the tool as well. There's therefore only one real
+      -- threshold to check per joint: the combined one. Checking the
+      -- weaker, dovetail-only threshold first (as a separate, earlier
+      -- check) would suggest a width that only solves the weaker problem,
+      -- leaving the (always at least as tight) tool-fit requirement still
+      -- unresolved - so only the combined check below is needed.
       if (tab_space_h <= required_side_space) then
         local suggested, direction = SuggestWorkingJointWidth(sideDoveTail.min_width, {inner_height}, required_side_space)
         local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text)
+        local steeper_angle = SuggestSteeperAngle(sideDoveTail.min_width, {inner_height}, options.thickness, effectiveDia, toolpath_safety_clearance)
+        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
+        DisplayMessageBox("The selected tool will not fit between the side joints." .. suggestion_text .. angle_text)
         return false
       end
       if cuttingBottomJoint and
-         ((tab_space_w_bottom <= bottom_min_space) or
-          (tab_space_d_bottom <= bottom_min_space) or
-          (tab_space_w_bottom <= required_bottom_space) or
+         ((tab_space_w_bottom <= required_bottom_space) or
           (tab_space_d_bottom <= required_bottom_space)) then
         local suggested, direction = SuggestWorkingJointWidth(bottomDoveTail.min_width, {inner_width, inner_depth}, required_bottom_space)
         local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text)
+        local steeper_angle = SuggestSteeperAngle(bottomDoveTail.min_width, {inner_width, inner_depth}, options.thickness, effectiveDia, toolpath_safety_clearance)
+        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
+        DisplayMessageBox("The selected tool will not fit between the bottom joints." .. suggestion_text .. angle_text)
         return false
       end
 
       if cuttingLidJoint and
-         ((tab_space_w_lid <= top_min_space) or
-          (tab_space_d_lid <= top_min_space) or
-          (tab_space_w_lid <= required_lid_space) or
+         ((tab_space_w_lid <= required_lid_space) or
           (tab_space_d_lid <= required_lid_space)) then
         local suggested, direction = SuggestWorkingJointWidth(lidDoveTail.min_width, {inner_width, inner_depth}, required_lid_space)
         local suggestion_text = suggested and string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or %s.", suggested, direction) or ""
-        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text)
+        local steeper_angle = SuggestSteeperAngle(lidDoveTail.min_width, {inner_width, inner_depth}, options.thickness, effectiveDia, toolpath_safety_clearance)
+        local angle_text = steeper_angle and string.format(" Or keep the current joint width and use a dovetail angle of %.1f\194\176 or steeper.", steeper_angle) or ""
+        DisplayMessageBox("The selected tool will not fit between the lid joints." .. suggestion_text .. angle_text)
         return false
       end
     else
