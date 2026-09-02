@@ -83,6 +83,13 @@ function main(script_path)
     return false
   end
 
+  -- Remember which sheet was active when the gadget started, so all of the
+  -- gadget's sheets get named after it (this exact name for the first sheet,
+  -- then "<name>-2", "-3", ... for any additional ones) instead of always
+  -- assuming a sheet literally named "Sheet 1" exists.
+  local base_sheet_id = job.SheetManager.ActiveSheetId
+  local base_sheet_name = job.SheetManager:GetSheetName(base_sheet_id)
+
   ----------------------- Gadget Options Default Settings --------------------------------
   local options = {}
 
@@ -246,14 +253,14 @@ function main(script_path)
   end
 
   local required_sheets
-  faces, required_sheets = LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
+  faces, required_sheets = LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
   if not required_sheets then
     return false
   end
 
-  CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter)
+  CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name)
 
-  SetSheet(job, "Sheet 1")
+  SetSheet(job, base_sheet_name)
 
   SaveDefaultsToRegistry(options, false)
   job:Refresh2DView()
@@ -398,14 +405,15 @@ end -- CreateBoxFaces
 |  if a required sheet could not be created.
 |
 ]]
-function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
+function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   -- local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local clampingMargin = options.clampingMargin or 0.5
   local required_sheets = 1
   if options.useSingleSheet then
-    -- Best effort: pack everything onto Sheet 1. Pieces that don't fit are
-    -- still laid out (overhanging the material) rather than opening a new sheet.
+    -- Best effort: pack everything onto the starting sheet. Pieces that don't
+    -- fit are still laid out (overhanging the material) rather than opening
+    -- a new sheet.
     faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
     for i = 1, #faces do
       faces[i].sheet_number = 1
@@ -415,7 +423,7 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter)
   end
 
   for sheet_num = 1, required_sheets do
-    if not SheetEnsureExists(job, sheet_num) then
+    if not SheetEnsureExists(job, base_sheet_id, base_sheet_name, sheet_num) then
       return nil
     end
   end
@@ -430,11 +438,11 @@ end
 |  to skip toolpaths) create the pocket, fluting and cutout toolpaths for it.
 |
 ]]
-function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter)
+function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name)
   local offset_radius = 0.5 * converted_tool_diameter - options.allowance
 
   for sheet_num = 1, required_sheets do
-    local sheet_name = "Sheet " .. tostring(sheet_num)
+    local sheet_name = SheetNameForIndex(base_sheet_name, sheet_num)
     if not SetSheet(job, sheet_name) then
       return false
     end

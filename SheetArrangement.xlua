@@ -333,8 +333,29 @@ function SetSheet(job, sheet_name)
   return true
 end
 
-function SheetEnsureExists(job, sheet_number)
-  local sheet_name = "Sheet " .. tostring(sheet_number)
+-- The sheet name to use for the sheet_num'th sheet (1-based): the gadget's
+-- starting sheet keeps its own name unchanged, and any additional sheets
+-- needed beyond that get "-2", "-3", ... appended.
+function SheetNameForIndex(base_name, sheet_num)
+  if sheet_num <= 1 then
+    return base_name
+  end
+  return base_name .. "-" .. tostring(sheet_num)
+end
+
+-- Make sure the sheet_num'th sheet (named per SheetNameForIndex, based off
+-- whichever sheet was active when the gadget started - base_sheet_id/
+-- base_sheet_name) exists, creating it if it doesn't, and makes it the
+-- active sheet either way.
+--
+-- Uses CreateNewSheet(sheet_name) so the sheet gets our name directly,
+-- rather than CreateSheets() cloning the base sheet and then hoping
+-- whatever name Vectric auto-assigns the clone happens to match what we
+-- computed. CreateNewSheet's return value isn't confirmed (it may return
+-- the new sheet's id, or nothing) so this still falls back to looking the
+-- sheet up by name afterward either way.
+function SheetEnsureExists(job, base_sheet_id, base_sheet_name, sheet_num)
+  local sheet_name = SheetNameForIndex(base_sheet_name, sheet_num)
   local sheet_manager = job.SheetManager
   local existing_id = SheetFindId(job, sheet_name)
   if existing_id ~= nil then
@@ -342,20 +363,11 @@ function SheetEnsureExists(job, sheet_number)
     return true
   end
 
-  local source_sheet_id = SheetFindId(job, "Sheet 1")
-  if source_sheet_id == nil then
-    DisplayMessageBox("Sheet 1 was not found. Cannot create " .. sheet_name .. ".")
-    return false
+  local new_id = sheet_manager:CreateNewSheet(sheet_name)
+  if new_id == nil then
+    new_id = SheetFindId(job, sheet_name)
   end
 
-  local material_block = MaterialBlock()
-  sheet_manager:CreateSheets(
-    1,
-    source_sheet_id,
-    Box2D(Point2D(0, 0), Point2D(material_block.Width, material_block.Height))
-  )
-
-  local new_id = SheetFindId(job, sheet_name)
   if new_id ~= nil then
     sheet_manager.ActiveSheetId = new_id
     return true
