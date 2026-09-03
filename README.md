@@ -2,6 +2,15 @@
 
 This is a fork of the Vectric created box gadget which has had significant enhancements provided by various users through collaborative efforts in the Vectric forums. Most notably user SharkCutUp has contributed greatly. It is now being moved to a git hub location to further foster combined efforts and gadget improvement.
 
+## How to use it
+
+I hope the UX is such that it's pretty straight forward but there are some things that can use explanation.
+
+The gadget will create a box of the given external dimensions and can make boxes with fingered or dovetailed joints, and a variety of lid or bottom types. Because of the inability of a CNC machine to create square corners on inside cuts the gadget will create a small dogbone that varies in size with the bit to accommodate the fingers. You may also choose not to create the dogbones and instead specify a Center Point roundover bit with a radius of 1/2 the diameter of the main cutting bit (so if using a 1/4" bit to cut use a 1/8" round over) and it can round the edges of the fingers which will also work.
+
+The checkbox to machine joints for missing faces is there so that you can create only a few faces if needed but still exactly like a full box (i.e. you damaged a face and need to re-create it) or you can create a box that just doesn't have a given side or end. 
+
+
 ### How can I help?
 
 First get setup to use the git repository (repo) for development purposes, the easiest way to do this is to clone the repo into your vectric gadgets directory and from there you can work with the code directly. It is recommended that you create a branch for your work which can then be submitted back to the repository as a PR for approval and release.
