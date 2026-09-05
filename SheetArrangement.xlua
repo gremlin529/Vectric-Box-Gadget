@@ -3,17 +3,23 @@
 --
 -- Shelf-packing layout of faces onto one or more material sheets, plus the
 -- sheet-manager glue (finding/creating/activating a "Sheet N" in the job).
+-- Before a piece is pushed to a new sheet (or left overhanging), rotating
+-- pieces already placed on an existing shelf is tried first - see
+-- TryShelfRepack.
 
 --[[  -------------- ArrangeContours --------------------------------------------------
 |
 |  Best-effort single-sheet layout, using the same shelf packing and rotation
 |  as ArrangeContoursToSheets, but restricted to one sheet. Faces are placed
 |  largest first, trying both the original and a 90 degree rotated orientation
-|  so pieces backfill gaps rather than wasting space.
+|  so pieces backfill gaps rather than wasting space. If neither orientation
+|  fits any shelf as-is, rotating pieces already placed on a shelf is tried
+|  next (see TryShelfRepack) before finally stacking the piece as an overhang.
 |
-|  A face that doesn't fit within the material at all (even rotated) is still
-|  stacked above the rest and returned rather than aborting, so it overhangs
-|  the sheet and the user can adjust the job size or move it afterwards.
+|  A face that doesn't fit within the material at all (even after all of the
+|  above) is still stacked above the rest and returned rather than aborting,
+|  so it overhangs the sheet and the user can adjust the job size or move it
+|  afterwards.
 |
 ]]
   function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin)
@@ -62,28 +68,32 @@
         rotated = (x ~= nil)
       end
 
-      if x == nil then
-        -- Nothing fits within the material, even rotated. Stack it above
-        -- everything else and let it overhang rather than failing.
-        local new_y = edge_margin
-        if #sheet.shelves > 0 then
-          local top = sheet.shelves[#sheet.shelves]
-          new_y = top.y + top.height + clearance_gap
+      if x ~= nil then
+        CommitPlacement(shelf, face, width, height, rotated, x, y, clearance_gap)
+      else
+        local repacked = false
+        for shelf_idx = 1, #sheet.shelves do
+          local candidate_shelf = sheet.shelves[shelf_idx]
+          local is_topmost = (shelf_idx == #sheet.shelves)
+          if TryShelfRepack(candidate_shelf, is_topmost, face, width, height, clearance_gap, edge_margin, usable_right, usable_top) then
+            repacked = true
+            break
+          end
         end
-        shelf = { y = new_y, height = height, x_cursor = edge_margin + width + clearance_gap }
-        sheet.shelves[#sheet.shelves + 1] = shelf
-        x, y = edge_margin, new_y
-        rotated = false
-      end
 
-      local placed_width  = rotated and height or width
-      local placed_height = rotated and width or height
-
-      PlaceFaceAt(face, x, y, rotated)
-
-      shelf.x_cursor = x + placed_width + clearance_gap
-      if placed_height > shelf.height then
-        shelf.height = placed_height
+        if not repacked then
+          -- Nothing fits within the material, even rotated or repacked.
+          -- Stack it above everything else and let it overhang rather than
+          -- failing.
+          local new_y = edge_margin
+          if #sheet.shelves > 0 then
+            local top = sheet.shelves[#sheet.shelves]
+            new_y = top.y + top.height + clearance_gap
+          end
+          local new_shelf = { y = new_y, height = 0, x_cursor = edge_margin, items = {} }
+          sheet.shelves[#sheet.shelves + 1] = new_shelf
+          CommitPlacement(new_shelf, face, width, height, false, edge_margin, new_y, clearance_gap)
+        end
       end
     end
 
@@ -104,7 +114,10 @@
 |  Faces are placed largest first, and for each face every open sheet is tried in
 |  turn - earliest sheet first, and in both the original and a 90 degree rotated
 |  orientation - so a face will backfill a gap on an earlier sheet rather than
-|  forcing a new one. A new sheet is only opened when nothing fits anywhere.
+|  forcing a new one. If that doesn't land it anywhere, rotating pieces already
+|  placed on an existing sheet is tried next (see TryShelfRepack), on every
+|  existing sheet, before finally opening a new one - so a new sheet is only
+|  opened once nothing already open can be made to fit.
 |
 |  As with ArrangeContours, a face that is too big for the material is still laid
 |  out (overhanging its sheet) rather than aborting, so the user can adjust the
@@ -112,9 +125,26 @@
 |
 ]]
 
+-- Place a face on a shelf and record it there in its ORIGINAL, unrotated
+-- dimensions plus which orientation was actually used, so a later piece that
+-- doesn't otherwise fit can consider re-rotating this one to free up room
+-- instead of forcing a new sheet - see TryShelfRepack.
+function CommitPlacement(shelf, face, orig_width, orig_height, rotated, x, y, clearance_gap)
+  PlaceFaceAt(face, x, y, rotated)
+  shelf.items[#shelf.items + 1] = { face = face, orig_width = orig_width, orig_height = orig_height, rotated = rotated }
+
+  local placed_width  = rotated and orig_height or orig_width
+  local placed_height = rotated and orig_width or orig_height
+  shelf.x_cursor = x + placed_width + clearance_gap
+  if placed_height > shelf.height then
+    shelf.height = placed_height
+  end
+end
+
 -- Try to fit a width x height box on a sheet, starting a new shelf if that is
 -- what it takes. Returns x, y and the shelf it landed on, or nil if it will not
--- fit. The caller advances the shelf's cursor once the face is actually placed.
+-- fit. The caller commits the placement (via CommitPlacement) once it decides
+-- which orientation/shelf to use.
 function SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usable_right, usable_top)
   local shelves = sheet.shelves
 
@@ -142,7 +172,7 @@ function SheetClaimSpace(sheet, width, height, clearance_gap, edge_margin, usabl
   end
 
   if ((new_y + height) <= usable_top) and ((edge_margin + width) <= usable_right) then
-    local shelf = { y = new_y, height = 0, x_cursor = edge_margin }
+    local shelf = { y = new_y, height = 0, x_cursor = edge_margin, items = {} }
     shelves[#shelves + 1] = shelf
     return shelf.x_cursor, shelf.y, shelf
   end
@@ -176,8 +206,13 @@ function QuarterTurnAngle()
   return g_quarter_turn
 end
 
--- Move a face so the lower left of its bounding box sits at (x, y), rotating it
--- 90 degrees first if asked.
+-- Move a face so the lower left of its bounding box sits at (x, y), rotating
+-- it 90 degrees first if asked. This always applies ONE MORE 90 degree turn
+-- when rotated is true, relative to whatever transform the face already has
+-- - it does not mean "make sure the final orientation is rotated". For a
+-- first-time placement rotated is simply "does this placement need a turn";
+-- re-placing an already-placed face (see RepositionFace) has to work out
+-- whether a turn is actually needed first, or this would over-rotate it.
 function PlaceFaceAt(face, x, y, rotated)
   if rotated then
     local bounds = face.contour.BoundingBox2D
@@ -187,6 +222,108 @@ function PlaceFaceAt(face, x, y, rotated)
 
   local bounds = face.contour.BoundingBox2D
   TransformFace(face, TranslationMatrix2D(Vector2D(x - bounds.MinX, y - bounds.MinY)))
+end
+
+-- Move an already-placed shelf item to a new spot, switching its orientation
+-- only if want_rotated actually differs from the orientation it's currently
+-- in - PlaceFaceAt always applies one MORE 90 degree turn when asked to
+-- rotate, so re-asserting the orientation it's already in would spin it all
+-- the way to 180 degrees instead of leaving it alone.
+function RepositionFace(item, x, y, want_rotated)
+  local need_to_flip = (item.rotated ~= want_rotated)
+  PlaceFaceAt(item.face, x, y, need_to_flip)
+  item.rotated = want_rotated
+end
+
+--[[  -------------- TryShelfRepack --------------------------------------------------
+|
+|  Before giving up on a sheet - moving a piece to the next one, or letting it
+|  overhang - see if rotating one or more of the pieces ALREADY placed on one
+|  of this sheet's shelves would free up enough room for it. Brute-forces
+|  every combination of orientations for that shelf's existing occupants plus
+|  the new piece (2^n combinations for n existing items - real box layouts
+|  have a handful of pieces per shelf, so this is effectively instant) and
+|  uses the first valid combination that changes the fewest existing pieces
+|  from their current orientation.
+|
+|  Skipped (returns false immediately) for a shelf with no existing items -
+|  SheetClaimSpace already tried starting a fresh shelf and failed, so an
+|  empty one wouldn't fit either - or with more than 12 items, where brute
+|  force stops being cheap; either way the normal new-sheet/overhang
+|  behaviour applies instead.
+|
+|  On success, repositions every changed occupant, places the new piece, and
+|  returns true. Returns false (leaving everything untouched) if no
+|  combination fits.
+|
+]]
+function TryShelfRepack(shelf, is_topmost, face, new_width, new_height, clearance_gap, edge_margin, usable_right, usable_top)
+  local items = shelf.items
+  local n = #items
+  if n == 0 or n > 12 then
+    return false
+  end
+
+  local allowed_height = is_topmost and (usable_top - shelf.y) or shelf.height
+  local usable_width = usable_right - edge_margin
+  local combos = 2 ^ (n + 1)
+
+  local best_mask, best_changes = nil, math.huge
+
+  for mask = 0, combos - 1 do
+    local total_width = clearance_gap * n
+    local max_height = 0
+    local changes = 0
+
+    for idx = 1, n do
+      local want_rotated = (math.floor(mask / (2 ^ (idx - 1))) % 2) == 1
+      local item = items[idx]
+      local w = want_rotated and item.orig_height or item.orig_width
+      local h = want_rotated and item.orig_width or item.orig_height
+      total_width = total_width + w
+      if h > max_height then max_height = h end
+      if want_rotated ~= item.rotated then changes = changes + 1 end
+    end
+
+    local new_rotated = (math.floor(mask / (2 ^ n)) % 2) == 1
+    total_width = total_width + (new_rotated and new_height or new_width)
+    local new_h = new_rotated and new_width or new_height
+    if new_h > max_height then max_height = new_h end
+
+    if total_width <= usable_width and max_height <= allowed_height and changes < best_changes then
+      best_mask, best_changes = mask, changes
+    end
+  end
+
+  if best_mask == nil then
+    return false
+  end
+
+  -- Re-lay the whole shelf out left to right per the winning combination.
+  local x_cursor = edge_margin
+  local new_shelf_height = 0
+  for idx = 1, n do
+    local want_rotated = (math.floor(best_mask / (2 ^ (idx - 1))) % 2) == 1
+    local item = items[idx]
+    local w = want_rotated and item.orig_height or item.orig_width
+    local h = want_rotated and item.orig_width or item.orig_height
+    RepositionFace(item, x_cursor, shelf.y, want_rotated)
+    x_cursor = x_cursor + w + clearance_gap
+    if h > new_shelf_height then new_shelf_height = h end
+  end
+
+  local new_rotated = (math.floor(best_mask / (2 ^ n)) % 2) == 1
+  local new_w = new_rotated and new_height or new_width
+  local new_h = new_rotated and new_width or new_height
+
+  PlaceFaceAt(face, x_cursor, shelf.y, new_rotated)
+  items[#items + 1] = { face = face, orig_width = new_width, orig_height = new_height, rotated = new_rotated }
+
+  shelf.x_cursor = x_cursor + new_w + clearance_gap
+  if new_h > new_shelf_height then new_shelf_height = new_h end
+  shelf.height = new_shelf_height
+
+  return true
 end
 
 function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
@@ -247,28 +384,38 @@ function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, ed
       end
 
       if x ~= nil then
-        local placed_width  = rotated and height or width
-        local placed_height = rotated and width or height
-
         face.sheet_number = sheet_num
-        PlaceFaceAt(face, x, y, rotated)
-
-        shelf.x_cursor = x + placed_width + clearance_gap
-        if placed_height > shelf.height then
-          shelf.height = placed_height
-        end
-
+        CommitPlacement(shelf, face, width, height, rotated, x, y, clearance_gap)
         placed = true
         break
       end
     end
 
     if not placed then
-      -- Nothing fits on any existing sheet. Open a fresh one (reusing the
-      -- last sheet if nothing has landed on it yet) and try both
-      -- orientations there just like any other sheet - a face can still
-      -- need a 90 degree rotation to fit even on an empty sheet, e.g. when
-      -- its long edge is wider than the sheet itself.
+      -- Nothing fits on any existing sheet as-is. Before opening a new one,
+      -- see if rotating something already placed on an existing sheet would
+      -- free up enough room instead - tried on every sheet, earliest first.
+      for sheet_num = 1, #sheets do
+        local sheet = sheets[sheet_num]
+        for shelf_idx = 1, #sheet.shelves do
+          local shelf = sheet.shelves[shelf_idx]
+          local is_topmost = (shelf_idx == #sheet.shelves)
+          if TryShelfRepack(shelf, is_topmost, face, width, height, clearance_gap, edge_margin, usable_right, usable_top) then
+            face.sheet_number = sheet_num
+            placed = true
+            break
+          end
+        end
+        if placed then break end
+      end
+    end
+
+    if not placed then
+      -- Nothing fits on any existing sheet, rotated or repacked. Open a
+      -- fresh one (reusing the last sheet if nothing has landed on it yet)
+      -- and try both orientations there just like any other sheet - a face
+      -- can still need a 90 degree rotation to fit even on an empty sheet,
+      -- e.g. when its long edge is wider than the sheet itself.
       local sheet = sheets[#sheets]
       if #sheet.shelves > 0 then
         sheet = AddSheet()
@@ -286,22 +433,14 @@ function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, ed
         -- Doesn't fit on a blank sheet either way - genuinely too big for
         -- the material. Stack it at the origin and let it overhang rather
         -- than failing.
-        shelf = { y = edge_margin, height = height, x_cursor = edge_margin + width + clearance_gap }
+        shelf = { y = edge_margin, height = 0, x_cursor = edge_margin, items = {} }
         sheet.shelves[#sheet.shelves + 1] = shelf
         x, y = edge_margin, edge_margin
         rotated = false
       end
 
-      local placed_width  = rotated and height or width
-      local placed_height = rotated and width or height
-
       face.sheet_number = #sheets
-      PlaceFaceAt(face, x, y, rotated)
-
-      shelf.x_cursor = x + placed_width + clearance_gap
-      if placed_height > shelf.height then
-        shelf.height = placed_height
-      end
+      CommitPlacement(shelf, face, width, height, rotated, x, y, clearance_gap)
     end
   end
 
