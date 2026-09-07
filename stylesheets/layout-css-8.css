@@ -48,6 +48,7 @@ body {
 .sub-panel {
   background-color: #f2f4f8;
   border: 1px solid #d0d4de;
+  border-left: 3px solid #2255aa;
   padding: 8px 10px;
 }
 .sub-panel-title {
@@ -156,16 +157,11 @@ body {
   font-weight: bold;
   color: #374151;
 }
+.checkbox-row:hover {
+  background-color: #e8eaf0;
+}
 .checkbox-row input {
   margin-right: 4px;
-}
-
-/* Subtle separator above a row, for grouping related controls within a
-   sub-panel without adding a whole new box. */
-.sub-panel-divider {
-  border-top: 1px solid #d0d4de;
-  margin-top: 2px;
-  padding-top: 8px;
 }
 
 /* ── Faces to machine ─────────────────────────────────────────────── */
@@ -177,6 +173,9 @@ body {
   font-weight: bold;
   color: #374151;
   white-space: nowrap;
+}
+.face-checkbox:hover {
+  background-color: #e8eaf0;
 }
 .face-checkbox input {
   margin-right: 3px;
@@ -214,6 +213,9 @@ input.ToolPicker {
   padding: 4px 6px;
   cursor: pointer;
   vertical-align: middle;
+}
+input.ToolPicker:hover {
+  background-color: #c8dcff;
 }
 #ToolNameField {
   font-size: 15px;
@@ -277,6 +279,10 @@ input.ToolPicker {
 .type-option-last {
   padding: 8px 10px;
   line-height: 26px;
+}
+.type-option:hover,
+.type-option-last:hover {
+  background-color: #f2f4f8;
 }
 .type-option-radio {
   float: left;
@@ -376,6 +382,9 @@ input.ToolPicker {
   padding: 7px 28px;
   cursor: pointer;
 }
+#ButtonOK:hover {
+  background-color: #176a35;
+}
 #ButtonCancel {
   background-color: #f2f4f8;
   color: #6b7280;
@@ -385,6 +394,9 @@ input.ToolPicker {
   font-weight: bold;
   padding: 7px 20px;
   cursor: pointer;
+}
+#ButtonCancel:hover {
+  background-color: #e2e5ee;
 }
 
 /* ── Dark mode overrides ──────────────────────────────────────────── */
@@ -405,6 +417,7 @@ body.dark-mode .section-header {
 body.dark-mode .sub-panel {
   background-color: #2a2f3b;
   border-color: #383d4a;
+  border-left-color: #3a6ab0;
 }
 body.dark-mode .sub-panel-title {
   color: #6ea0e0;
@@ -431,11 +444,14 @@ body.dark-mode .field-row select {
 body.dark-mode .checkbox-row {
   color: #b0b8cc;
 }
-body.dark-mode .sub-panel-divider {
-  border-top-color: #383d4a;
+body.dark-mode .checkbox-row:hover {
+  background-color: #2f3542;
 }
 body.dark-mode .face-checkbox {
   color: #b0b8cc;
+}
+body.dark-mode .face-checkbox:hover {
+  background-color: #2f3542;
 }
 body.dark-mode .tool-bar {
   background-color: #22262f;
@@ -457,6 +473,9 @@ body.dark-mode input.ToolPicker {
   color: #90bcf0;
   border-color: #3a6ab0;
 }
+body.dark-mode input.ToolPicker:hover {
+  background-color: #234a86;
+}
 body.dark-mode #ToolNameField {
   color: #8a92a8;
 }
@@ -473,6 +492,10 @@ body.dark-mode .type-panel-header {
 body.dark-mode .type-option {
   border-bottom-color: #383d4a;
 }
+body.dark-mode .type-option:hover,
+body.dark-mode .type-option-last:hover {
+  background-color: #2a2f3b;
+}
 body.dark-mode .type-option-radio {
   color: #b0b8cc;
 }
@@ -483,10 +506,16 @@ body.dark-mode .footer-bar {
 body.dark-mode .footer-option-item {
   color: #8a92a8;
 }
+body.dark-mode #ButtonOK:hover {
+  background-color: #24984c;
+}
 body.dark-mode #ButtonCancel {
   background-color: #2a2f3b;
   color: #8a92a8;
   border-color: #383d4a;
+}
+body.dark-mode #ButtonCancel:hover {
+  background-color: #333947;
 }
 body.dark-mode select {
   background-color: #1a1d24;

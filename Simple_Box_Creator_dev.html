@@ -72,15 +72,14 @@
               <label for="BottomTabWidthField">Bottom joints</label>
               <input type="number" id="BottomTabWidthField" placeholder="Width of Bottom Joint" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
             </div>
-
           </div>
         </div>
       </div>
 
-      <!-- Machining allowances -->
+      <!-- Machining & layout -->
       <div class="geometry-column-last">
         <div class="sub-panel">
-          <div class="sub-panel-title">Machining & Layout</div>
+          <div class="sub-panel-title">Machining &amp; Layout</div>
           <div class="field-row" title="Additional material removed in joints for better fitment, can be maximum of 1/2 the bit diameter.">
             <label for="AllowanceField">Allowance</label>
             <input type="number" id="AllowanceField" placeholder="Allowance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
@@ -97,7 +96,7 @@
             <input type="checkbox" class="LuaButton" id="CreateDogbones" onclick="updateRoundoverToolVisibility()" />
             <label for="CreateDogbones">Create dogbones</label>
           </div>
-          <div class="checkbox-row sub-panel-divider" title="When checked, fits as many pieces as possible onto a single sheet instead of creating additional sheets. Pieces that still don't fit will be placed outside the sheet boundary.">
+          <div class="checkbox-row" title="When checked, fits as many pieces as possible onto a single sheet instead of creating additional sheets. Pieces that still don't fit will be placed outside the sheet boundary.">
             <input type="checkbox" class="LuaButton" id="UseSingleSheet" />
             <label for="UseSingleSheet">Fit to single sheet</label>
           </div>
