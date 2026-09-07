@@ -46,7 +46,7 @@
 -- require("mobdebug").start()
 -- want to turn this on but there's several bits of code that 
 -- need addressing first
--- require("strict")
+require("strict")
 
 G_version = "dev"                                                 
 G_subVersion = "development"                                      
@@ -60,7 +60,7 @@ G_labelsLayerName = "Labels"
 G_cutoutLayerName = "CutOut"
 G_doveTailAngleDegrees = 60
 
-local librayModule
+local libraryModule
 
 -- MotazA 16/9/2020 check if job Exists 
 ---

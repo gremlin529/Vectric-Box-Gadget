@@ -478,14 +478,14 @@ function GetFriendlyFaceLabel(face)
 -- tabs
   function CreateTabbedCadContours(vdcontours, cadcontours)
     local cad_obj_list = CadObjectList(true)
-    local pos, vdctr, cdctr
-    vcpos = cadcontours:GetHeadPosition()
+    local pos, vdctr, vcctr
+    local vcpos = cadcontours:GetHeadPosition()
     while vcpos do
       vcctr, vcpos = cadcontours:GetNext(vcpos)
       local vcbox = vcctr:GetBoundingBox()
 
       -- find the vd contour whose bounding centre is nearest ours
-      vdpos = vdcontours:GetHeadPosition()
+      local vdpos = vdcontours:GetHeadPosition()
       while vdpos do
         vdctr, vdpos = vdcontours:GetNext(vdpos)
         local vdbox = vdctr.BoundingBox2D
