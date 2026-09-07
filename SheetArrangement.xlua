@@ -110,11 +110,14 @@ function ReserveRect(free_rects, c)
 end
 
 -- Find the best-scoring placement for a width x height piece among a
--- sheet's free rectangles, considering both the original and 90 degree
--- rotated orientation. Returns x, y, rotated, claimed (the rectangle to
--- actually reserve via ReserveRect, padded by clearance_gap) - or nil if
--- the piece doesn't fit into any free rectangle on this sheet at all.
-function FindBestPlacement(free_rects, width, height, clearance_gap)
+-- sheet's free rectangles. layout_mode controls which orientation(s) are
+-- allowed: "Normal" only ever considers the piece as-is, "Rotated" only
+-- ever considers it rotated 90 degrees, and anything else ("Auto", nil,
+-- or any other value) considers both and picks whichever fits best.
+-- Returns x, y, rotated, claimed (the rectangle to actually reserve via
+-- ReserveRect, padded by clearance_gap) - or nil if the piece doesn't fit
+-- into any free rectangle on this sheet at all in an allowed orientation.
+function FindBestPlacement(free_rects, width, height, clearance_gap, layout_mode)
   local best_area, best_short = nil, nil
   local best_x, best_y, best_rotated, best_claimed = nil, nil, nil, nil
 
@@ -135,8 +138,12 @@ function FindBestPlacement(free_rects, width, height, clearance_gap)
     end
   end
 
-  Consider(width, height, false)
-  Consider(height, width, true)
+  if layout_mode ~= "Rotated" then
+    Consider(width, height, false)
+  end
+  if layout_mode ~= "Normal" then
+    Consider(height, width, true)
+  end
 
   if best_x == nil then
     return nil
@@ -148,8 +155,11 @@ end
 |
 |  Best-effort single-sheet layout. Faces are placed largest first, into
 |  whichever free rectangle on the sheet fits them best (see
-|  FindBestPlacement/ReserveRect above), trying both the original and a 90
-|  degree rotated orientation.
+|  FindBestPlacement/ReserveRect above). layout_mode controls which
+|  orientation(s) a piece may use: "Auto" (or nil) tries both the original
+|  and a 90 degree rotated orientation and uses whichever fits best,
+|  "Normal" never rotates a piece, and "Rotated" always rotates every piece
+|  90 degrees.
 |
 |  A face that doesn't fit anywhere on the sheet at all (even rotated) is
 |  still stacked above everything placed so far (including previous
@@ -157,7 +167,7 @@ end
 |  and the user can adjust the job size or move it afterwards.
 |
 ]]
-  function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin)
+  function ArrangeContours(faces, clearance_gap, job_width, job_height, edge_margin, layout_mode)
 
     local transformed_faces = {}
 
@@ -196,7 +206,7 @@ end
       local width = bounds.XLength
       local height = bounds.YLength
 
-      local x, y, rotated, claimed = FindBestPlacement(free_rects, width, height, clearance_gap)
+      local x, y, rotated, claimed = FindBestPlacement(free_rects, width, height, clearance_gap, layout_mode)
 
       if x ~= nil then
         PlaceFaceAt(face, x, y, rotated)
@@ -206,10 +216,13 @@ end
           overhang_y = y + placed_height + clearance_gap
         end
       else
-        -- Doesn't fit anywhere on the sheet, even rotated. Stack it above
-        -- everything placed so far and let it overhang rather than failing.
-        PlaceFaceAt(face, edge_margin, overhang_y, false)
-        overhang_y = overhang_y + height + clearance_gap
+        -- Doesn't fit anywhere on the sheet in an orientation layout_mode
+        -- allows. Stack it above everything placed so far and let it
+        -- overhang rather than failing.
+        local overhang_rotated = (layout_mode == "Rotated")
+        local overhang_height = overhang_rotated and width or height
+        PlaceFaceAt(face, edge_margin, overhang_y, overhang_rotated)
+        overhang_y = overhang_y + overhang_height + clearance_gap
       end
     end
 
@@ -229,16 +242,17 @@ end
 |
 |  For each face, every open sheet is tried in turn - earliest sheet first,
 |  so a face will backfill a gap on an earlier sheet rather than forcing a
-|  later one to open - trying both the original and a 90 degree rotated
-|  orientation via FindBestPlacement. A new sheet is only opened once
-|  nothing already open can fit the face at all.
+|  later one to open - via FindBestPlacement, which layout_mode controls
+|  the same way it does for ArrangeContours above ("Auto"/nil tries both
+|  orientations, "Normal" never rotates, "Rotated" always rotates). A new
+|  sheet is only opened once nothing already open can fit the face at all.
 |
 |  As with ArrangeContours, a face that is too big for the material is
 |  still laid out (overhanging its sheet) rather than aborting, so the user
 |  can adjust the job size afterwards.
 |
 ]]
-function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin)
+function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, edge_margin, layout_mode)
   local transformed_faces = {}
   if #faces == 0 then
     return transformed_faces, 1
@@ -283,7 +297,7 @@ function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, ed
     -- Sheet major, so earlier sheets fill up before a later one is used.
     for sheet_num = 1, #sheets do
       local sheet = sheets[sheet_num]
-      local x, y, rotated, claimed = FindBestPlacement(sheet.free_rects, width, height, clearance_gap)
+      local x, y, rotated, claimed = FindBestPlacement(sheet.free_rects, width, height, clearance_gap, layout_mode)
 
       if x ~= nil then
         face.sheet_number = sheet_num
@@ -295,21 +309,25 @@ function ArrangeContoursToSheets(faces, clearance_gap, job_width, job_height, ed
     end
 
     if not placed then
-      -- Nothing fits on any existing sheet. Open a fresh one and try both
-      -- orientations there just like any other sheet - a face can still
-      -- need a 90 degree rotation to fit even on an empty sheet, e.g. when
-      -- its long edge is wider than the sheet itself.
+      -- Nothing fits on any existing sheet. Open a fresh one and try the
+      -- orientation(s) layout_mode allows there just like any other sheet
+      -- - a face can still need a 90 degree rotation to fit even on an
+      -- empty sheet, e.g. when its long edge is wider than the sheet.
       local sheet = NewSheet()
       sheets[#sheets + 1] = sheet
 
-      local x, y, rotated, claimed = FindBestPlacement(sheet.free_rects, width, height, clearance_gap)
+      local x, y, rotated, claimed = FindBestPlacement(sheet.free_rects, width, height, clearance_gap, layout_mode)
       if x == nil then
         -- Doesn't fit on a blank sheet either way - genuinely too big for
-        -- the material. Place it at the origin and let it overhang rather
-        -- than failing - still reserving its own footprint so a later,
-        -- smaller face doesn't get placed on top of it.
-        x, y, rotated = edge_margin, edge_margin, false
-        claimed = { x = edge_margin, y = edge_margin, width = width + clearance_gap, height = height + clearance_gap }
+        -- the material. Place it at the origin (rotated if layout_mode
+        -- says so) and let it overhang rather than failing - still
+        -- reserving its own footprint so a later, smaller face doesn't
+        -- get placed on top of it.
+        rotated = (layout_mode == "Rotated")
+        x, y = edge_margin, edge_margin
+        local claim_w = (rotated and height or width) + clearance_gap
+        local claim_h = (rotated and width or height) + clearance_gap
+        claimed = { x = edge_margin, y = edge_margin, width = claim_w, height = claim_h }
       end
 
       face.sheet_number = #sheets

@@ -101,6 +101,14 @@
             <input type="checkbox" class="LuaButton" id="UseSingleSheet" />
             <label for="UseSingleSheet">Fit to single sheet</label>
           </div>
+          <div class="field-row" title="How parts are oriented when laid out on the material. Auto picks whichever orientation (as-is or rotated 90 degrees) fits each part best. Normal never rotates parts. Rotated always rotates every part 90 degrees.">
+            <label for="PartLayoutSelect">Part Layout</label>
+            <select id="PartLayoutSelect">
+              <option value="Auto">Auto</option>
+              <option value="Normal">Normal</option>
+              <option value="Rotated">Rotated</option>
+            </select>
+          </div>
         </div>
       </div>
 

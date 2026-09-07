@@ -50,6 +50,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddCheckBox("NoToolpath", options.no_toolpath)
   dialog:AddCheckBox("CreateDogbones", options.create_dogbones)
   dialog:AddCheckBox("UseSingleSheet", options.useSingleSheet)
+  dialog:AddDropDownList("PartLayoutSelect", options.partLayout)
 
   -- Roundover tool picker (only used for box joints with no dogbones, see HTML/JS visibility)
   dialog:AddLabelField("RoundoverToolNameField", "")
@@ -623,6 +624,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
   options.useSingleSheet = dialog:GetCheckBox("UseSingleSheet")
+  options.partLayout = dialog:GetDropDownListValue("PartLayoutSelect")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
@@ -766,6 +768,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetBool("NoToolpath", options.no_toolpath)
   registry:SetBool("CreateDogbones", options.create_dogbones)
   registry:SetBool("SingleSheetBestEffort", options.useSingleSheet)
+  registry:SetString("PartLayout", options.partLayout)
 
   registry:SetDouble("RoundoverCutDepth", options.roundover_cut_depth)
   if options.roundover_tool ~= nil then
@@ -821,6 +824,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
   options.useSingleSheet = registry:GetBool("SingleSheetBestEffort", options.useSingleSheet)
+  options.partLayout = registry:GetString("PartLayout", options.partLayout)
 
   options.facesToMake.lid = registry:GetBool("MakeLid", options.facesToMake.lid)
   options.facesToMake.bottom = registry:GetBool("MakeBottom", options.facesToMake.bottom)

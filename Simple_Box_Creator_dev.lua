@@ -118,6 +118,7 @@ function main(script_path)
   options.no_toolpath = false
   options.create_dogbones = true
   options.useSingleSheet = false --- if true, pack everything onto one sheet and let non-fitting pieces overhang instead of creating new sheets
+  options.partLayout = "Auto"    --- "Auto" picks whichever orientation fits each part best, "Normal" never rotates parts, "Rotated" always rotates every part 90 degrees
   options.roundover_cut_depth = 0.125      --- cut depth for the finger roundover tool (box joints, no dogbones only)
 
   options.ZoomLevel = "Auto"
@@ -414,12 +415,12 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
     -- Best effort: pack everything onto the starting sheet. Pieces that don't
     -- fit are still laid out (overhanging the material) rather than opening
     -- a new sheet.
-    faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+    faces = ArrangeContours(faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
     for i = 1, #faces do
       faces[i].sheet_number = 1
     end
   else
-    faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin)
+    faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
   end
 
   for sheet_num = 1, required_sheets do

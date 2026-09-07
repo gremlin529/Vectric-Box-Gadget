@@ -133,7 +133,8 @@ body {
     font-size: 15px;
 }
 
-.field-row input {
+.field-row input,
+.field-row select {
     display: inline;   /* IE7 hack */
     zoom: 1;
 
@@ -400,7 +401,8 @@ body.dark-mode .header-text u {
 body.dark-mode .field-row label {
   color: #b0b8cc;
 }
-body.dark-mode .field-row input {
+body.dark-mode .field-row input,
+body.dark-mode .field-row select {
   background-color: #1a1d24;
   border-color: #383d4a;
   color: #d4d8e8;
