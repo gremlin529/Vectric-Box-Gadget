@@ -112,7 +112,7 @@ body {
 
 /* ── Label + input field row ──────────────────────────────────────── */
 .field-row {
-    margin-bottom: 6px;
+    margin-bottom: 8px;
 
     /* Keep label + input together on one line */
     white-space: nowrap;
@@ -151,13 +151,21 @@ body {
 
 /* ── Checkbox + label row ─────────────────────────────────────────── */
 .checkbox-row {
-  margin-bottom: 7px;
+  margin-bottom: 8px;
   font-size: 15px;
   font-weight: bold;
   color: #374151;
 }
 .checkbox-row input {
   margin-right: 4px;
+}
+
+/* Subtle separator above a row, for grouping related controls within a
+   sub-panel without adding a whole new box. */
+.sub-panel-divider {
+  border-top: 1px solid #d0d4de;
+  margin-top: 2px;
+  padding-top: 8px;
 }
 
 /* ── Faces to machine ─────────────────────────────────────────────── */
@@ -298,6 +306,13 @@ input.ToolPicker {
 .type-dropdown-content {
   padding: 8px 10px;
 }
+.type-dropdown-content select {
+  font-family: Tahoma, Arial, sans-serif;
+  font-size: 15px;
+  width: 100%;
+  -ms-box-sizing: border-box;
+  box-sizing: border-box;
+}
 .type-dropdown-preview {
   text-align: center;
   margin-top: 8px;
@@ -336,6 +351,12 @@ input.ToolPicker {
 }
 .footer-option-item input {
   margin-right: 4px;
+}
+#ZoomLevel {
+  font-family: Tahoma, Arial, sans-serif;
+  font-size: 15px;
+  width: 75px;
+  vertical-align: baseline;
 }
 .footer-cancel-button {
   float: right;
@@ -409,6 +430,9 @@ body.dark-mode .field-row select {
 }
 body.dark-mode .checkbox-row {
   color: #b0b8cc;
+}
+body.dark-mode .sub-panel-divider {
+  border-top-color: #383d4a;
 }
 body.dark-mode .face-checkbox {
   color: #b0b8cc;
