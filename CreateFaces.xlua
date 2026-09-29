@@ -343,9 +343,21 @@ end
 |  Returns the contour for the profile and a list of dovetails
 |
 ]]
-  function MakeBottomFaceContour(width, height, thickness, start_point, dovetail,
-      use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name, bottomGrooveDepth,
-      bottomGrooveWidth, bottomSameMaterial, bottomGrooveClearance, bottomRabbetDepthCorrection)
+  function MakeBottomFaceContour(options, dovetail, facesToMake, name)
+
+    -- Everything else this face needs comes straight out of the dialog options.
+    -- The bottom panel spans the box's width x depth.
+    local width = options.width
+    local height = options.depth
+    local thickness = options.thickness
+    local start_point = options.start_point
+    local bottomType = options.bottomType
+    local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
+    local bottomGrooveDepth = options.bottomGrooveDepth
+    local bottomGrooveWidth = options.bottomGrooveWidth
+    local bottomSameMaterial = options.bottomSameMaterial
+    local bottomGrooveClearance = options.bottomGrooveClearance
+    local bottomRabbetDepthCorrection = options.bottomRabbetDepthCorrection
 
     local dovetail_markers = {}
     local flute_sockets = {}
@@ -539,16 +551,32 @@ end
 
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
-  function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint,
-      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name, bottomGrooveOffset, bottomGrooveDepth, bottomGrooveWidth,
-      end1Height, end2Height, end1ChamferAngle, end2ChamferAngle) -- "Side Overhang": end1Height/end2Height are End 1's and End 2's own
-                                            -- (independently, possibly different, shorter) heights; this wall stays "height" tall and each end's own
-                                            -- difference becomes its own overhang, tapered by a chamfer whose slope is now set as an
-                                            -- angle (end1ChamferAngle/end2ChamferAngle, in degrees, measured from vertical - i.e. 0=a
-                                            -- plain vertical step, 45=classic symmetric chamfer, closer to 90=a long shallow ramp) -
-                                            -- independently per end, with the horizontal run derived from that angle and each end's
-                                            -- own overhang rather than being typed in directly. Side 1/Side 2 only, lidType None only
-                                            -- by Claude 9/20/2026
+  function MakeSideFace(options, sidedovetail, bottomdovetail, topdovetail, facesToMake, is_side1, name)
+
+    -- Everything else this face needs comes straight out of the dialog options.
+    -- A side wall spans the box's width x height.
+    local width = options.width
+    local height = options.height
+    local thickness = options.thickness
+    local start_point = options.start_point
+    local dovetailJoint = options.dovetailJoint
+    local lidType = options.lidType
+    local bottomType = options.bottomType
+    local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
+    local bottomGrooveOffset = options.bottomGrooveOffset
+    local bottomGrooveWidth = options.bottomGrooveWidth
+    -- "Side Overhang": options.end1Height/end2Height are End 1's and End 2's own
+    -- (independently, possibly different, shorter) heights; this wall stays "height" tall and each end's own
+    -- difference becomes its own overhang, tapered by a chamfer whose slope is now set as an
+    -- angle (options.end1ChamferAngle/end2ChamferAngle, in degrees, measured from vertical - i.e. 0=a
+    -- plain vertical step, 45=classic symmetric chamfer, closer to 90=a long shallow ramp) -
+    -- independently per end, with the horizontal run derived from that angle and each end's
+    -- own overhang rather than being typed in directly. Side 1/Side 2 only, lidType None only
+    -- by Claude 9/20/2026
+    local end1Height = options.end1Height
+    local end2Height = options.end2Height
+    local end1ChamferAngle = options.end1ChamferAngle
+    local end2ChamferAngle = options.end2ChamferAngle
 
     local dovetail_markers = {}
     local tablist = {}
@@ -900,8 +928,24 @@ end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
-  function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint,
-      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name, bottomGrooveOffset, bottomGrooveDepth, bottomGrooveWidth)
+  function MakeEndFace(options, sidedovetail, bottomdovetail, topdovetail, facesToMake, is_end1, name)
+
+    -- Everything else this face needs comes straight out of the dialog options.
+    -- An end piece spans the box's depth, and "Side Overhang" gives each end its
+    -- own (possibly shorter) height, independent of the other end. -- by Claude 9/20/2026
+    local width = options.depth
+    local height = options.end2Height
+    if (is_end1) then
+      height = options.end1Height
+    end
+    local thickness = options.thickness
+    local start_point = options.start_point
+    local dovetailJoint = options.dovetailJoint
+    local lidType = options.lidType
+    local bottomType = options.bottomType
+    local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
+    local bottomGrooveOffset = options.bottomGrooveOffset
+    local bottomGrooveWidth = options.bottomGrooveWidth
 
     local tablist = {}
     local dovetail_markers = {}
@@ -1278,7 +1322,17 @@ end
 
   end
 
-  function MakeLid(width, height, thickness, dovetail, start_point, lidType, facesToMake, create_tabs_for_missing_faces, use_dovetails, name)
+  function MakeLid(options, dovetail, facesToMake, name)
+
+    -- Everything else this face needs comes straight out of the dialog options.
+    -- The lid spans the box's width x depth.
+    local width = options.width
+    local height = options.depth
+    local thickness = options.thickness
+    local start_point = options.start_point
+    local lidType = options.lidType
+    local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
+    local use_dovetails = options.dovetailJoint
 
     local noLidTabs = (lidType == FaceJointType.Flat) or (lidType == FaceJointType.None) or (lidType == FaceJointType.Inset)
 

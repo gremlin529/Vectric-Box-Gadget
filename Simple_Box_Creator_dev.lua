@@ -314,133 +314,68 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     -- the bottom face is only the bottom so we didn't need to add
     -- a separate value to it, just pass it the bottom value
-    local bottom_face = MakeBottomFaceContour(options.width,
-      options.depth,
-      options.thickness,
-      options.start_point,
+    local bottom_face = MakeBottomFaceContour(options,
       bottomDoveTail,
-      options.dovetailJoint,  -- if true then create dovetails
-      options.bottomType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
-      "BottomFace",
-      options.bottomGrooveDepth,
-      options.bottomGrooveWidth,
-      options.bottomSameMaterial,
-      options.bottomGrooveClearance,
-      options.bottomRabbetDepthCorrection )
+      "BottomFace")
     faces[#faces + 1] = bottom_face
   end
 
   -- -- -- Make sides
   if computedFacesToMake.side1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local sideface1 = MakeSideFace(options.width,
-      options.height,
-      options.thickness,
-      options.start_point,
+    local sideface1 = MakeSideFace(options,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint,
-      options.lidType,
-      options.bottomType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
       true,  -- is_side1
-      "SideFace1",
-      options.bottomGrooveOffset,
-      options.bottomGrooveDepth,
-      options.bottomGrooveWidth,
-      options.end1Height,
-      options.end2Height,
-      options.end1ChamferAngle,
-      options.end2ChamferAngle)
+      "SideFace1")
     faces[#faces + 1] = sideface1
   end
 
   if computedFacesToMake.side2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local sideface2 = MakeSideFace(options.width,
-      options.height,
-      options.thickness,
-      options.start_point,
+    local sideface2 = MakeSideFace(options,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint,
-      options.lidType,
-      options.bottomType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
       false,  -- is_side1 (so this is side2)
-      "SideFace2",
-      options.bottomGrooveOffset,
-      options.bottomGrooveDepth,
-      options.bottomGrooveWidth,
-      options.end1Height,
-      options.end2Height,
-      options.end1ChamferAngle,
-      options.end2ChamferAngle)
+      "SideFace2")
     faces[#faces + 1] = sideface2
   end
 
   -- -- -- Make ends
   if computedFacesToMake.end1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local endface1 = MakeEndFace(options.depth,
-      options.end1Height, -- "Side Overhang": End 1 uses its own (possibly shorter) height, independent of End 2 -- by Claude 9/20/2026
-      options.thickness,
-      options.start_point,
+    local endface1 = MakeEndFace(options,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint,
-      options.lidType,
-      options.bottomType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
-      true,  -- is_end1
-      "EndFace1",
-      options.bottomGrooveOffset,
-      options.bottomGrooveDepth,
-      options.bottomGrooveWidth)
+      true,  -- is_end1 ("Side Overhang": End 1 uses its own (possibly shorter) height, independent of End 2 -- by Claude 9/20/2026)
+      "EndFace1")
     faces[#faces + 1] = endface1
   end
 
   if computedFacesToMake.end2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
-    local endface2 = MakeEndFace(options.depth,
-      options.end2Height, -- "Side Overhang": End 2 uses its own (possibly shorter) height, independent of End 1 -- by Claude 9/20/2026
-      options.thickness,
-      options.start_point,
+    local endface2 = MakeEndFace(options,
       sideDoveTail,
       bottomDoveTail,
       lidDoveTail,
-      options.dovetailJoint,
-      options.lidType,
-      options.bottomType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
-      false,  -- is_end1 (so this is end2)
-      "EndFace2",
-      options.bottomGrooveOffset,
-      options.bottomGrooveDepth,
-      options.bottomGrooveWidth)
+      false,  -- is_end1 (so this is end2; "Side Overhang": End 2 uses its own (possibly shorter) height, independent of End 1 -- by Claude 9/20/2026)
+      "EndFace2")
     faces[#faces + 1] = endface2
   end
 
   -- Make lid
   if (computedFacesToMake.lid and options.lidType ~= FaceJointType.None) then
-    local lid = MakeLid(options.width,
-      options.depth,
-      options.thickness,
+    local lid = MakeLid(options,
       lidDoveTail,
-      options.start_point,
-      options.lidType,
       computedFacesToMake,
-      options.create_tabs_for_missing_faces,
-      options.dovetailJoint,
       "Lid"
     )
     faces[#faces + 1] = lid
