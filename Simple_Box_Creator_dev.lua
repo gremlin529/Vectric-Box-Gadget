@@ -114,6 +114,17 @@ function main(script_path)
   options.dovetailAngleDegrees = G_doveTailAngleDegrees --- angle of the dovetail joint in degrees, only used/shown when dovetailJoint is true
   options.lidType = FaceJointType.Inset -- default lid type is inset
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
+  options.bottomGrooveWidth = options.thickness --- Grooved bottom only: width of the groove slot (defaults to material thickness, set independently for e.g. a thinner slide-in panel) -- by Claude 9/18/2026
+  options.bottomGrooveOffset = 0.25 + options.bottomGrooveWidth --- Grooved bottom only: distance from the wall's outer bottom edge up to the TOP of the groove (must be >= groove width)      -- by Claude 9/18/2026, updated 9/21/2026
+  options.bottomGrooveDepth = 0.125         --- Grooved bottom only: how deep the groove is plowed into Side1/Side2/End1              -- by Claude 9/18/2026
+  options.bottomSameMaterial = false        --- Grooved bottom only: if true, the bottom panel is cut from the same (full) material thickness as the walls, and a rabbet (Falz) is milled along Side 1/Side 2/End 1's edges to bring it down to the groove width there -- by Claude 9/21/2026
+  options.bottomGrooveClearance = 0.01      --- Grooved bottom + bottomSameMaterial only: clearance ("Luft") subtracted from how far the panel reaches into each of the 3 grooves, for an easier slide fit -- by Claude 9/21/2026
+  options.bottomRabbetDepthCorrection = 0   --- Grooved bottom + bottomSameMaterial only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
+  options.end1Height = options.height       --- "Side Overhang": End 1's own height. Equal to options.height by default (no overhang). Set it lower than
+  options.end2Height = options.height       --- the box height and Side 1/Side 2 (always cut "height" tall) will overhang End 1/End 2 by their own difference,
+                                             --- independently - so Front and Back can each have their own overhang. Only used when Lid Type = None. -- by Claude 9/20/2026
+  options.end1ChamferAngle = 45             --- "Side Overhang": angle (degrees, measured from vertical) of End 1 (Front)'s own chamfer; 45 = classic symmetric chamfer (its horizontal run is derived from this angle and the actual overhang, not typed in directly) -- by Claude 9/20/2026
+  options.end2ChamferAngle = 45             --- "Side Overhang": angle (degrees, measured from vertical) of End 2 (Back)'s own chamfer, independently of End 1's -- by Claude 9/20/2026
   options.label_faces   = true        --- default to labelling face vectors
   options.no_toolpath = false
   options.create_dogbones = true
@@ -181,6 +192,15 @@ function main(script_path)
     options.clampingMargin = Truncate(options.clampingMargin * multiplier, 2)
     options.partSpacing = Truncate(options.partSpacing * multiplier, 2)
     options.roundover_cut_depth = Truncate(options.roundover_cut_depth * multiplier, 2)
+    options.bottomGrooveOffset = Truncate(options.bottomGrooveOffset * multiplier, 2)
+    options.bottomGrooveDepth = Truncate(options.bottomGrooveDepth * multiplier, 2)
+    options.bottomGrooveWidth = Truncate(options.bottomGrooveWidth * multiplier, 2)
+    options.bottomGrooveClearance = Truncate(options.bottomGrooveClearance * multiplier, 2)
+    options.bottomRabbetDepthCorrection = Truncate(options.bottomRabbetDepthCorrection * multiplier, 2)
+    options.end1Height = Truncate(options.end1Height * multiplier, 2)
+    options.end2Height = Truncate(options.end2Height * multiplier, 2)
+    -- end1ChamferAngle/end2ChamferAngle are in degrees, not a length, so they
+    -- don't get rescaled when switching between inches and mm.  -- by Claude 9/20/2026
     options.InMM = job.InMM
   end
 
@@ -243,6 +263,14 @@ function main(script_path)
     computedFacesToMake.bottom = false
   end
 
+  if options.lidType ~= FaceJointType.None then
+    -- "Side Overhang" only makes sense without a lid (see DisplayDialog
+    -- validation) - if a lid is selected, ignore any stale/leftover end1Height/end2Height
+    -- value (e.g. from the registry) rather than silently shrinking End 1/End 2. -- by Claude 9/20/2026
+    options.end1Height = options.height
+    options.end2Height = options.height
+  end
+
   local faces = CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, computedFacesToMake)
 
   -- Arrange the contours across as many sheets as required.
@@ -295,7 +323,12 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
       options.bottomType,
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
-      "BottomFace" )
+      "BottomFace",
+      options.bottomGrooveDepth,
+      options.bottomGrooveWidth,
+      options.bottomSameMaterial,
+      options.bottomGrooveClearance,
+      options.bottomRabbetDepthCorrection )
     faces[#faces + 1] = bottom_face
   end
 
@@ -315,7 +348,14 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_side1
-      "SideFace1")
+      "SideFace1",
+      options.bottomGrooveOffset,
+      options.bottomGrooveDepth,
+      options.bottomGrooveWidth,
+      options.end1Height,
+      options.end2Height,
+      options.end1ChamferAngle,
+      options.end2ChamferAngle)
     faces[#faces + 1] = sideface1
   end
 
@@ -334,7 +374,14 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_side1 (so this is side2)
-      "SideFace2")
+      "SideFace2",
+      options.bottomGrooveOffset,
+      options.bottomGrooveDepth,
+      options.bottomGrooveWidth,
+      options.end1Height,
+      options.end2Height,
+      options.end1ChamferAngle,
+      options.end2ChamferAngle)
     faces[#faces + 1] = sideface2
   end
 
@@ -342,7 +389,7 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
   if computedFacesToMake.end1 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local endface1 = MakeEndFace(options.depth,
-      options.height,
+      options.end1Height, -- "Side Overhang": End 1 uses its own (possibly shorter) height, independent of End 2 -- by Claude 9/20/2026
       options.thickness,
       options.start_point,
       sideDoveTail,
@@ -354,14 +401,17 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       true,  -- is_end1
-      "EndFace1")
+      "EndFace1",
+      options.bottomGrooveOffset,
+      options.bottomGrooveDepth,
+      options.bottomGrooveWidth)
     faces[#faces + 1] = endface1
   end
 
   if computedFacesToMake.end2 then
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     local endface2 = MakeEndFace(options.depth,
-      options.height,
+      options.end2Height, -- "Side Overhang": End 2 uses its own (possibly shorter) height, independent of End 1 -- by Claude 9/20/2026
       options.thickness,
       options.start_point,
       sideDoveTail,
@@ -373,7 +423,10 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
       computedFacesToMake,
       options.create_tabs_for_missing_faces,
       false,  -- is_end1 (so this is end2)
-      "EndFace2")
+      "EndFace2",
+      options.bottomGrooveOffset,
+      options.bottomGrooveDepth,
+      options.bottomGrooveWidth)
     faces[#faces + 1] = endface2
   end
 
@@ -408,8 +461,7 @@ end -- CreateBoxFaces
 ]]
 function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
-  -- local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
-  local clampingMargin = options.clampingMargin or 0.5
+  local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local required_sheets = 1
   if options.useSingleSheet then
     -- Best effort: pack everything onto the starting sheet. Pieces that don't
@@ -512,6 +564,35 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
           (computedFacesToMake.bottom and options.bottomType == FaceJointType.Inset)),
            "Expected that if there are inset joints on this sheet, then at least one of the lid or bottom faces should be present and have an inset joint type.")
           CreateInsetPocketToolpath(job, options, sheet_faces, options.tool, "Pockets")
+        end
+
+        -- Grooved (slide-in) bottom: the groove geometry lives on Side1/Side2/End1,
+        -- not on the Bottom face itself, so check this sheet's own faces directly
+        -- rather than jointsOnSheet (which only tracks the Bottom/Lid face's joint
+        -- type and could miss a sheet split across multiple material sheets).  -- by Claude 9/18/2026
+        local has_bottom_grooves = false
+        for i = 1, #sheet_faces do
+          if sheet_faces[i].groove_contours ~= nil then
+            has_bottom_grooves = true
+            break
+          end
+        end
+        if has_bottom_grooves then
+          CreateGroovePocketToolpath(job, options, sheet_faces, options.tool, "Bottom Groove")
+        end
+
+        -- "Bottom aus gleichem Material": rabbet (Falz) milled along the bottom
+        -- panel's own Side 1/Side 2/End 1 edges, separate pass from the wall
+        -- grooves above since it's cut to a different depth.  -- by Claude 9/21/2026
+        local has_bottom_rabbet = false
+        for i = 1, #sheet_faces do
+          if sheet_faces[i].rabbet_contours ~= nil then
+            has_bottom_rabbet = true
+            break
+          end
+        end
+        if has_bottom_rabbet then
+          CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
         end
 
         if options.dovetailJoint then

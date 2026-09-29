@@ -11,7 +11,8 @@ FaceJointType = {
   Inset = 1,
   Fingers = 2,
   Flat  = 3,
-  None = 4
+  None = 4,
+  Grooved = 5 -- slide-in bottom: dado grooves in Side 1, Side 2 and End 1; End 2 stays open so the panel can be slid in -- by Claude 9/18/2026
 }
 
 FaceType = {
@@ -29,6 +30,8 @@ local unit_y = Vector2D(0,1)
 function ThicknessForFaceType(faceType, thickness)
   if (faceType == FaceJointType.None) then -- No lid or bottom, inner height isn't reduced
     return 0
+  elseif (faceType == FaceJointType.Grooved) then -- slide-in bottom floats in a dado partway up the wall, sides stay full height
+    return 0
   elseif (faceType == FaceJointType.Inset) then -- if Inset than the inner height is reduced by half the thickness of the material
     return 0.5 * thickness
   end
@@ -45,7 +48,7 @@ function FaceJointTypeToString( joint )
   return ""
 end
 
-function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets, fingerSides)
+function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jointtype, flute_sockets, fingerSides, groove_contours)
   local obj ={}
   obj.name = name
   obj.tabs = tabs
@@ -56,6 +59,7 @@ function Face(outer_contour, inset_contours, dovetails, tabs, name, facetype, jo
   obj.dovetail_list = dovetails
   obj.flute_sockets = flute_sockets or {}
   obj.fingerSides = fingerSides or nil
+  obj.groove_contours = groove_contours -- used on Side1/Side2/End1 for a Grooved (slide-in) bottom: the dado pocket for this wall -- by Claude 9/18/2026
   return obj
 end
 
@@ -91,6 +95,17 @@ function TransformFace(face, xform)
   -- Transform the finger sides
   if (face.fingerSides ~= nil)then
     face.fingerSides:Transform(xform)
+  end
+
+  -- Transform the groove pocket (Grooved/slide-in bottom) -- by Claude 9/18/2026
+  if (face.groove_contours ~= nil) then
+    face.groove_contours:Transform(xform)
+  end
+
+  -- Transform the bottom panel's own rabbet band (Falz), only present when
+  -- "Bottom aus gleichem Material" is on -- by Claude 9/21/2026
+  if (face.rabbet_contours ~= nil) then
+    face.rabbet_contours:Transform(xform)
   end
 
   -- Transform the flute sockets. The socket owns its points and vectors
@@ -193,6 +208,135 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
     true)
 end
 
+--[[  -------------- CreateGroovePocketToolpath --------------------------------------------------
+|
+|  Cut the dado grooves used to capture a "Grooved" (slide-in) bottom. Each of
+|  Side 1, Side 2 and End 1 carries its own groove_contours pocket (a simple
+|  rectangle plowed partway through the wall near its bottom edge); End 2 is
+|  left ungrooved so the bottom panel can be slid in from there before End 2
+|  is glued on. All grooves present on this sheet are cut in one pocket pass.
+|
+|  Added by Claude 9/18/2026
+|
+]]
+function CreateGroovePocketToolpath(job, options, faces, tool, layer_name)
+
+  if not Tool_ok(tool) then
+    DisplayMessageBox("Bottom Groove Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local cad_object_list = CadObjectList(true)
+  for i=1,#faces do
+    local cur_face = faces[i]
+    if (cur_face.groove_contours ~= nil) then
+      local pos = cur_face.groove_contours:GetHeadPosition()
+      while pos ~= nil do
+        local contour
+        contour, pos = cur_face.groove_contours:GetNext(pos)
+        local cad_contour = CreateCadContour(contour)
+        cad_object_list:AddTail(cad_contour)
+      end
+    end
+  end
+
+  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
+  SelectExactObjects(job, pocket_objects)
+
+  local pos_data = ToolpathPosData()
+  local pocket_data = PocketParameterData()
+  pocket_data.start_depth = 0
+  pocket_data.CutDepth = options.bottomGrooveDepth
+  pocket_data.Allowance = -options.allowance
+  pocket_data.DoRaster = false
+  pocket_data.DoRamping = true
+  pocket_data.RampDistance = 0.3*options.height
+
+  local geometry_selector = GeometrySelector()
+
+  local area_clear_tool = nil
+
+  local toolpath_manager = ToolpathManager()
+  toolpath_manager:CreatePocketingToolpath(
+    "Bottom Groove",
+    tool,
+    area_clear_tool,
+    pocket_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true)
+end
+
+--[[  -------------- CreateBottomRabbetToolpath --------------------------------------------------
+|
+|  "Bottom aus gleichem Material": when the Grooved bottom panel is cut from
+|  the same (full) material thickness as the walls, its edge has to be
+|  rabbeted (a Falz) down to the groove's own width along the 3 edges that
+|  actually seat in a groove - Side 1, Side 2 and End 1. End 2's edge is
+|  left at full thickness, since the panel is slid in from that opening.
+|  Cut as its own pocket pass (separate from the wall grooves themselves,
+|  which are plowed to a different depth) whenever a bottom face carries a
+|  rabbet_contours band.
+|
+|  Added by Claude 9/21/2026
+|
+]]
+function CreateBottomRabbetToolpath(job, options, faces, tool, layer_name)
+
+  if not Tool_ok(tool) then
+    DisplayMessageBox("Bottom Rabbet Toolpath: Please select a valid tool before continuing.")
+    return false
+  end
+
+  local cad_object_list = CadObjectList(true)
+  local rabbet_depth = 0
+  for i=1,#faces do
+    local cur_face = faces[i]
+    if (cur_face.rabbet_contours ~= nil) then
+      rabbet_depth = math.max(rabbet_depth, cur_face.rabbet_depth or 0)
+      local pos = cur_face.rabbet_contours:GetHeadPosition()
+      while pos ~= nil do
+        local contour
+        contour, pos = cur_face.rabbet_contours:GetNext(pos)
+        local cad_contour = CreateCadContour(contour)
+        cad_object_list:AddTail(cad_contour)
+      end
+    end
+  end
+
+  if (rabbet_depth <= 0.0001) then
+    return false
+  end
+
+  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
+  SelectExactObjects(job, pocket_objects)
+
+  local pos_data = ToolpathPosData()
+  local pocket_data = PocketParameterData()
+  pocket_data.start_depth = 0
+  pocket_data.CutDepth = rabbet_depth
+  pocket_data.Allowance = -options.allowance
+  pocket_data.DoRaster = false
+  pocket_data.DoRamping = true
+  pocket_data.RampDistance = 0.3*options.height
+
+  local geometry_selector = GeometrySelector()
+
+  local area_clear_tool = nil
+
+  local toolpath_manager = ToolpathManager()
+  toolpath_manager:CreatePocketingToolpath(
+    "Bottom Rabbet",
+    tool,
+    area_clear_tool,
+    pocket_data,
+    pos_data,
+    geometry_selector,
+    true,
+    true)
+end
+
 --[[  -------------- MakeBottomFace --------------------------------------------------
 |
 |  Make the bottom face of the box
@@ -200,16 +344,109 @@ end
 |
 ]]
   function MakeBottomFaceContour(width, height, thickness, start_point, dovetail,
-      use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name)
+      use_dovetails, bottomType, facesToMake, create_tabs_for_missing_faces, name, bottomGrooveDepth,
+      bottomGrooveWidth, bottomSameMaterial, bottomGrooveClearance, bottomRabbetDepthCorrection)
 
     local dovetail_markers = {}
     local flute_sockets = {}
     local tablist = {}
+    local fingerSides = ContourGroup(true)
+
+    -- Grooved (slide-in) bottom: a plain panel, no finger/dovetail tabs, sized so
+    -- it reaches into the dado grooves cut into Side 1, Side 2 and End 1. End 2 is
+    -- left flush (no groove) since the panel is slid in from that side before End 2
+    -- is glued on. Handled separately from the tabbed/rabbeted cases below since the
+    -- panel's footprint isn't simply width x height here.                              -- by Claude 9/18/2026
+    if (bottomType == FaceJointType.Grooved) then
+      local groove_depth = bottomGrooveDepth or 0
+      local groove_width = bottomGrooveWidth or thickness
+
+      -- "Bottom aus gleichem Material": the panel is cut from the same (full)
+      -- material thickness as the walls, so a rabbet (Falz) has to be milled
+      -- along the 3 edges that seat in a groove - Side 1, Side 2 and End 1 -
+      -- to bring the panel down to the groove's own width there. End 2 keeps
+      -- the full thickness, since the panel slides in from that opening. An
+      -- optional clearance ("Luft") shortens how far the panel reaches into
+      -- each of those 3 grooves, for an easier slide fit; an optional
+      -- correction fine-tunes the resulting rabbet depth.        -- by Claude 9/21/2026
+      local clearance = 0
+      if (bottomSameMaterial) then
+        clearance = bottomGrooveClearance or 0
+      end
+      local reach = math.max(0, groove_depth - clearance)
+
+      local blc = start_point + Vector2D(thickness - reach, thickness - reach)
+      -- End 2's own wall material is cut away below the groove (it's the insertion
+      -- side), so there's nothing there for the panel to stop against at its inner
+      -- face - the panel actually runs all the way through to End 2's OUTER face
+      -- and rests fully supported/flush with the back of the box. That's one more
+      -- full material thickness beyond the old (wrong) inner-face stopping point.  -- by Claude 9/21/2026
+      local panel_width = (width - 2*thickness) + reach + thickness   -- reaches into End 1; runs flush through to End 2's outer face
+      local panel_depth = (height - 2*thickness) + 2*reach     -- reaches into both Side 1 and Side 2 (Left/Right, "Laden Breite")
+
+      local contour = Contour(0.0)
+      contour:AppendPoint(blc)
+      LineToVector(contour, panel_width*unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      LineToVector(contour, panel_depth*unit_y)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      LineToVector(contour, -panel_width*unit_x)
+      AddMiddleOfLastSpanToList(contour, tablist)
+      LineToVector(contour, -panel_depth*unit_y)
+      AddMiddleOfLastSpanToList(contour, tablist)
+
+      local rabbet_contours = nil
+      local rabbet_depth = 0
+      if (bottomSameMaterial) then
+        rabbet_depth = math.max(0, thickness - groove_width + (bottomRabbetDepthCorrection or 0))
+        -- The rabbet band's width is the full groove_depth, NOT "reach" (which is
+        -- groove_depth minus the lateral clearance/"Luft"). The clearance only
+        -- pulls the panel's own tip back a bit for an easier slide fit - it must
+        -- not also shrink how far the rabbet itself is milled, or a sliver at the
+        -- groove's mouth would be left at full thickness instead of rabbeted.  -- by Claude 9/21/2026
+        if (rabbet_depth > 0.0001 and groove_depth > 0.0001) then
+          rabbet_contours = ContourGroup(true)
+
+          -- End 1 edge band (front)
+          local r1 = Contour(0.0)
+          r1:AppendPoint(Point2D(blc.x, blc.y))
+          r1:LineTo(Point2D(blc.x + groove_depth, blc.y))
+          r1:LineTo(Point2D(blc.x + groove_depth, blc.y + panel_depth))
+          r1:LineTo(Point2D(blc.x, blc.y + panel_depth))
+          r1:LineTo(Point2D(blc.x, blc.y))
+          rabbet_contours:AddTail(r1)
+
+          -- Side 1 edge band (bottom)
+          local r2 = Contour(0.0)
+          r2:AppendPoint(Point2D(blc.x, blc.y))
+          r2:LineTo(Point2D(blc.x + panel_width, blc.y))
+          r2:LineTo(Point2D(blc.x + panel_width, blc.y + groove_depth))
+          r2:LineTo(Point2D(blc.x, blc.y + groove_depth))
+          r2:LineTo(Point2D(blc.x, blc.y))
+          rabbet_contours:AddTail(r2)
+
+          -- Side 2 edge band (top)
+          local r3 = Contour(0.0)
+          r3:AppendPoint(Point2D(blc.x, blc.y + panel_depth - groove_depth))
+          r3:LineTo(Point2D(blc.x + panel_width, blc.y + panel_depth - groove_depth))
+          r3:LineTo(Point2D(blc.x + panel_width, blc.y + panel_depth))
+          r3:LineTo(Point2D(blc.x, blc.y + panel_depth))
+          r3:LineTo(Point2D(blc.x, blc.y + panel_depth - groove_depth))
+          rabbet_contours:AddTail(r3)
+        end
+      end
+
+      local bottom_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.Bottom, bottomType, flute_sockets, fingerSides)
+      bottom_face.rabbet_contours = rabbet_contours
+      bottom_face.rabbet_depth = rabbet_depth
+      return bottom_face
+    end
+
     local outer_blc = start_point
     local outer_brc = start_point  + width*Vector2D(1,0)
     local outer_trc = outer_brc + height*Vector2D(0,1)
     local outer_tlc = start_point + height*Vector2D(0, 1)
-    local fingerSides = ContourGroup(true) -- this will hold the sides of the fingers for the roundover layer if dogbones aren't made
+    -- fingerSides declared above (shared with the Grooved early-return path)
 
     -- // Width and height of interior rectangle
     local inner_width = width - 2*thickness
@@ -303,7 +540,15 @@ end
 -- Make the side faces
 -- Gremlin added bottom and top dovetails separate from side
   function MakeSideFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint,
-      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name)
+      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_side1, name, bottomGrooveOffset, bottomGrooveDepth, bottomGrooveWidth,
+      end1Height, end2Height, end1ChamferAngle, end2ChamferAngle) -- "Side Overhang": end1Height/end2Height are End 1's and End 2's own
+                                            -- (independently, possibly different, shorter) heights; this wall stays "height" tall and each end's own
+                                            -- difference becomes its own overhang, tapered by a chamfer whose slope is now set as an
+                                            -- angle (end1ChamferAngle/end2ChamferAngle, in degrees, measured from vertical - i.e. 0=a
+                                            -- plain vertical step, 45=classic symmetric chamfer, closer to 90=a long shallow ramp) -
+                                            -- independently per end, with the horizontal run derived from that angle and each end's
+                                            -- own overhang rather than being typed in directly. Side 1/Side 2 only, lidType None only
+                                            -- by Claude 9/20/2026
 
     local dovetail_markers = {}
     local tablist = {}
@@ -331,6 +576,10 @@ end
     local bottom_thickness = thickness
     if (bottomType == FaceJointType.None) then
       bottom_thickness = 0
+    elseif (bottomType == FaceJointType.Grooved) then
+      -- slide-in bottom floats in a dado partway up the wall, so the wall itself
+      -- stays full height at the bottom edge, same as no bottom at all -- by Claude 9/18/2026
+      bottom_thickness = 0
     elseif (bottomType == FaceJointType.Inset) then
       bottom_thickness = 0.5*thickness
     elseif (bottomType == FaceJointType.Flat) then
@@ -352,19 +601,110 @@ end
 
     local inner_height = height - (bottom_thickness + top_thickness)
 
+    -- "Side Overhang": if End 1/End 2 are shorter than this wall (end1Height/
+    -- end2Height < height), the corner finger/tab region at each end can only
+    -- be as tall as that end actually is - inner_trc/inner_tlc mark where
+    -- each corner region ends, and the two can now differ from each other.
+    -- Everything above them, up to this wall's own full inner_height, is a
+    -- free-standing overhang with no adjoining end material, so it is
+    -- tapered by a chamfer in the top-line branch below instead of getting
+    -- joint teeth. With no override, end1Height/end2Height default to height
+    -- and this is identical to the pre-existing behaviour.
+    -- "When creating side 1 the left face is end 1 ... end2 is the right side
+    -- for side1 and left for side 2" (see makeTabsForLeftFace/RightFace
+    -- above) - so left_end_height/right_end_height below use the same
+    -- is_side1 mapping.                                            -- by Claude 9/20/2026
+    local left_end_height  = is_side1 and (end1Height or height) or (end2Height or height)
+    local right_end_height = is_side1 and (end2Height or height) or (end1Height or height)
+    local corner_height_left  = left_end_height  - (bottom_thickness + top_thickness)
+    local corner_height_right = right_end_height - (bottom_thickness + top_thickness)
+
     local inner_blc = inner_start_point
     local inner_brc = inner_start_point + inner_width * unit_x
-    local inner_trc = inner_brc + inner_height*unit_y
-    local inner_tlc = inner_blc + inner_height*unit_y
+    local inner_trc = inner_brc + corner_height_right*unit_y
+    local inner_tlc = inner_blc + corner_height_left*unit_y
+
+    -- Grooved (slide-in) bottom: plow a dado pocket into this wall's inside face,
+    -- near its bottom edge, sized to receive the bottom panel. Both Side 1 and
+    -- Side 2 get one (the panel slides along them); only End 2 is left ungrooved
+    -- for insertion, which is handled in MakeEndFace, not here.
+    -- Run the full length of the panel (not just the inner/tabbed region) so the
+    -- groove reaches all the way to the End 2 corner with no obstruction - otherwise
+    -- the bottom panel gets blocked right where it needs to enter (at End 2). At the
+    -- End 1 (front) corner, though, the panel only needs to seat there, not slide
+    -- past it, so the groove is pulled back by half the material thickness on that
+    -- side only - matching the shortened groove already used at the back
+    -- (EndGrooveShortfall/bottomGrooveOffset). Left face is End 1 for Side 1 and
+    -- End 2 for Side 2 (see makeTabsForLeftFace comment above), so which of
+    -- groove_x0/groove_x1 is the "front" end depends on is_side1.  -- by Claude 9/22/2026
+    local groove_contours = nil
+    if (bottomType == FaceJointType.Grooved) then
+      local groove_width = bottomGrooveWidth or thickness
+      -- bottomGrooveOffset measures up to the groove's TOP edge, so the
+      -- pocket's bottom edge sits one groove-width below that. -- by Claude 9/21/2026
+      local groove_y0 = inner_blc.y + (bottomGrooveOffset or 0) - groove_width
+      local groove_x0 = start_point.x
+      local groove_x1 = start_point.x + width
+      if (is_side1) then
+        -- Side 1: left = End 1 (front) -> pull the front end in.
+        groove_x0 = groove_x0 + 0.5*thickness
+      else
+        -- Side 2: right = End 1 (front) -> pull the front end in.
+        groove_x1 = groove_x1 - 0.5*thickness
+      end
+      local groove = Contour(0.0)
+      groove:AppendPoint(Point2D(groove_x0, groove_y0))
+      groove:LineTo(Point2D(groove_x1, groove_y0))
+      groove:LineTo(Point2D(groove_x1, groove_y0 + groove_width))
+      groove:LineTo(Point2D(groove_x0, groove_y0 + groove_width))
+      groove:LineTo(Point2D(groove_x0, groove_y0))
+      groove_contours = ContourGroup(true)
+      groove_contours:AddTail(groove)
+    end
 
     -- Gremlin added bottom and top dovetails separate from side
     local num_flaps_bottom = math.floor((0.5*inner_width) / bottomdovetail.min_width )
     local num_flaps_top = math.floor((0.5*inner_width) / topdovetail.min_width )
-    local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
+    -- corner_height_left/corner_height_right can now differ (independent
+    -- End1Height/End2Height), so each corner gets its own finger pitch.
+    -- by Claude 9/20/2026
+    local num_flaps_side_left = math.floor((0.5*corner_height_left) / sidedovetail.min_width)
+    local num_flaps_side_right = math.floor((0.5*corner_height_right) / sidedovetail.min_width)
 
     local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
     local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)
-    local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width)/ (num_flaps_side + 1)
+    local tab_space_side_left = (corner_height_left - num_flaps_side_left*sidedovetail.min_width)/ (num_flaps_side_left + 1)
+    local tab_space_side_right = (corner_height_right - num_flaps_side_right*sidedovetail.min_width)/ (num_flaps_side_right + 1)
+
+    -- Grooved bottom trims End 2's own usable height (its material starts at
+    -- the top of the groove, not the true bottom) - see the matching comment
+    -- in MakeEndFace. corner_height_left/right and num_flaps_side_*/
+    -- tab_space_side_* above are already each side's REFERENCE pitch (as if
+    -- that end were End 1), so the corner that actually faces a Grooved End 2
+    -- needs the same shortfall trimmed off right next to the groove, or its
+    -- tabs won't line up with the ones End 2 itself now cuts. "When creating
+    -- side 1 the left face is end 1 ... end2 is the right side for side1 and
+    -- left for side 2" (see top of this function) - so exactly one of the two
+    -- corners below is ever affected.
+    -- by Claude 9/19/2026
+    local function EndGrooveShortfall(is_this_end1)
+      if (bottomType == FaceJointType.Grooved and not is_this_end1) then
+        -- bottomGrooveOffset now already measures up to the groove's TOP edge. -- by Claude 9/21/2026
+        return (bottomGrooveOffset or 0)
+      end
+      return 0
+    end
+    local left_shortfall = EndGrooveShortfall(is_side1)
+    local right_shortfall = EndGrooveShortfall(not is_side1)
+
+    local trimmed_num_flaps_side_left, trimmed_edge_gap_side_left = num_flaps_side_left, tab_space_side_left
+    if (left_shortfall > 0.0001) then
+      trimmed_num_flaps_side_left, trimmed_edge_gap_side_left = ComputeFingerTrim(num_flaps_side_left, tab_space_side_left, sidedovetail.min_width, left_shortfall)
+    end
+    local trimmed_num_flaps_side_right, trimmed_edge_gap_side_right = num_flaps_side_right, tab_space_side_right
+    if (right_shortfall > 0.0001) then
+      trimmed_num_flaps_side_right, trimmed_edge_gap_side_right = ComputeFingerTrim(num_flaps_side_right, tab_space_side_right, sidedovetail.min_width, right_shortfall)
+    end
 
     -- Create the contour
     local contour = Contour(0.0)
@@ -391,19 +731,54 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    -- -- brc -> trc (tabs for right end)
+    -- -- brc -> trc (tabs for right end). Drawn bottom-up from inner_brc, which
+    -- is where a Grooved End 2 has NO material below it (the groove cutout) -
+    -- so the margin/trim has to sit right at the START of this traversal, not
+    -- the end, to line up with where End 2's own right edge (MakeEndFace,
+    -- "brc --> trc") puts its matching trim: right there too, immediately
+    -- after ITS OWN inner_brc (which is offset up from the true bottom by
+    -- exactly this same shortfall). Putting it at the END instead (as an
+    -- earlier version of this code did) made the finger COUNT/SIZE come out
+    -- right but shifted every flap's actual position by a full pitch
+    -- (tab_space+min_width) whenever ComputeFingerTrim had to drop a flap -
+    -- invisible while shortfall was small enough to never drop one, but very
+    -- visible once it wasn't (the "Zinkenteilung ist heruntergerutscht" bug).
+    -- The tlc->blc edge below does NOT need this fix: it already reaches
+    -- inner_blc (this wall's own true bottom) at the END of ITS traversal,
+    -- so its trim naturally already lands on the groove side.  -- by Claude 9/20/2026
     if (makeTabsForRightFace) then
-      LineToVector(contour, tab_space_side*unit_y)
+      if (right_shortfall > 0.0001) then
+        -- End 2 has no material here to interlock with at all (it's cut away
+        -- below the groove), so this can't be a real finger joint - but the
+        -- side wall's OWN material should still reach all the way out to the
+        -- true outer corner for this whole margin, not stay recessed one
+        -- thickness short of it. A plain straight run along unit_y (the old
+        -- code) never moves outward at all, leaving an actual notch cut into
+        -- the side wall itself here - visible as a gap once assembled, right
+        -- next to the groove, from the bottom up to the groove's top edge.
+        -- by Claude 9/21/2026
+        LineToVector(contour, thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, right_shortfall*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+      end
+      -- The same (possibly shrunk) first gap End 2's own right edge starts
+      -- with, right after its own no-material zone - together with the
+      -- margin above, this reproduces the exact flat run End 2 itself has
+      -- right after its inner_brc.                                 -- by Claude 9/20/2026
+      LineToVector(contour, trimmed_edge_gap_side_right*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       if dovetailJoint then
-        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, num_flaps_side, tab_space_side)
+        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, trimmed_num_flaps_side_right, tab_space_side_right)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, unit_y, unit_x, contour, num_flaps_side, fingerSides)
+        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side_right, unit_y, unit_x, contour, trimmed_num_flaps_side_right, fingerSides)
       end
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
-      LineToVector(contour, tab_space_side*unit_y)
+      LineToVector(contour, tab_space_side_right*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -416,10 +791,60 @@ end
       -- so the box goes the whole-way up
       -- Also used for a dovetail/tabbed lid where we're not cutting tabs as it would also
       -- be full height
-      LineToVector(contour, 0*unit_y)
-      LineToVector(contour, -inner_width*unit_x)
-      AddMiddleOfLastSpanToList(contour, tablist)
-      contour:LineTo(inner_tlc)
+      local right_overhang = inner_height - corner_height_right
+      local left_overhang = inner_height - corner_height_left
+      if (lidType == FaceJointType.None and (right_overhang > 0.0001 or left_overhang > 0.0001)) then
+        -- "Side Overhang": the middle of Side 1 / Side 2 rises above the end
+        -- pieces (End 1/End 2 are only end1Height/end2Height tall) up to this
+        -- wall's own full height, with a chamfer at each end tapering back
+        -- down to inner_trc/inner_tlc - i.e. exactly where the corner tab
+        -- region ends - so End 1/End 2 and the corner joints are completely
+        -- unaffected, same philosophy as the Grooved bottom's corners. The
+        -- chamfer's rise always exactly equals that end's own overhang so the
+        -- profile lands flush on the end piece; its horizontal run is now
+        -- derived from an angle (end1ChamferAngle/end2ChamferAngle, degrees,
+        -- measured from vertical) instead of being typed in directly - a
+        -- steeper (smaller) angle gives a shorter run for the same rise, a
+        -- shallower (bigger) angle a longer one, and 45 degrees reproduces
+        -- run==rise (the original fixed-width look). This traversal runs trc
+        -- -> tlc (right to left), so the first chamfer belongs to the right
+        -- corner and the second to the left corner; "When creating side 1
+        -- the left face is end 1 ... end2 is the right side for side1 and
+        -- left for side 2" (see top of this function) - so the same is_side1
+        -- mapping used for left_end_height/right_end_height above picks out
+        -- which end's own chamfer angle belongs on which corner. End1/End2
+        -- can now have different heights and different chamfer angles, so
+        -- the two chamfers can differ from each other - a zero overhang on
+        -- one side degenerates to a flat run regardless of its angle.
+        -- by Claude 9/20/2026
+        local right_chamfer_angle = (is_side1 and end2ChamferAngle or end1ChamferAngle) or 45
+        local left_chamfer_angle  = (is_side1 and end1ChamferAngle or end2ChamferAngle) or 45
+        local right_chamfer_w = right_overhang * math.tan(math.rad(right_chamfer_angle))
+        local left_chamfer_w = left_overhang * math.tan(math.rad(left_chamfer_angle))
+        local plateau_width = inner_width - right_chamfer_w - left_chamfer_w
+        if (plateau_width < 0) then
+          -- Chamfers alone are wider than the panel: scale both down
+          -- proportionally (no flat plateau) rather than producing invalid
+          -- geometry.                                              -- by Claude 9/20/2026
+          local scale = inner_width / (right_chamfer_w + left_chamfer_w)
+          right_chamfer_w = right_chamfer_w * scale
+          left_chamfer_w = left_chamfer_w * scale
+          plateau_width = 0
+        end
+
+        LineToVector(contour, -right_chamfer_w*unit_x + right_overhang*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -plateau_width*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -left_chamfer_w*unit_x - left_overhang*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        contour:LineTo(inner_tlc)
+      else
+        LineToVector(contour, 0*unit_y)
+        LineToVector(contour, -inner_width*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        contour:LineTo(inner_tlc)
+      end
     else
       -- this is for a tabbed/dovetailed lid
       LineToVector(contour, -tab_space_top*unit_x)
@@ -433,31 +858,50 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    -- tlc -> blc this is the left end
+    -- tlc -> blc this is the left end. Drawn top-down from inner_tlc (this
+    -- wall's real top, unaffected) down to inner_blc - which is raised up to
+    -- the top of the groove when the adjoining end is a Grooved End 2 - so
+    -- any trim sits at the END, right before inner_blc.           -- by Claude 9/19/2026
     if (makeTabsForLeftFace) then
-      LineToVector(contour, -tab_space_side*unit_y)
+      LineToVector(contour, -tab_space_side_left*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (dovetailJoint) then
-        AddMaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, -unit_x, contour, num_flaps_side, tab_space_side)
+        AddMaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, -unit_y, -unit_x, contour, trimmed_num_flaps_side_left, tab_space_side_left, trimmed_edge_gap_side_left)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side, -unit_y, -unit_x, contour, num_flaps_side, fingerSides)
+        AddFlapsAlongLineTrimEnd(thickness, sidedovetail.min_width, tab_space_side_left, trimmed_edge_gap_side_left, -unit_y, -unit_x, contour, trimmed_num_flaps_side_left, fingerSides)
+      end
+      if (left_shortfall > 0.0001) then
+        -- Mirrors the brc->trc fix above: inner_blc sits (corner_height_left -
+        -- left_shortfall) short of inner_tlc along the drawn pattern, so the
+        -- missing amount has to be drawn explicitly right before inner_blc,
+        -- where End 2 has no material to interlock with - otherwise the
+        -- closing LineTo below silently swallows it into the last flap's gap.
+        -- Reaches out to the true outer corner for the whole margin instead
+        -- of leaving it recessed one thickness short (an actual notch cut
+        -- into the side wall itself) - by Claude 9/19/2026, updated 9/21/2026
+        LineToVector(contour, -thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -left_shortfall*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
       end
       contour:LineTo(inner_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
-      LineToVector(contour, -tab_space_side*unit_y)
+      LineToVector(contour, -tab_space_side_left*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       contour:LineTo(inner_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides, groove_contours)
   end
 
 -- Make an end face
 -- Gremlin added doevtail seperation for different sizes
   function MakeEndFace(width, height, thickness, start_point, sidedovetail, bottomdovetail, topdovetail, dovetailJoint,
-      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name)
+      lidType, bottomType, facesToMake, create_tabs_for_missing_faces, is_end1, name, bottomGrooveOffset, bottomGrooveDepth, bottomGrooveWidth)
 
     local tablist = {}
     local dovetail_markers = {}
@@ -467,6 +911,19 @@ end
     local bottom_thickness = 0
     if (bottomType == FaceJointType.None) then
       bottom_thickness = 0
+    elseif (bottomType == FaceJointType.Grooved) then
+      if is_end1 then
+        -- End 1 stays full height; it gets a dado pocket (below) that acts as the
+        -- front stop for the sliding bottom panel.                        -- by Claude 9/18/2026
+        bottom_thickness = 0
+      else
+        -- End 2 is the open/insertion side: shortened so its bottom edge starts at
+        -- the TOP of the groove. That leaves the whole slot below permanently open,
+        -- so the bottom panel can be slid in (or pulled back out) even after End 2
+        -- has already been glued to Side 1 / Side 2. bottomGrooveOffset now
+        -- already measures up to the groove's top edge directly.  -- by Claude 9/18/2026, updated 9/21/2026
+        bottom_thickness = bottomGrooveOffset or 0
+      end
     elseif (bottomType == FaceJointType.Inset) then
       bottom_thickness = 0.5*thickness
     elseif (bottomType == FaceJointType.Flat) then
@@ -496,14 +953,73 @@ end
     local inner_trc = inner_brc + inner_height*unit_y
     local inner_tlc = inner_blc + inner_height*unit_y
 
+    -- Grooved (slide-in) bottom: only End 1 gets a groove (it acts as the front
+    -- stop for the sliding panel); End 2 is deliberately left ungrooved so the
+    -- bottom panel can be inserted through it before End 2 is glued on. -- by Claude 9/18/2026
+    -- With true dovetails (dovetailJoint), this groove would need to sit on the
+    -- opposite side of the panel because of how the angled dovetail tails are
+    -- cut at End 1's edges - rather than relocate it, skip cutting it
+    -- altogether when dovetails are selected, per the user's own machining
+    -- experience with this setting.                              -- by Claude 9/19/2026
+    local groove_contours = nil
+    if (bottomType == FaceJointType.Grooved and is_end1 and not dovetailJoint) then
+      local groove_width = bottomGrooveWidth or thickness
+      -- bottomGrooveOffset measures up to the groove's TOP edge, so the
+      -- pocket's bottom edge sits one groove-width below that. -- by Claude 9/21/2026
+      local groove_y0 = inner_blc.y + (bottomGrooveOffset or 0) - groove_width
+      -- Stop the groove half a material thickness short of each corner instead
+      -- of running it all the way through the finger joints there - leaves a
+      -- solid sliver of material at each corner rather than breaking straight
+      -- into the open gap between the interlocking fingers/tabs. Box joints
+      -- only (Dovetail already skips this groove entirely, above). -- by Claude 9/19/2026
+      local groove_x0 = inner_blc.x + 0.5*thickness
+      local groove_x1 = inner_brc.x - 0.5*thickness
+      local groove = Contour(0.0)
+      groove:AppendPoint(Point2D(groove_x0, groove_y0))
+      groove:LineTo(Point2D(groove_x1, groove_y0))
+      groove:LineTo(Point2D(groove_x1, groove_y0 + groove_width))
+      groove:LineTo(Point2D(groove_x0, groove_y0 + groove_width))
+      groove:LineTo(Point2D(groove_x0, groove_y0))
+      groove_contours = ContourGroup(true)
+      groove_contours:AddTail(groove)
+    end
+
     -- Gremlin added doevtail seperation for different sizes
     local num_flaps_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
     local num_flaps_top = math.floor((0.5*inner_width) / topdovetail.min_width)
-    local num_flaps_side = math.floor((0.5*inner_height) / sidedovetail.min_width)
+
+    -- The side (left/right) finger PITCH is always computed from the
+    -- REFERENCE height - i.e. as if this were End 1 - never from this end's
+    -- own inner_height, which for a Grooved End 2 is shortened (its material
+    -- starts at the top of the groove, not the true bottom). That way End 1
+    -- and End 2 (and the Side 1/Side 2 corners they mate with) all share one
+    -- identical pitch. Where End 2 really is shorter, the shortfall is
+    -- trimmed off right next to the groove (ComputeFingerTrim, Dovetails.xlua)
+    -- instead of being absorbed by refitting a different pitch to the whole
+    -- edge - that mismatch was the actual bug ("Zinkengröße bei End 2 stimmt
+    -- nicht").                                                    -- by Claude 9/19/2026
+    local reference_bottom_thickness = 0
+    if (bottomType == FaceJointType.Inset) then
+      reference_bottom_thickness = 0.5*thickness
+    elseif (bottomType == FaceJointType.Flat) then
+      reference_bottom_thickness = thickness
+    elseif (bottomType == FaceJointType.None) or (bottomType == FaceJointType.Grooved) then
+      reference_bottom_thickness = 0
+    else
+      reference_bottom_thickness = thickness
+    end
+    local reference_side_height = height - (top_thickness + reference_bottom_thickness)
+    local side_shortfall = reference_side_height - inner_height
+
+    local num_flaps_side = math.floor((0.5*reference_side_height) / sidedovetail.min_width)
+    local tab_space_side = (reference_side_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
+    local trimmed_num_flaps_side, trimmed_edge_gap_side = num_flaps_side, tab_space_side
+    if (side_shortfall > 0.0001) then
+      trimmed_num_flaps_side, trimmed_edge_gap_side = ComputeFingerTrim(num_flaps_side, tab_space_side, sidedovetail.min_width, side_shortfall)
+    end
 
     local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width) / (num_flaps_bottom + 1)
     local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width) / (num_flaps_top + 1)
-    local tab_space_side = (inner_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
 
     local makeTabsForLeftEnd = create_tabs_for_missing_faces or (facesToMake.side1 and is_end1) or (facesToMake.side2 and not is_end1)
     local makeTabsForRightEnd = create_tabs_for_missing_faces or (facesToMake.side2 and is_end1) or (facesToMake.side1 and not is_end1)
@@ -527,11 +1043,14 @@ end
     end
     AddMiddleOfLastSpanToList(contour, tablist)
 
-    -- brc --> trc (tabs for right side)
+    -- brc --> trc (tabs for right side). Drawn bottom-up from inner_brc, which
+    -- is where material for the adjoining end actually starts when that end
+    -- is a Grooved End 2 - so any trim sits at the START (the initial gap).
+    -- by Claude 9/19/2026
     if (makeTabsForRightEnd) then
-      LineToVector(contour,  (tab_space_side)*unit_y)
+      LineToVector(contour,  (trimmed_edge_gap_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
+      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, trimmed_num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -577,11 +1096,15 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    -- tlc -> brc
+    -- tlc -> brc. Drawn top-down from inner_tlc (this wall's real top,
+    -- unaffected) down to inner_blc - which for a Grooved End 2 is raised up
+    -- to the top of the groove, so any trim goes at the END, right before
+    -- inner_blc (AddFemaleDoveTailsAlongLineTrimEnd).             -- by Claude 9/19/2026
     if (makeTabsForLeftEnd) then
       LineToVector(contour, (tab_space_side*-unit_y))
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, -unit_y, unit_x, contour, num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
+      AddFemaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, -unit_y, unit_x, contour, trimmed_num_flaps_side, tab_space_side, trimmed_edge_gap_side, dovetail_markers, flute_sockets, fingerSides)
+      contour:LineTo(inner_blc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
       LineToVector(contour, (tab_space_side*-unit_y))
@@ -590,7 +1113,7 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides)
+    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
   end
 
   -- Splits a comma‑separated string into a numeric array.

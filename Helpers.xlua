@@ -192,7 +192,10 @@ end
 end
 
 function GetFriendlyFaceLabel(face)
-  local lookup = { BottomFace = "BOTTOM", SideFace1 = "SIDE 1", SideFace2 = "SIDE 2", EndFace1 = "END 1", EndFace2 = "END 2", Lid = "LID" }
+  -- Renamed for the "Grooved-variabel" drawer variant: Side1/Side2 are the
+  -- drawer's left/right walls, End1/End2 its front/back - clearer labels for
+  -- a drawer than the generic Side/End naming.               -- by Claude 9/20/2026
+  local lookup = { BottomFace = "BOTTOM", SideFace1 = "LEFT", SideFace2 = "RIGHT", EndFace1 = "FRONT", EndFace2 = "BACK", Lid = "LID" }
   if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
   end
 
@@ -373,6 +376,70 @@ function GetFriendlyFaceLabel(face)
       elseif letter == 88 or letter == 120 then
         AddLine(pA0, pG8)
         AddLine(pA8, pG0)
+        return pH0
+
+      -- Letters added for the "Grooved-variabel" LEFT/RIGHT/FRONT/BACK labels
+      -- (and a few more added at the same time since they reuse the same
+      -- existing grid points at no extra cost).             -- by Claude 9/20/2026
+      elseif letter == 67 or letter == 99 then -- C
+        AddPoly({pG8, pA8, pA0, pG0})
+        return pH0
+
+      elseif letter == 70 or letter == 102 then -- F
+        AddPoly({pG8, pA8, pA0})
+        AddLine(pA4, pD4)
+        return pH0
+
+      elseif letter == 71 or letter == 103 then -- G
+        AddPoly({pG8, pA8, pA0, pG0, pG4, pD4})
+        return pH0
+
+      elseif letter == 72 or letter == 104 then -- H
+        AddLine(pA0, pA8)
+        AddLine(pG0, pG8)
+        AddLine(pA4, pG4)
+        return pH0
+
+      elseif letter == 74 or letter == 106 then -- J
+        AddPoly({pG8, pG2, pF0, pB0})
+        return pH0
+
+      elseif letter == 75 or letter == 107 then -- K
+        AddLine(pA0, pA8)
+        AddLine(pG8, pA4)
+        AddLine(pA4, pG0)
+        return pH0
+
+      elseif letter == 80 or letter == 112 then -- P
+        AddPoly({pA0, pA8, pF8, pG6, pG4, pF4, pA4})
+        return pH0
+
+      elseif letter == 82 or letter == 114 then -- R
+        AddPoly({pA0, pA8, pF8, pG6, pG4, pF4, pA4})
+        AddLine(pA4, pG0)
+        return pH0
+
+      elseif letter == 85 or letter == 117 then -- U
+        AddPoly({pA8, pA2, pB0, pF0, pG2, pG8})
+        return pH0
+
+      elseif letter == 86 or letter == 118 then -- V
+        AddLine(pA8, pD0)
+        AddLine(pD0, pG8)
+        return pH0
+
+      elseif letter == 87 or letter == 119 then -- W
+        AddPoly({pA8, pB0, pD4, pF0, pG8})
+        return pH0
+
+      elseif letter == 89 or letter == 121 then -- Y
+        AddLine(pA8, pD4)
+        AddLine(pG8, pD4)
+        AddLine(pD4, pD0)
+        return pH0
+
+      elseif letter == 90 or letter == 122 then -- Z
+        AddPoly({pA8, pG8, pA0, pG0})
         return pH0
 
       else

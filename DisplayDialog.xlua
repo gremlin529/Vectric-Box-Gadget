@@ -383,7 +383,22 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   local double_thickness = options.thickness * 2
   local inner_width = options.width - double_thickness
   local inner_depth = options.depth - double_thickness
-  local inner_height = options.height - ThicknessForFaceType(options.lidType, options.thickness) - ThicknessForFaceType(options.bottomType, options.thickness)
+  -- "Side Overhang" (independent End 1/End 2 heights) and a Grooved bottom
+  -- (which reserves less height above End 2's own corner than a normal
+  -- bottom) can each make one end's usable corner height smaller than the
+  -- other's; validate against whichever corner is actually smaller. When
+  -- neither feature is in use, end1Height/end2Height both equal options.height
+  -- and bottomGrooveOffset is unused, so this reduces to the original formula.
+  -- (merged in from the Grooved-variabel fork)
+  local top_reserved_for_corner = ThicknessForFaceType(options.lidType, options.thickness)
+  local bottom_thickness_end1 = ThicknessForFaceType(options.bottomType, options.thickness)
+  local bottom_thickness_end2 = bottom_thickness_end1
+  if (options.bottomType == FaceJointType.Grooved) then
+    bottom_thickness_end2 = options.bottomGrooveOffset or 0
+  end
+  local inner_height = math.min(
+    (options.end1Height or options.height) - top_reserved_for_corner - bottom_thickness_end1,
+    (options.end2Height or options.height) - top_reserved_for_corner - bottom_thickness_end2)
 
   local cuttingBottomJoint = (options.bottomType == FaceJointType.Fingers) and
     (options.facesToMake.bottom or options.create_tabs_for_missing_faces)
@@ -692,6 +707,28 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   local bottomString = FaceJointTypeToString(options.bottomType)
   dialog:AddDropDownList("BottomTypeSelect", bottomString)
 
+  -- Grooved (slide-in) bottom options -- by Claude 9/18/2026
+  dialog:AddDoubleField("BottomGrooveOffsetField", options.bottomGrooveOffset)
+  dialog:AddDoubleField("BottomGrooveDepthField", options.bottomGrooveDepth)
+  dialog:AddDoubleField("BottomGrooveWidthField", options.bottomGrooveWidth)
+
+  -- "Bottom aus gleichem Material": cut the bottom panel from the same (full)
+  -- material thickness as the walls, with a rabbet (Falz) milled along Side
+  -- 1/Side 2/End 1's edges down to the groove width there.   -- by Claude 9/21/2026
+  dialog:AddCheckBox("BottomSameMaterial", options.bottomSameMaterial)
+  dialog:AddDoubleField("BottomGrooveClearanceField", options.bottomGrooveClearance)
+  dialog:AddDoubleField("BottomRabbetCorrectionField", options.bottomRabbetDepthCorrection)
+
+  -- "Side Overhang" (Side 1/Side 2 only, Lid Type None only).
+  -- The user sets End 1's and End 2's own height directly and independently;
+  -- Side 1/Side 2 stay the full box height, so each end's own overhang is just
+  -- its own difference - no separate on/off switch is needed, both fields
+  -- default to the box height (= no overhang) when equal to it.  -- by Claude 9/20/2026
+  dialog:AddDoubleField("End1HeightField", options.end1Height)
+  dialog:AddDoubleField("End2HeightField", options.end2Height)
+  dialog:AddDoubleField("End1ChamferAngleField", options.end1ChamferAngle)
+  dialog:AddDoubleField("End2ChamferAngleField", options.end2ChamferAngle)
+
   local units_string = "Inches"
   if options.tool.InMM then
     units_string = "MM"
@@ -705,6 +742,56 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     if not ValidateBoxDimensions(dialog, options, true) then
       return false
+    end
+
+    -- Grooved (slide-in) bottom: validate the groove offset/depth/width -- by Claude 9/18/2026
+    if (options.bottomType == FaceJointType.Grooved) then
+      if not IsNonNeg(options.bottomGrooveDepth) or options.bottomGrooveDepth <= 0 then
+        DisplayMessageBox("Groove depth must be greater than 0.")
+        return false
+      end
+      if options.bottomGrooveDepth >= options.thickness then
+        DisplayMessageBox(string.format("Groove depth %.2f must be less than the material thickness %.2f.", options.bottomGrooveDepth, options.thickness))
+        return false
+      end
+      if not IsNonNeg(options.bottomGrooveOffset) then
+        DisplayMessageBox("Groove offset from the bottom edge (to the top of the groove) must be 0 or greater.")
+        return false
+      end
+      if not IsNonNeg(options.bottomGrooveWidth) or options.bottomGrooveWidth <= 0 then
+        DisplayMessageBox("Groove width must be greater than 0.")
+        return false
+      end
+      -- Groove offset now measures up to the groove's TOP edge (was: bottom
+      -- edge), so the groove itself (extending downward by groove width from
+      -- there) must not reach below the wall's true bottom edge. -- by Claude 9/21/2026
+      if options.bottomGrooveOffset < options.bottomGrooveWidth then
+        DisplayMessageBox(string.format("Groove offset %.2f must be at least the groove width %.2f (the groove would otherwise reach below the wall's bottom edge).", options.bottomGrooveOffset, options.bottomGrooveWidth))
+        return false
+      end
+      -- "Bottom aus gleichem Material": validate the clearance ("Luft") the
+      -- panel's reach into each of the 3 grooves gets shortened by. The
+      -- rabbet-depth correction isn't validated here - a bad value just
+      -- yields a shallower/deeper (possibly zero) rabbet.   -- by Claude 9/21/2026
+      if (options.bottomSameMaterial) then
+        if not IsNonNeg(options.bottomGrooveClearance) then
+          DisplayMessageBox("Bottom groove clearance (Luft) must be 0 or greater.")
+          return false
+        end
+        if options.bottomGrooveClearance >= options.bottomGrooveDepth then
+          DisplayMessageBox(string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth))
+          return false
+        end
+      end
+      -- End 2 is shortened to start at the top of the groove (bottomGrooveOffset
+      -- itself, now that it measures up to the groove's top edge), so there must
+      -- still be enough height left above that for End 2 itself (and for the
+      -- lid's own reserved thickness, if any) to be a real panel. -- by Claude 9/21/2026
+      local top_reserved = ThicknessForFaceType(options.lidType, options.thickness)
+      if (options.bottomGrooveOffset + top_reserved) >= options.height then
+        DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (End 2 would have no height left).", options.height))
+        return false
+      end
     end
 
     -- Tool must be chosen and valid (only when creating toolpaths)
@@ -754,6 +841,66 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
+    local double_thickness = options.thickness * 2
+    local inner_width = options.width - double_thickness
+    local inner_depth = options.depth - double_thickness
+
+    -- "Side Overhang": End 1's and End 2's own heights
+    -- (end1Height/end2Height) can each be set shorter than the box height,
+    -- independently of one another; Side 1/Side 2 stay the full box height,
+    -- so each end's own difference becomes its own overhang, tapered by a
+    -- chamfer. Only valid without a lid, since a lid can't sit flush over the
+    -- raised middle section of Side 1/Side 2.                    -- by Claude 9/20/2026
+    local function ValidateEndHeight(end_height, chamfer_angle, end_label)
+      if not IsNonNeg(end_height) or end_height <= 0 then
+        DisplayMessageBox(string.format("The %s height must be greater than 0.", end_label))
+        return false
+      end
+      if (end_height > options.height) then
+        DisplayMessageBox(string.format("The %s height %.2f cannot be more than the box height %.2f.", end_label, end_height, options.height))
+        return false
+      end
+      if (end_height < options.height) then
+        if (options.lidType ~= FaceJointType.None) then
+          DisplayMessageBox(string.format("A shorter %s height (\"Side Overhang\") only works with Lid Type = None (an open box), because a lid can't sit flush over the raised middle section of Side 1/Side 2.", end_label))
+          return false
+        end
+        if end_height <= double_thickness then
+          DisplayMessageBox(string.format("The %s height %.2f is too small for material thickness %.2f.", end_label, end_height, options.thickness))
+          return false
+        end
+        -- Chamfer is now set as an angle (degrees, measured from vertical) rather
+        -- than a width: 0 would be a plain vertical step (no taper) and 90 an
+        -- infinitely long, perfectly flat ramp, so both ends are excluded.
+        -- by Claude 9/20/2026
+        if not IsNonNeg(chamfer_angle) or chamfer_angle <= 0 or chamfer_angle >= 90 then
+          DisplayMessageBox(string.format("The %s chamfer angle must be greater than 0 and less than 90 degrees.", end_label))
+          return false
+        end
+      end
+      return true
+    end
+    if not ValidateEndHeight(options.end1Height, options.end1ChamferAngle, "End 1 (Front)") then return false end
+    if not ValidateEndHeight(options.end2Height, options.end2ChamferAngle, "End 2 (Back)") then return false end
+
+    -- Front and Back now each have their own chamfer angle, and the chamfer's
+    -- horizontal run is derived from that angle and the actual overhang at each
+    -- end (run = overhang * tan(angle)), exactly like MakeSideFace computes it -
+    -- so the combined-width check has to derive both runs the same way rather
+    -- than assuming a typed-in width.                                -- by Claude 9/20/2026
+    if (options.lidType == FaceJointType.None) then
+      local end1_overhang = math.max(0, options.height - options.end1Height)
+      local end2_overhang = math.max(0, options.height - options.end2Height)
+      if (end1_overhang > 0.0001 or end2_overhang > 0.0001) then
+        local end1_chamfer_w = end1_overhang * math.tan(math.rad(options.end1ChamferAngle))
+        local end2_chamfer_w = end2_overhang * math.tan(math.rad(options.end2ChamferAngle))
+        if ((end1_chamfer_w + end2_chamfer_w) >= inner_width) then
+          DisplayMessageBox(string.format("The overhang chamfers resulting from these angles (Front %.2f + Back %.2f) are too wide for the side's inner width %.2f - try steeper (smaller) chamfer angles.", end1_chamfer_w, end2_chamfer_w, inner_width))
+          return false
+        end
+      end
+    end
+
     return true
   end
 
@@ -798,6 +945,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.partLayout = dialog:GetDropDownListValue("PartLayoutSelect")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
+  options.bottomSameMaterial   = dialog:GetCheckBox("BottomSameMaterial")
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
   options.facesToMake.side2    = dialog:GetCheckBox("MakeSide2")
   options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
@@ -840,9 +988,40 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   local lid_type = dialog:GetDropDownListValue("LidTypeSelect")
   options.lidType = FaceJointType[lid_type]
+  if options.lidType == nil then
+    -- Defensive fallback: an unrecognised dropdown value must never leave
+    -- options.lidType nil, since that then poisons a Face's jointtype and
+    -- crashes later as an obscure "table index is nil" error.  -- by Claude 9/18/2026
+    options.lidType = FaceJointType.Inset
+  end
 
   local bottom_type = dialog:GetDropDownListValue("BottomTypeSelect")
   options.bottomType = FaceJointType[bottom_type]
+  if options.bottomType == nil then
+    options.bottomType = FaceJointType.Fingers -- by Claude 9/18/2026
+  end
+
+  -- Grooved (slide-in) bottom options -- by Claude 9/18/2026
+  options.bottomGrooveOffset = dialog:GetDoubleField("BottomGrooveOffsetField")
+  options.bottomGrooveDepth = dialog:GetDoubleField("BottomGrooveDepthField")
+  options.bottomGrooveWidth = dialog:GetDoubleField("BottomGrooveWidthField")
+  options.bottomGrooveClearance = dialog:GetDoubleField("BottomGrooveClearanceField")
+  options.bottomRabbetDepthCorrection = dialog:GetDoubleField("BottomRabbetCorrectionField")
+
+  -- "Side Overhang": End 1's and End 2's own heights
+  -- (independent of each other), plus the chamfer's horizontal run. If a
+  -- field is empty/invalid, fall back to the box height (i.e. no overhang
+  -- for that end) rather than leaving it nil.                    -- by Claude 9/20/2026
+  options.end1Height = dialog:GetDoubleField("End1HeightField")
+  if not options.end1Height or options.end1Height <= 0 then
+    options.end1Height = options.height
+  end
+  options.end2Height = dialog:GetDoubleField("End2HeightField")
+  if not options.end2Height or options.end2Height <= 0 then
+    options.end2Height = options.height
+  end
+  options.end1ChamferAngle = dialog:GetDoubleField("End1ChamferAngleField")
+  options.end2ChamferAngle = dialog:GetDoubleField("End2ChamferAngleField")
 
 
   -- Get from tool picker
@@ -931,6 +1110,16 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("DovetailAngle", options.dovetailAngleDegrees)
   registry:SetDouble("LidType", options.lidType)
   registry:SetDouble("BottomType", options.bottomType)
+  registry:SetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
+  registry:SetDouble("BottomGrooveDepth", options.bottomGrooveDepth)    -- Added by Claude 9/18/2026
+  registry:SetDouble("BottomGrooveWidth", options.bottomGrooveWidth)    -- Added by Claude 9/18/2026
+  registry:SetBool("BottomSameMaterial", options.bottomSameMaterial)                     -- Added by Claude 9/21/2026
+  registry:SetDouble("BottomGrooveClearance", options.bottomGrooveClearance)             -- Added by Claude 9/21/2026
+  registry:SetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
+  registry:SetDouble("End1Height", options.end1Height)                             -- Added by Claude 9/20/2026
+  registry:SetDouble("End2Height", options.end2Height)                             -- Added by Claude 9/20/2026
+  registry:SetDouble("End1ChamferAngle", options.end1ChamferAngle)                 -- Added by Claude 9/20/2026
+  registry:SetDouble("End2ChamferAngle", options.end2ChamferAngle)                 -- Added by Claude 9/20/2026
 
   if options.tool ~= nil then
     options.tool.ToolDBId:SaveDefaults("BoxCreator_"..G_version, "")
@@ -984,6 +1173,20 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.dovetailAngleDegrees = registry:GetDouble("DovetailAngle", options.dovetailAngleDegrees)
   options.lidType = registry:GetDouble("LidType", options.lidType)
   options.bottomType = registry:GetDouble("BottomType", options.bottomType)
+  options.bottomGrooveOffset = registry:GetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
+  options.bottomGrooveDepth = registry:GetDouble("BottomGrooveDepth", options.bottomGrooveDepth)      -- Added by Claude 9/18/2026
+  options.bottomGrooveWidth = registry:GetDouble("BottomGrooveWidth", options.bottomGrooveWidth)      -- Added by Claude 9/18/2026
+  options.bottomSameMaterial = registry:GetBool("BottomSameMaterial", options.bottomSameMaterial)                         -- Added by Claude 9/21/2026
+  options.bottomGrooveClearance = registry:GetDouble("BottomGrooveClearance", options.bottomGrooveClearance)              -- Added by Claude 9/21/2026
+  options.bottomRabbetDepthCorrection = registry:GetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
+  -- Fall back to the just-loaded options.height (not the pre-load default) so a
+  -- registry with no saved End1Height/End2Height yet (e.g. right after
+  -- upgrading) comes up as "no overhang" instead of accidentally showing a
+  -- stale one.                                                    -- by Claude 9/20/2026
+  options.end1Height = registry:GetDouble("End1Height", options.height)
+  options.end2Height = registry:GetDouble("End2Height", options.height)
+  options.end1ChamferAngle = registry:GetDouble("End1ChamferAngle", options.end1ChamferAngle) -- Added by Claude 9/20/2026
+  options.end2ChamferAngle = registry:GetDouble("End2ChamferAngle", options.end2ChamferAngle) -- Added by Claude 9/20/2026
   options.default_toolid = ToolDBId("BoxCreator_"..G_version, "")
 
   options.roundover_cut_depth = registry:GetDouble("RoundoverCutDepth", options.roundover_cut_depth)
@@ -1034,4 +1237,4 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
 
   return true
-end
+end

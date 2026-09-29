@@ -1,0 +1,1 @@
+any ux generated for this project or changes to html files needs to be compatible with internet exploer 7 host
