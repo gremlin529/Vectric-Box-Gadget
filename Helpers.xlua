@@ -193,8 +193,14 @@ end
 
 function GetFriendlyFaceLabel(face)
   -- Renamed for the "Grooved-variabel" drawer variant: Side1/Side2 are the
-  -- drawer's left/right walls, End1/End2 its front/back - clearer labels for
-  -- a drawer than the generic Side/End naming.               -- by Claude 9/20/2026
+  -- drawer's left/right walls (they carry the "Side Overhang"/"Englischer
+  -- Zug" chamfer, which only makes sense on the panels that run front-to-
+  -- back), End1/End2 its front/back - clearer labels for a drawer than the
+  -- generic Side/End naming.                                -- by Claude 9/20/2026
+  -- 10/1/2026: briefly "corrected" this to Side=Front/Back, End=Left/Right
+  -- based on a width/depth mix-up that actually lived at the dialog's
+  -- Width/Depth input fields (see GetOptionsFromDialog in DisplayDialog.xlua)
+  -- - reverted back to the original, correct mapping here. -- by Claude 10/1/2026
   local lookup = { BottomFace = "BOTTOM", SideFace1 = "LEFT", SideFace2 = "RIGHT", EndFace1 = "FRONT", EndFace2 = "BACK", Lid = "LID" }
   if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
   end

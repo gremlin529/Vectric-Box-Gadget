@@ -2,6 +2,14 @@
 
 Aenderungen an diesem Gadget-Fork ("Vectric-Box-Gadget_claude"), damit auch nach einer neuen Chat-Sitzung nachvollziehbar bleibt, was wann und warum geaendert wurde.
 
+### 2026-10-01
+
+- **Aufräumen: Gelber "DEV BUILD"-Banner aus der HTML entfernt**
+  Der temporäre, lokal zur Unterscheidung von `Simple-Drawer-Creator` eingebaute Banner (`Simple_Box_Creator_dev.html`, 9/30/2026) wurde vor dem Commit/Push auf gremlins Branch wieder entfernt.
+
+- **Fix: Width und Depth wurden in der fertigen Box-Geometrie vertauscht (nur `Simple_Box_Creator_Dev`, gremlin-Branch)**
+  Beim Testen zeigte sich, dass bei z.B. Width=360/Depth=800 die ausgegebenen Teile genau andersherum herauskamen: LEFT/RIGHT (Side 1/Side 2, die Seitenteile mit der "Englischer Zug"-Fase) wurden kurz (360) statt lang (800), FRONT/BACK (End 1/End 2) wurden lang (800) statt kurz (360). Ursache war **nicht** eine falsche Beschriftung der Teile (Side 1/Side 2 = Left/Right, End 1/End 2 = Front/Back ist und bleibt korrekt - das wurde zwischenzeitlich faelschlich anders herum "korrigiert" und wieder zurueckgesetzt), sondern die Verdrahtung der Dialogfelder: `GetOptionsFromDialog`/`ReadOptionsFromDialog` in `DisplayDialog.xlua` las `options.width` aus dem "Width"-Eingabefeld und `options.depth` aus dem "Depth"-Feld - `CreateFaces.xlua` (`MakeSideFace`/`MakeEndFace`, unveraendert) nutzt aber `options.width` fuer die Laenge von Side 1/Side 2 und `options.depth` fuer die Laenge von End 1/End 2. Da Side 1/Side 2 (Left/Right) vorne-hinten verlaufen (also die real eingegebene Depth als Laenge brauchen) und End 1/End 2 (Front/Back) links-rechts (also die real eingegebene Width brauchen), war das vertauscht. Fix (nur in `DisplayDialog.xlua`, wie vom Nutzer vorgeschlagen): die Zuordnung Width-Feld/Depth-Feld zu `options.width`/`options.depth` wurde beim Einlesen (`ReadOptionsFromDialog`) und beim Befuellen des Dialogs beim Oeffnen (`AddDoubleField`) vertauscht, sodass `options.width` jetzt den Wert aus dem Depth-Feld und `options.depth` den Wert aus dem Width-Feld haelt - `CreateFaces.xlua` musste dafuer nicht angefasst werden. Die zugehoerigen Validierungsmeldungen (`ValidateBoxDimensions`: welches Feld bei zu kleiner Breite/Tiefe rot markiert wird, und die "box inner width/depth"-Meldungen in `ValidateJointWidths`) wurden entsprechend mitgetauscht, damit Fehlermeldung und rot markiertes Feld weiterhin zusammenpassen. Nutzer-getestet und bestaetigt.
+
 ### 2026-09-22
 
 - **Fix: Nut in Side 1/Side 2 an der End-1-Ecke (vorne) um halbe Materialstaerke verkuerzt**

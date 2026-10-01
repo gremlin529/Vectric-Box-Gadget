@@ -301,6 +301,14 @@
     <div class="card-body clearfix">
       <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
       <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <!-- Side 1/Side 2 are the drawer's Left/Right walls (they carry the Side
+           Overhang/"Englischer Zug" chamfer, which only makes sense on the panels
+           that run front-to-back); End 1/End 2 are its Front/Back walls - see
+           GetFriendlyFaceLabel in Helpers.xlua. (10/1/2026: briefly relabeled
+           these the other way around based on a Width/Depth mix-up that actually
+           lived at the dialog's Width/Depth input fields - see GetOptionsFromDialog
+           in DisplayDialog.xlua - reverted back to the original, correct labels
+           here.)                                                      -- by Claude 10/1/2026 -->
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
@@ -419,7 +427,7 @@
 
   // Side Overhang (End 1/End 2 height + chamfer) only makes sense with Lid Type =
   // None (ValidateEndHeight on the Lua side rejects it otherwise) - rather than
-  // let the user set it up and only find out on OK, lock Front/Back height to the
+  // let the user set it up and only find out on OK, lock Left/Right height to the
   // box height and greyed out (no overhang possible) whenever a real Lid is
   // selected, same for the now-pointless chamfer angle fields. Called on every
   // Lid Type change and on init, so the lock is always in sync.  -- by Claude 9/26/2026

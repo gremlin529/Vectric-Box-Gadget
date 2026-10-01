@@ -28,9 +28,15 @@ local G_dialogOptions
 -- Returns true if width, depth and height are all valid.
 local function ValidateBoxDimensions(dialog, options, report_as_dialog)
   local double_thickness = options.thickness * 2
+  -- options.width/options.depth are swapped against the WidthField/DepthField
+  -- HTML inputs (see ReadOptionsFromDialog) - options.width holds what the user
+  -- typed into DepthField and vice versa - so the invalid_field here (which
+  -- drives which on-screen input gets the red outline/tooltip, via
+  -- g_invalidFieldMap in the HTML) has to follow the same swap.
+  --                                                            -- by Claude 10/1/2026
   local dims = {
-    { value = options.width,  label = "width",  invalid_field = "InvalidWidth" },
-    { value = options.depth,  label = "depth",  invalid_field = "InvalidDepth" },
+    { value = options.width,  label = "depth",  invalid_field = "InvalidDepth" },
+    { value = options.depth,  label = "width",  invalid_field = "InvalidWidth" },
     { value = options.height, label = "height", invalid_field = "InvalidHeight" },
   }
 
@@ -381,6 +387,13 @@ end
 -- Returns true if every joint currently being cut is valid.
 local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail, report_as_dialog)
   local double_thickness = options.thickness * 2
+  -- options.width/options.depth are swapped against the real-world box Width/
+  -- Depth (see ReadOptionsFromDialog), so inner_width here is actually the
+  -- box's inner depth and inner_depth its inner width - the suffixes below
+  -- (_w/_d) just track which of options.width/options.depth each one came
+  -- from, not the real-world dimension, and the messages further down are
+  -- worded to match the real-world dimension rather than the suffix.
+  --                                                            -- by Claude 10/1/2026
   local inner_width = options.width - double_thickness
   local inner_depth = options.depth - double_thickness
   -- "Side Overhang" (independent End 1/End 2 heights) and a Grooved bottom
@@ -442,9 +455,9 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
       local suggestion_text = string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", suggested)
       local message
       if (not options.useAllJointWidths) then
-        message = string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text)
+        message = string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text)
       else
-        message = string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text)
+        message = string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_width, suggestion_text)
       end
       local aborted
       bottom_message, aborted = report(bottom_message, message)
@@ -456,9 +469,9 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
       local suggestion_text = string.format(" Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", suggested)
       local message
       if (not options.useAllJointWidths) then
-        message = string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text)
+        message = string.format("The joint width %." .. G_decimalPlaces .. "f is too big given boxes bottom given the inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text)
       else
-        message = string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text)
+        message = string.format("The bottom joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f.%s", bottomDoveTail.min_width, inner_depth, suggestion_text)
       end
       local aborted
       bottom_message, aborted = report(bottom_message, message)
@@ -469,14 +482,14 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   if cuttingLidJoint then
     if (num_flaps_w_lid < 1) or (total_tab_space_w_lid < 0) then
       local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-      local message = string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_width, suggested)
+      local message = string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_width, suggested)
       local aborted
       lid_message, aborted = report(lid_message, message)
       if aborted then return false end
     end
     if (num_flaps_d_lid < 1) or (total_tab_space_d_lid < 0) then
       local suggested = SuggestSmallerJointWidth({inner_width, inner_depth})
-      local message = string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner depth is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_depth, suggested)
+      local message = string.format("The lid joint width %." .. G_decimalPlaces .. "f is too big given box inner width is %." .. G_decimalPlaces .. "f. Try a joint width of %." .. G_decimalPlaces .. "f or smaller.", lidDoveTail.min_width, inner_depth, suggested)
       local aborted
       lid_message, aborted = report(lid_message, message)
       if aborted then return false end
@@ -635,8 +648,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddLabelField("GadgetVersion", G_version)
 
   -- Add Geometry fields
-  dialog:AddDoubleField("WidthField", options.width)
-  dialog:AddDoubleField("DepthField", options.depth)
+  -- WidthField/DepthField are swapped against options.width/options.depth here
+  -- (and in the matching read-back in ReadOptionsFromDialog below) - see the
+  -- comment there for why.                                   -- by Claude 10/1/2026
+  dialog:AddDoubleField("WidthField", options.depth)
+  dialog:AddDoubleField("DepthField", options.width)
   dialog:AddDoubleField("HeightField", options.height)
   dialog:AddDoubleField("DovetailAngleField", options.dovetailAngleDegrees)
   dialog:AddDoubleField("SideTabWidthField", options.sideOrAllTabWidth)
@@ -880,6 +896,12 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       end
       return true
     end
+    -- End 1/End 2 are the Front/Back walls; Side 1/Side 2 are the Left/Right
+    -- walls (they carry the Side Overhang/chamfer, which only makes sense on
+    -- the panels running front-to-back). (10/1/2026: briefly had this
+    -- backwards based on a Width/Depth mix-up that actually lived at the
+    -- dialog's Width/Depth input fields - see GetOptionsFromDialog below -
+    -- reverted back to the original, correct wording here.)
     if not ValidateEndHeight(options.end1Height, options.end1ChamferAngle, "End 1 (Front)") then return false end
     if not ValidateEndHeight(options.end2Height, options.end2ChamferAngle, "End 2 (Back)") then return false end
 
@@ -925,8 +947,20 @@ end
 -- This function will read the options out of the dialog
 function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   -- Read back data from the form
-  options.width     = dialog:GetDoubleField("WidthField")
-  options.depth     = dialog:GetDoubleField("DepthField")
+  -- Swapped on purpose: Side 1/Side 2 (the Left/Right walls, which run
+  -- front-to-back between End 1/End 2) get their length from options.width in
+  -- MakeSideFace, and End 1/End 2 (the Front/Back walls) get theirs from
+  -- options.depth in MakeEndFace (CreateFaces.xlua, unchanged, matches the
+  -- pre-refactor/base gadget). So for Side 1/Side 2 to come out the length the
+  -- user actually types into the "Depth" field (front-to-back), and End 1/End 2
+  -- the length typed into "Width" (side-to-side), options.width must take the
+  -- DepthField value and options.depth the WidthField value here - without
+  -- this, Width and Depth come out transposed in the finished box, which is
+  -- exactly what was reported. (AddDoubleField above mirrors this swap so the
+  -- dialog still shows back what the user typed under the right label next
+  -- time it's opened.)                                        -- by Claude 10/1/2026
+  options.width     = dialog:GetDoubleField("DepthField")
+  options.depth     = dialog:GetDoubleField("WidthField")
   options.height    = dialog:GetDoubleField("HeightField")
   options.sideOrAllTabWidth  = dialog:GetDoubleField("SideTabWidthField")
   sideDoveTail.min_width = options.sideOrAllTabWidth
