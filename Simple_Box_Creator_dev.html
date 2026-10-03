@@ -427,7 +427,7 @@
 
   // Side Overhang (End 1/End 2 height + chamfer) only makes sense with Lid Type =
   // None (ValidateEndHeight on the Lua side rejects it otherwise) - rather than
-  // let the user set it up and only find out on OK, lock Left/Right height to the
+  // let the user set it up and only find out on OK, lock Front/Back height to the
   // box height and greyed out (no overhang possible) whenever a real Lid is
   // selected, same for the now-pointless chamfer angle fields. Called on every
   // Lid Type change and on init, so the lock is always in sync.  -- by Claude 9/26/2026
