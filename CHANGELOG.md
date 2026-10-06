@@ -2,6 +2,14 @@
 
 Aenderungen an diesem Gadget-Fork ("Vectric-Box-Gadget_claude"), damit auch nach einer neuen Chat-Sitzung nachvollziehbar bleibt, was wann und warum geaendert wurde.
 
+### 2026-10-06
+
+- **UI: Neue Skizze fuer "Bottom Type: Grooved Options"**
+  `Images/GroovedOverhangSketch.png` ersetzt: statt der bisherigen abstrakten Skizze jetzt ein Laengsschnitt durch die Lade (mit Bruchlinien in der Mitte, nach einer Vorlage des Nutzers). Links Back, rechts Front, jeweils niedriger als die Box mit eigener Fase an der Seitenwand (vorne groesserer Rueckstand als hinten), bemasst mit Height, Height Back, Height Front und Chamfer Angle. Der Boden laeuft unter dem verkuerzten Back durch bis zur Aussenkante und greift vorne mit der Feder in die Nut. Rechts ein vergroessertes "Detail A" der Nut an der Front mit Groove offset, Groove width, Groove depth, Bottom Clearance (rot) und Rabbet correction (blau). HTML unveraendert, nur das Bild wurde getauscht.
+
+- **Fix: Fasen-Pruefung ("Englischer Zug") vergleicht jetzt mit der inneren Tiefe statt der inneren Breite**
+  Seit gremlins Width/Depth-Fix (Branch `users/gremlin/DepthWidth`, PR #71) laufen Left/Right (Side 1/Side 2) ueber die Tiefe der Box (`MakeSideFace` nutzt `options.depth`). Die Validierung im Dialog (`DisplayDialog.xlua`, Pruefung ob Front- und Back-Fase zusammen auf das Seitenteil passen) verglich aber noch mit `inner_width`. Folge: bei einer Lade, die tiefer als breit ist, wurden passende Fasen faelschlich abgelehnt; im umgekehrten Fall konnten zu breite Fasen durchrutschen. Jetzt wird mit `inner_depth` (Tiefe minus beide Wandstaerken) verglichen, die Fehlermeldung nennt entsprechend die Innenlaenge des Seitenteils.
+
 ### 2026-09-22
 
 - **Fix: Nut in Side 1/Side 2 an der End-1-Ecke (vorne) um halbe Materialstaerke verkuerzt**
