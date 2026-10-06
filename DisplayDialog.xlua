@@ -888,14 +888,17 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
     -- end (run = overhang * tan(angle)), exactly like MakeSideFace computes it -
     -- so the combined-width check has to derive both runs the same way rather
     -- than assuming a typed-in width.                                -- by Claude 9/20/2026
+    -- The chamfers sit on the Left/Right walls, which run front-to-back and so
+    -- span the box's depth (MakeSideFace uses options.depth), so both runs have
+    -- to fit into the inner depth, not the inner width.          -- by Claude 10/6/2026
     if (options.lidType == FaceJointType.None) then
       local end1_overhang = math.max(0, options.height - options.end1Height)
       local end2_overhang = math.max(0, options.height - options.end2Height)
       if (end1_overhang > 0.0001 or end2_overhang > 0.0001) then
         local end1_chamfer_w = end1_overhang * math.tan(math.rad(options.end1ChamferAngle))
         local end2_chamfer_w = end2_overhang * math.tan(math.rad(options.end2ChamferAngle))
-        if ((end1_chamfer_w + end2_chamfer_w) >= inner_width) then
-          DisplayMessageBox(string.format("The overhang chamfers resulting from these angles (Front %.2f + Back %.2f) are too wide for the side's inner width %.2f - try steeper (smaller) chamfer angles.", end1_chamfer_w, end2_chamfer_w, inner_width))
+        if ((end1_chamfer_w + end2_chamfer_w) >= inner_depth) then
+          DisplayMessageBox(string.format("The overhang chamfers resulting from these angles (Front %.2f + Back %.2f) are too wide for the side's inner length %.2f (box depth minus both walls) - try steeper (smaller) chamfer angles.", end1_chamfer_w, end2_chamfer_w, inner_depth))
           return false
         end
       end

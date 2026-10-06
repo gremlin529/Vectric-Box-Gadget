@@ -2,6 +2,11 @@
 
 Aenderungen an diesem Gadget-Fork ("Vectric-Box-Gadget_claude"), damit auch nach einer neuen Chat-Sitzung nachvollziehbar bleibt, was wann und warum geaendert wurde.
 
+### 2026-10-06
+
+- **Fix: Fasen-Pruefung ("Englischer Zug") vergleicht jetzt mit der inneren Tiefe statt der inneren Breite**
+  Seit gremlins Width/Depth-Fix (Branch `users/gremlin/DepthWidth`, PR #71) laufen Left/Right (Side 1/Side 2) ueber die Tiefe der Box (`MakeSideFace` nutzt `options.depth`). Die Validierung im Dialog (`DisplayDialog.xlua`, Pruefung ob Front- und Back-Fase zusammen auf das Seitenteil passen) verglich aber noch mit `inner_width`. Folge: bei einer Lade, die tiefer als breit ist, wurden passende Fasen faelschlich abgelehnt; im umgekehrten Fall konnten zu breite Fasen durchrutschen. Jetzt wird mit `inner_depth` (Tiefe minus beide Wandstaerken) verglichen, die Fehlermeldung nennt entsprechend die Innenlaenge des Seitenteils.
+
 ### 2026-09-22
 
 - **Fix: Nut in Side 1/Side 2 an der End-1-Ecke (vorne) um halbe Materialstaerke verkuerzt**
