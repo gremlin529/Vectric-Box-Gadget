@@ -354,6 +354,99 @@ local function ValidateDovetailAngle(dialog, options, report_as_dialog)
   return not is_invalid
 end
 
+-- Validates the Open Box options ("Side Overhang"): each end's own height and
+-- chamfer angle, and whether the two chamfers fit along the Left/Right walls.
+-- Only applies with Lid Type = None - with a lid fitted the fields are locked
+-- to the box height in the dialog, so any stale values are ignored and nothing
+-- is flagged.
+--
+-- report_as_dialog = true (OK/Validate flow): pops a DisplayMessageBox for the
+-- first problem and returns false.
+-- report_as_dialog = false (live DimensionsChanged callback): writes each
+-- field's own problem (or "" when valid) into its own Invalid text field, so
+-- the HTML marks that field red and shows the message as its tooltip.
+--
+-- Returns true if the open box options are all valid.
+local function ValidateOpenBoxOptions(dialog, options, report_as_dialog)
+  local double_thickness = options.thickness * 2
+  local inner_depth = options.depth - double_thickness
+  local lid_fitted = (options.lidType ~= FaceJointType.None)
+
+  local ends = {
+    { height = options.end1Height, angle = options.end1ChamferAngle, label = "Front",
+      invalid_height = "InvalidEnd1Height", invalid_angle = "InvalidEnd1ChamferAngle" },
+    { height = options.end2Height, angle = options.end2ChamferAngle, label = "Back",
+      invalid_height = "InvalidEnd2Height", invalid_angle = "InvalidEnd2ChamferAngle" },
+  }
+
+  -- One message per field ("" means no problem), remembering the order fields
+  -- were checked in so the first problem reported is the one closest to the top.
+  local messages, order = {}, {}
+  local function SetMessage(field, message)
+    if messages[field] == nil then order[#order + 1] = field end
+    messages[field] = message
+  end
+  local function AnyProblem()
+    for _, field in ipairs(order) do
+      if messages[field] ~= "" then return true end
+    end
+    return false
+  end
+
+  for _, end_info in ipairs(ends) do
+    local height_message, angle_message = "", ""
+    if not lid_fitted then
+      if not IsNonNeg(end_info.height) or end_info.height <= 0 then
+        height_message = string.format("The %s height must be greater than 0.", end_info.label)
+      elseif end_info.height > options.height then
+        height_message = string.format("The %s height %.2f cannot be more than the box height %.2f.", end_info.label, end_info.height, options.height)
+      elseif end_info.height < options.height then
+        if end_info.height <= double_thickness then
+          height_message = string.format("The %s height %.2f is too small for material thickness %.2f.", end_info.label, end_info.height, options.thickness)
+        -- Chamfer is an angle (degrees, from vertical): 0 would be a plain vertical
+        -- step and 90 an infinitely long flat ramp, so both ends are excluded.
+        elseif not IsNonNeg(end_info.angle) or end_info.angle <= 0 or end_info.angle >= 90 then
+          angle_message = string.format("The %s chamfer angle must be greater than 0 and less than 90 degrees.", end_info.label)
+        end
+      end
+    end
+    SetMessage(end_info.invalid_height, height_message)
+    SetMessage(end_info.invalid_angle, angle_message)
+  end
+
+  -- Both chamfers sit on the Left/Right walls, which run front-to-back and so
+  -- span the box's depth. Their combined horizontal run must fit into it.
+  -- Only checked once each end's own height and angle are valid.
+  if not lid_fitted and not AnyProblem() then
+    local end1_overhang = math.max(0, options.height - options.end1Height)
+    local end2_overhang = math.max(0, options.height - options.end2Height)
+    if (end1_overhang > 0.0001 or end2_overhang > 0.0001) then
+      local end1_chamfer_w = end1_overhang * math.tan(math.rad(options.end1ChamferAngle))
+      local end2_chamfer_w = end2_overhang * math.tan(math.rad(options.end2ChamferAngle))
+      if ((end1_chamfer_w + end2_chamfer_w) >= inner_depth) then
+        local message = string.format("The overhang chamfers resulting from these angles (Front %.2f + Back %.2f) are too wide for the side's inner length %.2f (box depth minus both walls) - try steeper (smaller) chamfer angles.", end1_chamfer_w, end2_chamfer_w, inner_depth)
+        SetMessage("InvalidEnd1ChamferAngle", message)
+        SetMessage("InvalidEnd2ChamferAngle", message)
+      end
+    end
+  end
+
+  if report_as_dialog then
+    for _, field in ipairs(order) do
+      if messages[field] ~= "" then
+        DisplayMessageBox(messages[field])
+        return false
+      end
+    end
+    return true
+  end
+
+  for _, field in ipairs(order) do
+    dialog:UpdateTextField(field, messages[field])
+  end
+  return not AnyProblem()
+end
+
 -- Validates the Side/Bottom/Lid joint widths: first that they geometrically
 -- fit within the box's own inner dimensions, then - if the allowance leaves
 -- a usable effective tool diameter - that the cutting tool actually fits in
@@ -674,6 +767,10 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidBottomJointWidth", "")
   dialog:AddTextField("InvalidDovetailAngle", "")
   dialog:AddTextField("InvalidAllowance", "")
+  dialog:AddTextField("InvalidEnd1Height", "")
+  dialog:AddTextField("InvalidEnd2Height", "")
+  dialog:AddTextField("InvalidEnd1ChamferAngle", "")
+  dialog:AddTextField("InvalidEnd2ChamferAngle", "")
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -841,71 +938,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
-    local double_thickness = options.thickness * 2
-    local inner_width = options.width - double_thickness
-    local inner_depth = options.depth - double_thickness
-
-    -- "Side Overhang": End 1's and End 2's own heights
-    -- (end1Height/end2Height) can each be set shorter than the box height,
-    -- independently of one another; Side 1/Side 2 stay the full box height,
-    -- so each end's own difference becomes its own overhang, tapered by a
-    -- chamfer. Only valid without a lid, since a lid can't sit flush over the
-    -- raised middle section of Side 1/Side 2.                    -- by Claude 9/20/2026
-    local function ValidateEndHeight(end_height, chamfer_angle, end_label)
-      -- "Side Overhang" only exists without a lid (see comment above) - with a
-      -- real lid fitted, end1Height/end2Height are locked to the box height
-      -- and greyed out in the dialog (updateSideOverhangLidLock in the HTML),
-      -- but a stale value left over from before the lid was added (or from
-      -- before the box height was lowered) could still fail the checks below
-      -- even though the field is no longer meaningful - so skip validating it
-      -- entirely whenever there's an actual lid.
-      if (options.lidType ~= FaceJointType.None) then
-        return true
-      end
-      if not IsNonNeg(end_height) or end_height <= 0 then
-        DisplayMessageBox(string.format("The %s height must be greater than 0.", end_label))
-        return false
-      end
-      if (end_height > options.height) then
-        DisplayMessageBox(string.format("The %s height %.2f cannot be more than the box height %.2f.", end_label, end_height, options.height))
-        return false
-      end
-      if (end_height < options.height) then
-        if end_height <= double_thickness then
-          DisplayMessageBox(string.format("The %s height %.2f is too small for material thickness %.2f.", end_label, end_height, options.thickness))
-          return false
-        end
-        -- Chamfer is now set as an angle (degrees, measured from vertical) rather
-        -- than a width: 0 would be a plain vertical step (no taper) and 90 an
-        -- infinitely long, perfectly flat ramp, so both ends are excluded.
-        -- by Claude 9/20/2026
-        if not IsNonNeg(chamfer_angle) or chamfer_angle <= 0 or chamfer_angle >= 90 then
-          DisplayMessageBox(string.format("The %s chamfer angle must be greater than 0 and less than 90 degrees.", end_label))
-          return false
-        end
-      end
-      return true
-    end
-    if not ValidateEndHeight(options.end1Height, options.end1ChamferAngle, "Front") then return false end
-    if not ValidateEndHeight(options.end2Height, options.end2ChamferAngle, "Back") then return false end
-
-    -- Front and Back now each have their own chamfer angle, and the chamfer's
-    -- horizontal run is derived from that angle and the actual overhang at each
-    -- end (run = overhang * tan(angle)), exactly like MakeSideFace computes it -
-    -- so the combined-width check has to derive both runs the same way rather
-    -- than assuming a typed-in width.                                -- by Claude 9/20/2026
-    -- The chamfers sit on the Left/Right walls, which run front-to-back and so
-    -- span the box's depth (MakeSideFace uses options.depth), so both runs have
-    -- to fit into the inner depth, not the inner width.          -- by Claude 10/6/2026
-    local end1_overhang = math.max(0, options.height - options.end1Height)
-    local end2_overhang = math.max(0, options.height - options.end2Height)
-    if (end1_overhang > 0.0001 or end2_overhang > 0.0001) then
-      local end1_chamfer_w = end1_overhang * math.tan(math.rad(options.end1ChamferAngle))
-      local end2_chamfer_w = end2_overhang * math.tan(math.rad(options.end2ChamferAngle))
-      if ((end1_chamfer_w + end2_chamfer_w) >= inner_depth) then
-        DisplayMessageBox(string.format("The overhang chamfers resulting from these angles (Front %.2f + Back %.2f) are too wide for the side's inner length %.2f (box depth minus both walls) - try steeper (smaller) chamfer angles.", end1_chamfer_w, end2_chamfer_w, inner_depth))
-        return false
-      end
+    if not ValidateOpenBoxOptions(dialog, options, true) then
+      return false
     end
 
     return true
@@ -1242,6 +1276,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateBoxDimensions(dialog, G_dialogOptions, false)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
+  ValidateOpenBoxOptions(dialog, G_dialogOptions, false)
 
   return true
 end

@@ -197,11 +197,11 @@
           <div class="clearfix" style="margin-bottom: 8px;">
             <div class="field-row" style="float: left; width: 170px; margin-right: 20px; margin-bottom: 0;" title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
               <label for="End1ChamferAngleField">Front</label>
-              <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
             </div>
             <div class="field-row" style="float: left; width: 170px; margin-bottom: 0;" title="Angle of Back (End 2)'s own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
               <label for="End2ChamferAngleField">Back</label>
-              <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
             </div>
           </div>
 
@@ -209,11 +209,11 @@
           <div class="clearfix" style="margin-bottom: 6px;">
             <div class="field-row" style="float: left; width: 170px; margin-right: 20px; margin-bottom: 0;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
               <label for="End1HeightField">Front</label>
-              <input type="number" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input type="number" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
             </div>
             <div class="field-row" style="float: left; width: 170px; margin-bottom: 0;" title="Height of Back (End 2). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
               <label for="End2HeightField">Back</label>
-              <input type="number" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              <input type="number" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
             </div>
           </div>
           <div style="font-size: 11px; opacity: 0.8; min-height: 14px;" id="SideOverhangComputedText"></div>
@@ -222,9 +222,9 @@
     </div>
   </div>
 
-  <!-- ── Bottom Type: Grooved Options ───────────────────────────────────
+  <!-- ── Grooved Bottom Options ───────────────────────────────────
        Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
-  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Bottom Type: Grooved Options</div>
+  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
   <div class="card" id="showHideGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
       <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Side 1, Side 2 &amp; End 1 (Box joints only - with Dovetail joints, End 1's groove is skipped, since it would land inside the angled dovetail tails there). End 2 is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
@@ -363,6 +363,10 @@
     <input type="text" id="InvalidHeight" value=""/>
     <input type="text" id="InvalidDovetailAngle" value=""/>
     <input type="text" id="InvalidAllowance" value=""/>
+    <input type="text" id="InvalidEnd1Height" value=""/>
+    <input type="text" id="InvalidEnd2Height" value=""/>
+    <input type="text" id="InvalidEnd1ChamferAngle" value=""/>
+    <input type="text" id="InvalidEnd2ChamferAngle" value=""/>
     <input type="text" id="InvalidSideJointWidth" value=""/>
     <input type="text" id="InvalidLidJointWidth" value=""/>
     <input type="text" id="InvalidBottomJointWidth" value=""/>
@@ -554,7 +558,11 @@
     "InvalidAllowance":        "AllowanceField",
     "InvalidSideJointWidth":   "SideTabWidthField",
     "InvalidLidJointWidth":    "TopTabWidthField",
-    "InvalidBottomJointWidth": "BottomTabWidthField"
+    "InvalidBottomJointWidth": "BottomTabWidthField",
+    "InvalidEnd1Height":       "End1HeightField",
+    "InvalidEnd2Height":       "End2HeightField",
+    "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
+    "InvalidEnd2ChamferAngle": "End2ChamferAngleField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
