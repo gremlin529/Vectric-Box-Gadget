@@ -354,11 +354,11 @@ local function ValidateDovetailAngle(dialog, options, report_as_dialog)
   return not is_invalid
 end
 
--- Validates the Open Box options ("Side Overhang"): each end's own height and
--- chamfer angle, and whether the two chamfers fit along the Left/Right walls.
--- Only applies with Lid Type = None - with a lid fitted the fields are locked
--- to the box height in the dialog, so any stale values are ignored and nothing
--- is flagged.
+-- Validates the Open Chamfer options ("Side Overhang"): each end's own height
+-- and chamfer angle, and whether the two chamfers fit along the Left/Right
+-- walls. Only applies with Lid Type = Open Chamfer - with any other lid type
+-- the fields are locked to the box height in the dialog, so any stale values
+-- are ignored and nothing is flagged.
 --
 -- report_as_dialog = true (OK/Validate flow): pops a DisplayMessageBox for the
 -- first problem and returns false.
@@ -366,11 +366,11 @@ end
 -- field's own problem (or "" when valid) into its own Invalid text field, so
 -- the HTML marks that field red and shows the message as its tooltip.
 --
--- Returns true if the open box options are all valid.
-local function ValidateOpenBoxOptions(dialog, options, report_as_dialog)
+-- Returns true if the open chamfer options are all valid.
+local function ValidateOpenChamferOptions(dialog, options, report_as_dialog)
   local double_thickness = options.thickness * 2
   local inner_depth = options.depth - double_thickness
-  local lid_fitted = (options.lidType ~= FaceJointType.None)
+  local chamfer_allowed = (options.lidType == FaceJointType.OpenChamfer)
 
   local ends = {
     { height = options.end1Height, angle = options.end1ChamferAngle, label = "Front",
@@ -395,11 +395,11 @@ local function ValidateOpenBoxOptions(dialog, options, report_as_dialog)
 
   for _, end_info in ipairs(ends) do
     local height_message, angle_message = "", ""
-    if not lid_fitted then
+    if chamfer_allowed then
       if not IsNonNeg(end_info.height) or end_info.height <= 0 then
         height_message = string.format("The %s height must be greater than 0.", end_info.label)
       elseif end_info.height > options.height then
-        height_message = string.format("The %s height %.2f cannot be more than the box height %.2f.", end_info.label, end_info.height, options.height)
+        height_message = string.format("The %s chamfer height %.2f is taller than the box height %.2f.", end_info.label, end_info.height, options.height)
       elseif end_info.height < options.height then
         if end_info.height <= double_thickness then
           height_message = string.format("The %s height %.2f is too small for material thickness %.2f.", end_info.label, end_info.height, options.thickness)
@@ -417,7 +417,7 @@ local function ValidateOpenBoxOptions(dialog, options, report_as_dialog)
   -- Both chamfers sit on the Left/Right walls, which run front-to-back and so
   -- span the box's depth. Their combined horizontal run must fit into it.
   -- Only checked once each end's own height and angle are valid.
-  if not lid_fitted and not AnyProblem() then
+  if chamfer_allowed and not AnyProblem() then
     local end1_overhang = math.max(0, options.height - options.end1Height)
     local end2_overhang = math.max(0, options.height - options.end2Height)
     if (end1_overhang > 0.0001 or end2_overhang > 0.0001) then
@@ -938,7 +938,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
-    if not ValidateOpenBoxOptions(dialog, options, true) then
+    if not ValidateOpenChamferOptions(dialog, options, true) then
       return false
     end
 
@@ -1029,6 +1029,11 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   local lid_type = dialog:GetDropDownListValue("LidTypeSelect")
   options.lidType = FaceJointType[lid_type]
+  -- The dropdown label "Open Chamfer" doesn't match its FaceJointType name
+  -- "OpenChamfer", so accept the label too rather than falling back to Inset.
+  if options.lidType == nil and lid_type == "Open Chamfer" then
+    options.lidType = FaceJointType.OpenChamfer
+  end
   if options.lidType == nil then
     -- Defensive fallback: an unrecognised dropdown value must never leave
     -- options.lidType nil, since that then poisons a Face's jointtype and
@@ -1276,7 +1281,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateBoxDimensions(dialog, G_dialogOptions, false)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
-  ValidateOpenBoxOptions(dialog, G_dialogOptions, false)
+  ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
 
   return true
 end

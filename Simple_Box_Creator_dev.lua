@@ -122,7 +122,7 @@ function main(script_path)
   options.bottomRabbetDepthCorrection = 0   --- Grooved bottom + bottomSameMaterial only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
   options.end1Height = options.height       --- "Side Overhang": End 1's own height. Equal to options.height by default (no overhang). Set it lower than
   options.end2Height = options.height       --- the box height and Side 1/Side 2 (always cut "height" tall) will overhang End 1/End 2 by their own difference,
-                                             --- independently - so Front and Back can each have their own overhang. Only used when Lid Type = None. -- by Claude 9/20/2026
+                                             --- independently - so Front and Back can each have their own overhang. Only used when Lid Type = Open Chamfer. -- by Claude 9/20/2026
   options.end1ChamferAngle = 45             --- "Side Overhang": angle (degrees, measured from vertical) of End 1 (Front)'s own chamfer; 45 = classic symmetric chamfer (its horizontal run is derived from this angle and the actual overhang, not typed in directly) -- by Claude 9/20/2026
   options.end2ChamferAngle = 45             --- "Side Overhang": angle (degrees, measured from vertical) of End 2 (Back)'s own chamfer, independently of End 1's -- by Claude 9/20/2026
   options.label_faces   = true        --- default to labelling face vectors
@@ -253,7 +253,7 @@ function main(script_path)
   computedFacesToMake.end1 = options.facesToMake.end1
   computedFacesToMake.end2 = options.facesToMake.end2
 
-  if options.lidType == FaceJointType.None then
+  if IsOpenLidType(options.lidType) then
     -- if we aren't making a lid then we shouldn't make tabs for the lid since there won't be a lid to fit them
     computedFacesToMake.lid = false
   end
@@ -263,9 +263,9 @@ function main(script_path)
     computedFacesToMake.bottom = false
   end
 
-  if options.lidType ~= FaceJointType.None then
-    -- "Side Overhang" only makes sense without a lid (see DisplayDialog
-    -- validation) - if a lid is selected, ignore any stale/leftover end1Height/end2Height
+  if options.lidType ~= FaceJointType.OpenChamfer then
+    -- "Side Overhang" only makes sense with the Open Chamfer lid type (see DisplayDialog
+    -- validation) - for any other lid, ignore any stale/leftover end1Height/end2Height
     -- value (e.g. from the registry) rather than silently shrinking End 1/End 2. -- by Claude 9/20/2026
     options.end1Height = options.height
     options.end2Height = options.height
@@ -372,7 +372,7 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
   end
 
   -- Make lid
-  if (computedFacesToMake.lid and options.lidType ~= FaceJointType.None) then
+  if (computedFacesToMake.lid and not IsOpenLidType(options.lidType)) then
     local lid = MakeLid(options,
       lidDoveTail,
       computedFacesToMake,

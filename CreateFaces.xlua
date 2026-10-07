@@ -12,7 +12,8 @@ FaceJointType = {
   Fingers = 2,
   Flat  = 3,
   None = 4,
-  Grooved = 5 -- slide-in bottom: dado grooves in Left, Right and Front; Back stays open so the panel can be slid in -- by Claude 9/18/2026
+  Grooved = 5, -- slide-in bottom: dado grooves in Left, Right and Front; Back stays open so the panel can be slid in -- by Claude 9/18/2026
+  OpenChamfer = 6 -- lid type: no lid, with Front/Back chamfered (Side Overhang) -- by Claude 10/6/2026
 }
 
 FaceType = {
@@ -27,8 +28,13 @@ local unit_y = Vector2D(0,1)
 
 -- ---------- VALIDATION HELPERS ----------
 
+-- True for a lid type that leaves the top of the box open (no lid is made).
+function IsOpenLidType(lidType)
+  return lidType == FaceJointType.None or lidType == FaceJointType.OpenChamfer
+end
+
 function ThicknessForFaceType(faceType, thickness)
-  if (faceType == FaceJointType.None) then -- No lid or bottom, inner height isn't reduced
+  if (faceType == FaceJointType.None or faceType == FaceJointType.OpenChamfer) then -- No lid or bottom, inner height isn't reduced
     return 0
   elseif (faceType == FaceJointType.Grooved) then -- slide-in bottom floats in a dado partway up the wall, sides stay full height
     return 0
@@ -575,7 +581,7 @@ end
     -- angle (options.end1ChamferAngle/end2ChamferAngle, in degrees, measured from vertical - i.e. 0=a
     -- plain vertical step, 45=classic symmetric chamfer, closer to 90=a long shallow ramp) -
     -- independently per end, with the horizontal run derived from that angle and each end's
-    -- own overhang rather than being typed in directly. Left/Right walls only, lidType None only
+    -- own overhang rather than being typed in directly. Left/Right walls only, lidType Open Chamfer only
     -- by Claude 9/20/2026
     local end1Height = options.end1Height
     local end2Height = options.end2Height
@@ -622,7 +628,7 @@ end
     end
 
     local top_thickness = thickness
-    if (lidType == FaceJointType.None) then
+    if IsOpenLidType(lidType) then
       top_thickness = 0
     elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
@@ -825,7 +831,7 @@ end
       -- be full height
       local right_overhang = inner_height - corner_height_right
       local left_overhang = inner_height - corner_height_left
-      if (lidType == FaceJointType.None and (right_overhang > 0.0001 or left_overhang > 0.0001)) then
+      if (lidType == FaceJointType.OpenChamfer and (right_overhang > 0.0001 or left_overhang > 0.0001)) then
         -- "Side Overhang": the middle of Left / Right rises above the end
         -- pieces (Front/Back are only end1Height/end2Height tall) up to this
         -- wall's own full height, with a chamfer at each end tapering back
@@ -981,7 +987,7 @@ end
     end
 
     local top_thickness = 0
-    if (lidType == FaceJointType.None) then
+    if IsOpenLidType(lidType) then
       top_thickness = 0
     elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
@@ -1342,7 +1348,7 @@ end
     local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
     local use_dovetails = options.dovetailJoint
 
-    local noLidTabs = (lidType == FaceJointType.Flat) or (lidType == FaceJointType.None) or (lidType == FaceJointType.Inset)
+    local noLidTabs = (lidType == FaceJointType.Flat) or IsOpenLidType(lidType) or (lidType == FaceJointType.Inset)
 
     local tablist = {}
     local dovetail_markers = {}

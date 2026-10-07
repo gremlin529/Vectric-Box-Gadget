@@ -148,6 +148,7 @@
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
             <option value="None">None</option>
+            <option value="OpenChamfer">Open Chamfer</option>
           </select>
           <div class="type-dropdown-preview">
             <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
@@ -176,15 +177,15 @@
 
   </div>
 
-  <!-- ── Open Box Options (Side Overhang) ──────────────────────
-       Only shown when Lid Type = None, regardless of Bottom Type. Front/Back
+  <!-- ── Open Chamfer Options (Side Overhang) ──────────────────────
+       Only shown when Lid Type = Open Chamfer, regardless of Bottom Type. Front/Back
        heights and chamfer angles can each be set below the box height, tapered
        by a chamfer. Shares the groove sketch, same as the Grooved options.
                                                                -- by Claude 10/6/2026 -->
-  <div class="section-header" id="showHideOpenBoxSectionHeader" style="display: none;">Open Box Options</div>
-  <div class="card" id="showHideOpenBoxOptions" style="display: none;">
+  <div class="section-header" id="showHideOpenChamferSectionHeader" style="display: none;">Open Chamfer Options</div>
+  <div class="card" id="showHideOpenChamferOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Side Overhang: Front &amp; Back (End 1 &amp; End 2) can each get their own height below the box height, tapered by a chamfer. Only available with Lid Type = None (an open box).</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Side Overhang: Front &amp; Back can each get their own height below the box height, tapered by a chamfer. Only available with Lid Type = Open Chamfer (a lidless box with chamfered Front and Back).</div>
 
       <div class="clearfix">
         <div style="float: left; margin-right: 20px;">
@@ -416,6 +417,16 @@
     if (body) { body.style.display = display; }
   }
 
+  // Lid Type dropdown option indexes (see LidTypeSelect). Only Open Chamfer
+  // allows Side Overhang; None is a plain open box without it.
+  var LID_INDEX_NONE = 3;
+  var LID_INDEX_OPEN_CHAMFER = 4;
+
+  // True for either lid type that leaves the top of the box open.
+  function isOpenLidIndex(index) {
+    return index === LID_INDEX_NONE || index === LID_INDEX_OPEN_CHAMFER;
+  }
+
   // Lid type changes which faces validation even looks at (cuttingLidJoint
   // in ValidateJointWidths only applies when the lid uses finger joints), so
   // this also re-runs validation the same way editing a geometry field does.
@@ -424,7 +435,7 @@
     var selectedIndex = select ? select.selectedIndex : 0;
 
     var imgFiles = ["Images/InsetLid.png", "Images/tabbedlid.png",
-                    "Images/FlatLid.png",  ""];
+                    "Images/FlatLid.png",  "", "Images/ChamferLid.png"];
     var img = document.getElementById("LidTypeImage");
     if (img) {
       var src = imgFiles[selectedIndex] || "";
@@ -435,22 +446,23 @@
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) { lidJointRow.style.display = (selectedIndex === 1) ? "block" : "none"; }
 
+    // Both open lid types (None and Open Chamfer) have no lid to make.
     var lidCheckItem = document.getElementById("MakeLidCheckItem");
-    if (lidCheckItem) { lidCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
+    if (lidCheckItem) { lidCheckItem.style.display = isOpenLidIndex(selectedIndex) ? "none" : "block"; }
 
-    // Open Box options (Side Overhang) only apply with Lid Type = None (index 3).
-    setSectionVisible("showHideOpenBoxSectionHeader", "showHideOpenBoxOptions", selectedIndex === 3);
+    // Open Chamfer options (Side Overhang) only apply with Lid Type = Open Chamfer.
+    setSectionVisible("showHideOpenChamferSectionHeader", "showHideOpenChamferOptions", selectedIndex === LID_INDEX_OPEN_CHAMFER);
 
     onSideOverhangFieldsChanged();
     onGeometryFieldChanged();
   }
 
   // Side Overhang (End 1/End 2 height + chamfer) only makes sense with Lid Type =
-  // None (ValidateEndHeight on the Lua side rejects it otherwise) - rather than
-  // let the user set it up and only find out on OK, lock Front/Back height to the
-  // box height and greyed out (no overhang possible) whenever a real Lid is
-  // selected, same for the now-pointless chamfer angle fields. Called on every
-  // Lid Type change and on init, so the lock is always in sync.  -- by Claude 9/26/2026
+  // Open Chamfer (ValidateOpenChamferOptions on the Lua side rejects it otherwise)
+  // - rather than let the user set it up and only find out on OK, lock Front/Back
+  // height to the box height and greyed out (no overhang possible) for any other
+  // Lid Type, same for the chamfer angle fields. Called on every Lid Type change
+  // and on init, so the lock is always in sync.  -- by Claude 9/26/2026, 10/6/2026
   function updateSideOverhangLidLock() {
     var lidSelect = document.getElementById("LidTypeSelect");
     var heightEl = document.getElementById("HeightField");
@@ -460,18 +472,16 @@
     var end2ChamferEl = document.getElementById("End2ChamferAngleField");
     if (!lidSelect || !heightEl || !end1HeightEl || !end2HeightEl) { return; }
 
-    // Lid Type index 3 = None (see imgFiles in onLidTypeChanged) - any other
-    // index means a real lid is fitted, so no overhang is possible.
-    var lidFitted = lidSelect.selectedIndex !== 3;
+    var overhangLocked = lidSelect.selectedIndex !== LID_INDEX_OPEN_CHAMFER;
 
-    if (lidFitted) {
+    if (overhangLocked) {
       end1HeightEl.value = heightEl.value;
       end2HeightEl.value = heightEl.value;
     }
-    end1HeightEl.disabled = lidFitted;
-    end2HeightEl.disabled = lidFitted;
-    if (end1ChamferEl) { end1ChamferEl.disabled = lidFitted; }
-    if (end2ChamferEl) { end2ChamferEl.disabled = lidFitted; }
+    end1HeightEl.disabled = overhangLocked;
+    end2HeightEl.disabled = overhangLocked;
+    if (end1ChamferEl) { end1ChamferEl.disabled = overhangLocked; }
+    if (end2ChamferEl) { end2ChamferEl.disabled = overhangLocked; }
   }
 
   // Shows the resulting overhang(s) (Height - End height) as the user types, purely
