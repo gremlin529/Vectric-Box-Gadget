@@ -799,6 +799,15 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddRadioGroup("TabTypeRadio", tab_default_index)
 
   local topString = FaceJointTypeToString(options.lidType)
+  -- The dropdown's visible label "Open Chamfer" doesn't match its
+  -- FaceJointType name "OpenChamfer" - AddDropDownList selects by the
+  -- visible label, so without this translation it fails to select Open
+  -- Chamfer and silently falls back to the dropdown's first entry (Inset),
+  -- which then overwrites options.lidType back to Inset on the next OK.
+  -- Mirrors the same translation in ReadOptionsFromDialog.
+  if topString == "OpenChamfer" then
+    topString = "Open Chamfer"
+  end
   dialog:AddDropDownList("LidTypeSelect", topString)
 
   local bottomString = FaceJointTypeToString(options.bottomType)
