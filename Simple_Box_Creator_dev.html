@@ -176,29 +176,24 @@
 
   </div>
 
-  <!-- ── Bottom Type: Grooved Options (includes Side Overhang) ───────────
-       Only shown when Bottom Type = Grooved. Chamfer Angle/Height (formerly
-       their own separate "Side Overhang" section) now live here too, at the
-       user's request, sharing one combined sketch with the groove/rabbet
-       fields. Tradeoff accepted by the user: Side Overhang now requires
-       Bottom Type = Grooved (it used to be usable with any Bottom Type,
-       gated only on Lid Type = None - that Lid Type check still happens on
-       the Lua side via ValidateEndHeight, so picking a Lid with Grooved
-       still just reports the same clear error instead of silently doing
-       nothing).                                              -- by Claude 9/26/2026 -->
-  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Bottom Type: Grooved Options</div>
-  <div class="card" id="showHideGrooveOptions" style="display: none;">
+  <!-- ── Open Box Options (Side Overhang) ──────────────────────
+       Only shown when Lid Type = None, regardless of Bottom Type. Front/Back
+       heights and chamfer angles can each be set below the box height, tapered
+       by a chamfer. Shares the groove sketch, same as the Grooved options.
+                                                               -- by Claude 10/6/2026 -->
+  <div class="section-header" id="showHideOpenBoxSectionHeader" style="display: none;">Open Box Options</div>
+  <div class="card" id="showHideOpenBoxOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 11px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Side 1, Side 2 &amp; End 1 (Box joints only - with Dovetail joints, End 1's groove is skipped, since it would land inside the angled dovetail tails there). End 2 is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material). Also includes Side Overhang: Front &amp; Back (End 1 &amp; End 2) can each get their own height below the box height, tapered by a chamfer - only with Lid Type = None.</div>
-
-      <div class="clearfix" style="margin-bottom: 12px;">
-        <img src="Images/GroovedOverhangSketch.png" alt="Sketch: Side, Chamfer Angle, Height, Groove offset, Groove width, Groove depth, rabbet correction, Bottom Clearance" style="max-width: 100%; height: auto;" />
-      </div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Side Overhang: Front &amp; Back (End 1 &amp; End 2) can each get their own height below the box height, tapered by a chamfer. Only available with Lid Type = None (an open box).</div>
 
       <div class="clearfix">
-        <!-- Left: Chamfer Angle + Height (Front/Back) - the former Side Overhang fields -->
-        <div style="float: left; width: 370px; margin-right: 20px;">
-          <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">Chamfer Angle</div>
+        <div style="float: left; margin-right: 20px;">
+          <img src="Images/ChamferedTop.png" alt="Sketch: Chamfer Angle, Height" />
+        </div>
+
+        <!-- Chamfer Angle + Height (Front/Back), to the right of the image -->
+        <div style="overflow: hidden;">
+          <div style="font-size: 15px; font-weight: bold; margin-bottom: 4px;">Chamfer Angle</div>
           <div class="clearfix" style="margin-bottom: 8px;">
             <div class="field-row" style="float: left; width: 170px; margin-right: 20px; margin-bottom: 0;" title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
               <label for="End1ChamferAngleField">Front</label>
@@ -210,7 +205,7 @@
             </div>
           </div>
 
-          <div style="font-size: 12px; font-weight: bold; margin-bottom: 4px;">Height</div>
+          <div style="font-size: 15px; font-weight: bold; margin-bottom: 4px;">Height</div>
           <div class="clearfix" style="margin-bottom: 6px;">
             <div class="field-row" style="float: left; width: 170px; margin-right: 20px; margin-bottom: 0;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
               <label for="End1HeightField">Front</label>
@@ -223,8 +218,23 @@
           </div>
           <div style="font-size: 11px; opacity: 0.8; min-height: 14px;" id="SideOverhangComputedText"></div>
         </div>
+      </div>
+    </div>
+  </div>
 
-        <!-- Right: Groove offset/width/depth, Bottom same material, Bottom Clearance, Rabbet correction -->
+  <!-- ── Bottom Type: Grooved Options ───────────────────────────────────
+       Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
+  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Bottom Type: Grooved Options</div>
+  <div class="card" id="showHideGrooveOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Side 1, Side 2 &amp; End 1 (Box joints only - with Dovetail joints, End 1's groove is skipped, since it would land inside the angled dovetail tails there). End 2 is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+
+      <div class="clearfix">
+        <div style="float: left; width: 200px; margin-right: 20px;">
+          <img src="Images/GroovedOverhangSketch.png" alt="Sketch: Side, Chamfer Angle, Height, Groove offset, Groove width, Groove depth, rabbet correction, Bottom Clearance" style="width: 200px; height: auto;" />
+        </div>
+
+        <!-- Right: Groove offset/width/depth, Bottom same material, Bottom Clearance, Rabbet correction, to the right of the image -->
         <div style="overflow: hidden;">
           <div class="clearfix" style="margin-bottom: 8px;">
             <div class="field-row" style="float: left; width: 170px; margin-right: 20px; margin-bottom: 0;" title="Distance from the outer bottom edge of the walls up to the TOP of the groove that captures the bottom panel (must be at least the groove width)">
@@ -391,6 +401,17 @@
     }
   }
 
+  // Shows or hides a section header and its card together, so the header never
+  // shows on its own. Only uses getElementById and style, so it stays IE7-safe.
+  // -- by Claude 10/6/2026
+  function setSectionVisible(headerId, bodyId, visible) {
+    var header = document.getElementById(headerId);
+    var body = document.getElementById(bodyId);
+    var display = visible ? "block" : "none";
+    if (header) { header.style.display = display; }
+    if (body) { body.style.display = display; }
+  }
+
   // Lid type changes which faces validation even looks at (cuttingLidJoint
   // in ValidateJointWidths only applies when the lid uses finger joints), so
   // this also re-runs validation the same way editing a geometry field does.
@@ -412,6 +433,9 @@
 
     var lidCheckItem = document.getElementById("MakeLidCheckItem");
     if (lidCheckItem) { lidCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
+
+    // Open Box options (Side Overhang) only apply with Lid Type = None (index 3).
+    setSectionVisible("showHideOpenBoxSectionHeader", "showHideOpenBoxOptions", selectedIndex === 3);
 
     onSideOverhangFieldsChanged();
     onGeometryFieldChanged();
@@ -492,10 +516,7 @@
     if (bottomCheckItem) { bottomCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
 
     // Grooved (slide-in) bottom: index 4 -- by Claude 9/18/2026
-    var grooveOptions = document.getElementById("showHideGrooveOptions");
-    if (grooveOptions) { grooveOptions.style.display = (selectedIndex === 4) ? "block" : "none"; }
-    var grooveSectionHeader = document.getElementById("showHideGrooveSectionHeader");
-    if (grooveSectionHeader) { grooveSectionHeader.style.display = (selectedIndex === 4) ? "block" : "none"; }
+    setSectionVisible("showHideGrooveSectionHeader", "showHideGrooveOptions", selectedIndex === 4);
 
     // For a Grooved bottom, unchecking "Bottom" still cuts the slide-in groove into
     // Side 1, Side 2 & End 1 (and still shortens End 2) - it only skips cutting the
@@ -689,4 +710,4 @@
 
 </script>
 </body>
-</html>
+</html>
