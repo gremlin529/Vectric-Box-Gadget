@@ -27,6 +27,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          # Comma-separated GitHub usernames whose text is always treated as German
+          GERMAN_USERS: ${{ vars.GERMAN_USERS }}
         with:
           script: |
             const MARKER = '<!-- auto-translation -->';
@@ -63,14 +65,18 @@ jobs:
             const key = process.env.DEEPL_API_KEY;
             const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
 
-            async function deepl(text, target) {
+            async function deepl(text, target, source) {
               const res = await fetch(`https://${host}/v2/translate`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `DeepL-Auth-Key ${key}`,
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text: [text], target_lang: target }),
+                body: JSON.stringify(
+                  source
+                    ? { text: [text], target_lang: target, source_lang: source }
+                    : { text: [text], target_lang: target }
+                ),
               });
               if (!res.ok) throw new Error(`DeepL error ${res.status}: ${await res.text()}`);
               const t = (await res.json()).translations[0];
@@ -80,12 +86,23 @@ jobs:
               };
             }
 
-            // Step 1: translate to English and see what language it was
-            const en = await deepl(prepared, 'EN-US');
+            // Listed German speakers skip auto-detection: always German -> English
+            const germanUsers = (process.env.GERMAN_USERS || '')
+              .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+            const isGerman = germanUsers.includes(user.login.toLowerCase());
+
+            // Step 1: translate to English (forcing German as source for listed users)
+            const en = isGerman
+              ? await deepl(prepared, 'EN-US', 'DE')
+              : await deepl(prepared, 'EN-US');
+            const detected = isGerman ? 'DE' : en.detected;
+            core.info(`author=${user.login} forcedGerman=${isGerman} detected=${en.detected}`);
 
             let label, translated;
-            if (en.detected !== 'EN') {
-              label = `English (translated from ${en.detected})`;
+            if (detected !== 'EN') {
+              // Nothing changed, so it wasn't really in another language
+              if (en.text.trim() === body.trim()) return;
+              label = `English (translated from ${detected})`;
               translated = en.text;
             } else {
               // Step 2: it was already English, so translate to German
