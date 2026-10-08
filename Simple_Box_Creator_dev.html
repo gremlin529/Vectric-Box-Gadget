@@ -188,27 +188,38 @@
       <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Side Overhang: Front &amp; Back can each get their own height below the box height, tapered by a chamfer. Only available with Lid Type = Open Chamfer (a lidless box with chamfered Front and Back).</div>
 
       <!-- Fields left (Back) and right (Front) of the sketch, first field level with the top edge of the box.
-           Sketch is shown 501px wide and 20% flatter than the original. Absolute positions inside a relative
-           wrapper only (IE7-safe).  -- by Claude 10/7/2026 -->
-      <div style="position: relative; width: 781px; height: 240px; margin: 0 auto;">
-        <img src="Images/ChamferedTop.png" alt="Sketch: Chamfer Angle, Height" style="position: absolute; left: 140px; top: 0; width: 501px; height: 233px;" />
-        <div style="position: absolute; left: 0px; top: 24px; width: 130px;" title="Angle of Back (End 2)'s own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
-          <label for="End2ChamferAngleField" style="font-weight: bold; display: block; margin-bottom: 2px;">Back Chamfer</label>
-          <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" style="width: 100px;" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-        </div>
-        <div style="position: absolute; left: 0px; top: 80px; width: 130px;" title="Height of Back (End 2). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
-          <label for="End2HeightField" style="font-weight: bold; display: block; margin-bottom: 2px;">Back Height</label>
-          <input type="number" step="any" id="End2HeightField" placeholder="End height" style="width: 100px;" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-        </div>
-        <div style="position: absolute; left: 651px; top: 24px; width: 130px;" title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
-          <label for="End1ChamferAngleField" style="font-weight: bold; display: block; margin-bottom: 2px;">Front Chamfer</label>
-          <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" style="width: 100px;" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-        </div>
-        <div style="position: absolute; left: 651px; top: 80px; width: 130px;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
-          <label for="End1HeightField" style="font-weight: bold; display: block; margin-bottom: 2px;">Front Height</label>
-          <input type="number" step="any" id="End1HeightField" placeholder="End height" style="width: 100px;" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-        </div>
-      </div>
+           Laid out as a plain 3-column table instead of absolute positions: IE's body zoom (Zoom Level
+           dropdown) did not scale the absolutely positioned sketch, so it stayed small while text and
+           fields grew. The sketch (ChamferedTop_276.png, 276x117, drawn at its display size, no bottom/groove,
+           cut off in its lower third, about as tall as the two fields) sits in normal flow, so it zooms like
+           every other image in the dialog.                                      -- by Claude 10/8/2026 -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="width: 130px; vertical-align: top; padding-top: 17px;">
+            <div title="Angle of Back (End 2)'s own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
+              <label for="End2ChamferAngleField" style="font-weight: bold; display: block; margin-bottom: 2px;">Back Chamfer</label>
+              <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" style="width: 100px;" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            </div>
+            <div style="margin-top: 14px;" title="Height of Back (End 2). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+              <label for="End2HeightField" style="font-weight: bold; display: block; margin-bottom: 2px;">Back Height</label>
+              <input type="number" step="any" id="End2HeightField" placeholder="End height" style="width: 100px;" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            </div>
+          </td>
+          <td style="vertical-align: top; padding: 0 10px;">
+            <img src="Images/ChamferedTop_276.png" alt="Sketch: Chamfer Angle, Height" />
+          </td>
+          <td style="width: 130px; vertical-align: top; padding-top: 17px;">
+            <div title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
+              <label for="End1ChamferAngleField" style="font-weight: bold; display: block; margin-bottom: 2px;">Front Chamfer</label>
+              <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" style="width: 100px;" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            </div>
+            <div style="margin-top: 14px;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+              <label for="End1HeightField" style="font-weight: bold; display: block; margin-bottom: 2px;">Front Height</label>
+              <input type="number" step="any" id="End1HeightField" placeholder="End height" style="width: 100px;" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            </div>
+          </td>
+        </tr>
+      </table>
       <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center;" id="SideOverhangComputedText"></div>
     </div>
   </div>
