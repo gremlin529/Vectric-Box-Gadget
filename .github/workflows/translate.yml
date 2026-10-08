@@ -10,10 +10,9 @@ on:
     types: [created]
   pull_request_target:
     types: [opened]
-  pull_request_review_comment:
-    types: [created]
-  pull_request_review:
-    types: [submitted]
+# Review comments, thread replies and review summaries are handled by
+# translate-reviews.yml (scheduled), since GitHub doesn't reliably trigger
+# workflows for them on PRs that target non-default branches.
 
 permissions:
   issues: write
@@ -43,10 +42,6 @@ jobs:
                 body = p.comment.body; user = p.comment.user; number = p.issue.number; break;
               case 'pull_request_target':
                 body = p.pull_request.body; user = p.pull_request.user; number = p.pull_request.number; break;
-              case 'pull_request_review_comment':
-                body = p.comment.body; user = p.comment.user; number = p.pull_request.number; break;
-              case 'pull_request_review':
-                body = p.review.body; user = p.review.user; number = p.pull_request.number; break;
               default:
                 return;
             }

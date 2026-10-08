@@ -1,0 +1,173 @@
+name: Translate review comments (scheduled)
+
+# GitHub isn't starting the event-based workflow for replies in inline review
+# threads on this repo's PRs, so this polls for them instead.
+# - Covers inline review comments, replies in review threads, and review summaries.
+# - Scheduled workflows only run from the default branch (main).
+# - Safe to re-run: each translation carries a marker with the source comment's ID,
+#   and anything already translated is skipped.
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: translate-reviews
+  cancel-in-progress: false
+
+jobs:
+  translate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Translate new review comments and review summaries
+        uses: actions/github-script@v7
+        env:
+          DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          # Comma-separated GitHub usernames whose text is always treated as German
+          GERMAN_USERS: ${{ vars.GERMAN_USERS }}
+        with:
+          script: |
+            // How far back to look. Scheduled runs can be delayed, so this is
+            // deliberately longer than the 5-minute interval.
+            const LOOKBACK_MINUTES = 20;
+
+            const { owner, repo } = context.repo;
+            const since = new Date(Date.now() - LOOKBACK_MINUTES * 60 * 1000).toISOString();
+
+            const key = process.env.DEEPL_API_KEY;
+            const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
+            const germanUsers = (process.env.GERMAN_USERS || '')
+              .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+
+            // Comments sent by email reply carry the quoted thread and GitHub's footer.
+            function stripEmailReply(text) {
+              if (!text) return '';
+              let cut = text.length;
+              const markers = [
+                /^Am .{0,150}?\d{1,2}:\d{2}.{0,60}?schrieb/ms,
+                /^On .{0,150}?\d{1,2}:\d{2}.{0,150}?wrote:/ms,
+              ];
+              for (const re of markers) {
+                const m = text.match(re);
+                if (m && m.index < cut) cut = m.index;
+              }
+              const dash = text.match(/^—\s*$/m);
+              if (dash && text.slice(dash.index).includes('github.com/notifications') && dash.index < cut) {
+                cut = dash.index;
+              }
+              return text.slice(0, cut).replace(/^>.*$/gm, '').trim();
+            }
+
+            async function deeplRaw(text, target, source) {
+              const res = await fetch(`https://${host}/v2/translate`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `DeepL-Auth-Key ${key}`,
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(
+                  source
+                    ? { text: [text], target_lang: target, source_lang: source }
+                    : { text: [text], target_lang: target }
+                ),
+              });
+              if (!res.ok) throw new Error(`DeepL error ${res.status}: ${await res.text()}`);
+              const t = (await res.json()).translations[0];
+              return { detected: t.detected_source_language, text: t.text };
+            }
+
+            // Returns { label, text } or null if there is nothing to post
+            async function translate(rawBody, login) {
+              const body = stripEmailReply(rawBody);
+              if (!body) return null;
+
+              // Protect fenced code blocks from translation
+              const blocks = [];
+              const prepared = body.replace(/```[\s\S]*?```/g, (m) => {
+                blocks.push(m);
+                return `CODEBLOCK${blocks.length - 1}X`;
+              });
+              if (!prepared.replace(/CODEBLOCK\d+X/g, '').trim()) return null;
+              const restore = (t) => t.replace(/CODEBLOCK(\d+)X/g, (_, i) => blocks[i] ?? '');
+
+              const isGerman = germanUsers.includes(login.toLowerCase());
+              const en = isGerman
+                ? await deeplRaw(prepared, 'EN-US', 'DE')
+                : await deeplRaw(prepared, 'EN-US');
+              const detected = isGerman ? 'DE' : en.detected;
+              core.info(`author=${login} forcedGerman=${isGerman} detected=${en.detected}`);
+
+              if (detected !== 'EN') {
+                const out = restore(en.text);
+                if (out.trim() === body.trim()) return null; // nothing changed
+                return { label: `English (translated from ${detected})`, text: out };
+              }
+              const de = await deeplRaw(prepared, 'DE');
+              return { label: 'Deutsch (automatisch übersetzt)', text: restore(de.text) };
+            }
+
+            // ---- Collect candidates from the lookback window ----
+            const items = [];
+
+            // Inline review comments and replies in review threads (all PRs)
+            const reviewComments = await github.paginate(
+              github.rest.pulls.listReviewCommentsForRepo,
+              { owner, repo, since, sort: 'created', direction: 'asc', per_page: 100 }
+            );
+            for (const c of reviewComments) {
+              if (c.created_at < since) continue; // `since` matches edits too; ignore old comments
+              items.push({
+                kind: 'review-comment', id: c.id, body: c.body, user: c.user, url: c.html_url,
+                number: Number(c.pull_request_url.split('/').pop()),
+              });
+            }
+
+            // Review summaries (the text submitted with Approve / Request changes / Comment)
+            const openPrs = await github.rest.pulls.list({
+              owner, repo, state: 'open', sort: 'updated', direction: 'desc', per_page: 50,
+            });
+            for (const pr of openPrs.data) {
+              if (pr.updated_at < since) break;
+              const reviews = await github.paginate(github.rest.pulls.listReviews, {
+                owner, repo, pull_number: pr.number, per_page: 100,
+              });
+              for (const r of reviews) {
+                if (!r.body || !r.submitted_at || r.submitted_at < since) continue;
+                items.push({
+                  kind: 'review', id: r.id, body: r.body, user: r.user, url: r.html_url,
+                  number: pr.number,
+                });
+              }
+            }
+
+            core.info(`${items.length} candidate(s) since ${since}`);
+
+            // ---- Translate anything that hasn't been translated yet ----
+            const existingByPr = {};
+            for (const it of items) {
+              try {
+                if (!it.body || it.user.type === 'Bot' || it.body.includes('<!-- auto-translation')) continue;
+
+                const marker = `<!-- auto-translation:${it.kind}:${it.id} -->`;
+                existingByPr[it.number] ??= await github.paginate(github.rest.issues.listComments, {
+                  owner, repo, issue_number: it.number, per_page: 100,
+                });
+                if (existingByPr[it.number].some((c) => c.body && c.body.includes(marker))) continue;
+
+                const result = await translate(it.body, it.user.login);
+                if (!result) continue;
+
+                const created = await github.rest.issues.createComment({
+                  owner, repo, issue_number: it.number,
+                  body: `> 🌐 **Automatic translation: ${result.label}** · [original comment](${it.url})\n\n${result.text}\n\n${marker}`,
+                });
+                existingByPr[it.number].push(created.data);
+              } catch (err) {
+                core.warning(`Failed on ${it.kind} ${it.id}: ${err.message}`);
+              }
+            }
