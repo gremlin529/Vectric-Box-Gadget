@@ -12,6 +12,8 @@ on:
     types: [opened]
   pull_request_review_comment:
     types: [created]
+  pull_request_review:
+    types: [submitted]
 
 permissions:
   issues: write
@@ -25,6 +27,8 @@ jobs:
         uses: actions/github-script@v7
         env:
           DEEPL_API_KEY: ${{ secrets.DEEPL_API_KEY }}
+          # Comma-separated GitHub usernames whose text is always treated as German
+          GERMAN_USERS: ${{ vars.GERMAN_USERS }}
         with:
           script: |
             const MARKER = '<!-- auto-translation -->';
@@ -41,9 +45,34 @@ jobs:
                 body = p.pull_request.body; user = p.pull_request.user; number = p.pull_request.number; break;
               case 'pull_request_review_comment':
                 body = p.comment.body; user = p.comment.user; number = p.pull_request.number; break;
+              case 'pull_request_review':
+                body = p.review.body; user = p.review.user; number = p.pull_request.number; break;
               default:
                 return;
             }
+
+            // Comments sent by email reply carry the quoted thread and GitHub's footer.
+            // Keep only what the person actually wrote.
+            function stripEmailReply(text) {
+              if (!text) return '';
+              let cut = text.length;
+              const markers = [
+                /^Am .{0,150}?\d{1,2}:\d{2}.{0,60}?schrieb/ms,   // German attribution line
+                /^On .{0,150}?\d{1,2}:\d{2}.{0,150}?wrote:/ms,   // English attribution line
+              ];
+              for (const re of markers) {
+                const m = text.match(re);
+                if (m && m.index < cut) cut = m.index;
+              }
+              // Footer: a lone em dash line followed by GitHub notification links
+              const dash = text.match(/^—\s*$/m);
+              if (dash && text.slice(dash.index).includes('github.com/notifications') && dash.index < cut) {
+                cut = dash.index;
+              }
+              return text.slice(0, cut).replace(/^>.*$/gm, '').trim();
+            }
+
+            body = stripEmailReply(body);
 
             // Don't translate bots or our own translations (prevents loops)
             if (!body || user.type === 'Bot' || body.includes(MARKER)) return;
@@ -59,14 +88,18 @@ jobs:
             const key = process.env.DEEPL_API_KEY;
             const host = key.endsWith(':fx') ? 'api-free.deepl.com' : 'api.deepl.com';
 
-            async function deepl(text, target) {
+            async function deepl(text, target, source) {
               const res = await fetch(`https://${host}/v2/translate`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `DeepL-Auth-Key ${key}`,
                   'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ text: [text], target_lang: target }),
+                body: JSON.stringify(
+                  source
+                    ? { text: [text], target_lang: target, source_lang: source }
+                    : { text: [text], target_lang: target }
+                ),
               });
               if (!res.ok) throw new Error(`DeepL error ${res.status}: ${await res.text()}`);
               const t = (await res.json()).translations[0];
@@ -76,12 +109,23 @@ jobs:
               };
             }
 
-            // Step 1: translate to English and see what language it was
-            const en = await deepl(prepared, 'EN-US');
+            // Listed German speakers skip auto-detection: always German -> English
+            const germanUsers = (process.env.GERMAN_USERS || '')
+              .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
+            const isGerman = germanUsers.includes(user.login.toLowerCase());
+
+            // Step 1: translate to English (forcing German as source for listed users)
+            const en = isGerman
+              ? await deepl(prepared, 'EN-US', 'DE')
+              : await deepl(prepared, 'EN-US');
+            const detected = isGerman ? 'DE' : en.detected;
+            core.info(`author=${user.login} forcedGerman=${isGerman} detected=${en.detected}`);
 
             let label, translated;
-            if (en.detected !== 'EN') {
-              label = `English (translated from ${en.detected})`;
+            if (detected !== 'EN') {
+              // Nothing changed, so it wasn't really in another language
+              if (en.text.trim() === body.trim()) return;
+              label = `English (translated from ${detected})`;
               translated = en.text;
             } else {
               // Step 2: it was already English, so translate to German
