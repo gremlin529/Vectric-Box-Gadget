@@ -3,6 +3,8 @@ name: Translate review comments (scheduled)
 # GitHub isn't starting the event-based workflow for replies in inline review
 # threads on this repo's PRs, so this polls for them instead.
 # - Covers inline review comments, replies in review threads, and review summaries.
+# - Thread comments are translated as a reply inside the same thread; review
+#   summaries (which aren't threads) get a regular PR comment.
 # - Scheduled workflows only run from the default branch (main).
 # - Safe to re-run: each translation carries a marker with the source comment's ID,
 #   and anything already translated is skipped.
@@ -119,11 +121,21 @@ jobs:
               github.rest.pulls.listReviewCommentsForRepo,
               { owner, repo, since, sort: 'created', direction: 'asc', per_page: 100 }
             );
+            // Markers on bot replies already in review threads (stateless de-duplication)
+            const seenMarkers = new Set();
+            for (const c of reviewComments) {
+              for (const m of (c.body || '').matchAll(/<!-- auto-translation:([\w-]+:\d+) -->/g)) {
+                seenMarkers.add(m[1]);
+              }
+            }
+
             for (const c of reviewComments) {
               if (c.created_at < since) continue; // `since` matches edits too; ignore old comments
               items.push({
                 kind: 'review-comment', id: c.id, body: c.body, user: c.user, url: c.html_url,
                 number: Number(c.pull_request_url.split('/').pop()),
+                // Threads are flat: every reply points at the thread's first comment
+                threadRoot: c.in_reply_to_id ?? c.id,
               });
             }
 
@@ -153,7 +165,11 @@ jobs:
               try {
                 if (!it.body || it.user.type === 'Bot' || it.body.includes('<!-- auto-translation')) continue;
 
-                const marker = `<!-- auto-translation:${it.kind}:${it.id} -->`;
+                const itemKey = `${it.kind}:${it.id}`;
+                const marker = `<!-- auto-translation:${itemKey} -->`;
+                if (seenMarkers.has(itemKey)) continue;
+                // Also check PR conversation comments (review summaries go there,
+                // as did translations posted by an earlier version of this workflow)
                 existingByPr[it.number] ??= await github.paginate(github.rest.issues.listComments, {
                   owner, repo, issue_number: it.number, per_page: 100,
                 });
@@ -162,11 +178,21 @@ jobs:
                 const result = await translate(it.body, it.user.login);
                 if (!result) continue;
 
-                const created = await github.rest.issues.createComment({
-                  owner, repo, issue_number: it.number,
-                  body: `> 🌐 **Automatic translation: ${result.label}** · [original comment](${it.url})\n\n${result.text}\n\n${marker}`,
-                });
-                existingByPr[it.number].push(created.data);
+                if (it.kind === 'review-comment') {
+                  // Reply inside the same review thread
+                  await github.rest.pulls.createReplyForReviewComment({
+                    owner, repo, pull_number: it.number, comment_id: it.threadRoot,
+                    body: `> 🌐 **Automatic translation: ${result.label}**\n\n${result.text}\n\n${marker}`,
+                  });
+                } else {
+                  // Review summaries aren't threads, so these go in the PR conversation
+                  const created = await github.rest.issues.createComment({
+                    owner, repo, issue_number: it.number,
+                    body: `> 🌐 **Automatic translation: ${result.label}** · [original review](${it.url})\n\n${result.text}\n\n${marker}`,
+                  });
+                  existingByPr[it.number].push(created.data);
+                }
+                seenMarkers.add(itemKey);
               } catch (err) {
                 core.warning(`Failed on ${it.kind} ${it.id}: ${err.message}`);
               }
