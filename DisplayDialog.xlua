@@ -51,6 +51,29 @@ jobs:
                 return;
             }
 
+            // Comments sent by email reply carry the quoted thread and GitHub's footer.
+            // Keep only what the person actually wrote.
+            function stripEmailReply(text) {
+              if (!text) return '';
+              let cut = text.length;
+              const markers = [
+                /^Am .{0,150}?\d{1,2}:\d{2}.{0,60}?schrieb/ms,   // German attribution line
+                /^On .{0,150}?\d{1,2}:\d{2}.{0,150}?wrote:/ms,   // English attribution line
+              ];
+              for (const re of markers) {
+                const m = text.match(re);
+                if (m && m.index < cut) cut = m.index;
+              }
+              // Footer: a lone em dash line followed by GitHub notification links
+              const dash = text.match(/^—\s*$/m);
+              if (dash && text.slice(dash.index).includes('github.com/notifications') && dash.index < cut) {
+                cut = dash.index;
+              }
+              return text.slice(0, cut).replace(/^>.*$/gm, '').trim();
+            }
+
+            body = stripEmailReply(body);
+
             // Don't translate bots or our own translations (prevents loops)
             if (!body || user.type === 'Bot' || body.includes(MARKER)) return;
 
