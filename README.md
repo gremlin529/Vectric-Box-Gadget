@@ -1,4 +1,4 @@
-## Vectric Drawer Creator Gadget 
+## Vectric Box Creator Gadget 
 
 This is a fork of the Vectric created box gadget which has had significant enhancements provided by various users through collaborative efforts in the Vectric forums. Most notably user SharkCutUp has contributed greatly. It is now being moved to a git hub location to further foster combined efforts and gadget improvement.
 
@@ -29,17 +29,17 @@ To do this follow these steps
 
 5. now put the repo in this code location with the following command
 
-   `git clone https://github.com/Ursa-Soft/Simple-Drawer-Creator.git Simple_Drawer_Creator`
+   `git clone https://github.com/gremlin529/Vectric-Box-Gadget.git Simple_Box_Creator_Dev`
 
-6. this puts a copy of the current code in your Vectric gadgets directory and you can now actually start up vectric and you'll see a new gadget called “Vectric-Box-Gadget” and under that you can run it
+6. this puts a copy of the current code in your Vectric gadgets directory and you can now actually start up vectric and you'll see a new gadget called “Simple Box Creator dev” and under that you can run it
 
-7. type `cd Simple_Drawer_Creator`
+7. type `cd Simple_Box_Creator_Dev`
 
 8. `code .`
 
 9. Now you should have a code editor opened and can edit and view the lua file for the script and the html and stylesheets for the html
 
-10. to create a new branch to make changes in type something like `git switch -c <user>/<branchname>` where the name is something descriptive about what you are doing for instance I might have used `git switch -c gremlin/bottomtabs`
+10. to create a new branch to make changes in type something like `git switch -c users/<user name>/<branchname>` where the name is something descriptive about what you are doing for instance I might have used `git switch -c users/gremlin/bottomtabs`
     
 11. Now you can work on the code as you'd like making edits and such, at anytime you can create a commit back to your branch (look up the commands `git commit` and `git push` or most editors will do this for you. It's a good idea to compare the changes before you push the commit to ensure that there's no inadvertent changes included. 
 
