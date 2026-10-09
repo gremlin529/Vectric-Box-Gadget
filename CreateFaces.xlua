@@ -404,21 +404,32 @@ end
           -- One U-shaped band along Left, Front and Right (Back stays full thickness).
           -- Was three overlapping rectangles before, but VCarve's pocketing does not
           -- cope with overlapping vectors and dropped the Front band.  -- by Claude 10/9/2026
+          --
+          -- The rabbet sits on the panel's open edge, so the band reaches one tool
+          -- diameter OUT past the panel (and past its Back edge) into the waste
+          -- around it: any bit then fits, however narrow the groove depth, and the
+          -- rabbet's inner edge (the only edge that matters) is still exactly at
+          -- groove_depth. The extra cut only removes waste the cutout takes away
+          -- anyway; parts are spaced at least 2 tool diameters apart.  -- by Claude 10/9/2026
+          local ext = thickness
+          if Tool_ok(options.tool) then
+            ext = ConvertUnitsFrom(options.tool.ToolDia, options.tool, MaterialBlock())
+          end
           local x0 = blc.x
           local x1 = blc.x + panel_width
           local y0 = blc.y                  -- Front edge
           local y1 = blc.y + panel_depth    -- Back edge
           local g  = groove_depth
           local band = Contour(0.0)
-          band:AppendPoint(Point2D(x0, y0))
-          band:LineTo(Point2D(x1, y0))
-          band:LineTo(Point2D(x1, y1))
-          band:LineTo(Point2D(x1 - g, y1))
+          band:AppendPoint(Point2D(x0 - ext, y0 - ext))
+          band:LineTo(Point2D(x1 + ext, y0 - ext))
+          band:LineTo(Point2D(x1 + ext, y1 + ext))
+          band:LineTo(Point2D(x1 - g, y1 + ext))
           band:LineTo(Point2D(x1 - g, y0 + g))
           band:LineTo(Point2D(x0 + g, y0 + g))
-          band:LineTo(Point2D(x0 + g, y1))
-          band:LineTo(Point2D(x0, y1))
-          band:LineTo(Point2D(x0, y0))
+          band:LineTo(Point2D(x0 + g, y1 + ext))
+          band:LineTo(Point2D(x0 - ext, y1 + ext))
+          band:LineTo(Point2D(x0 - ext, y0 - ext))
           rabbet_contours:AddTail(band)
         end
       end
