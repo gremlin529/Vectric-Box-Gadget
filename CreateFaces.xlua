@@ -361,7 +361,7 @@ end
     local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
     local bottomGrooveDepth = options.bottomGrooveDepth
     local bottomGrooveWidth = options.bottomGrooveWidth
-    local bottomSameMaterial = options.bottomSameMaterial
+    local bottomThickness = options.bottomThickness or options.thickness  -- replaces bottomSameMaterial -- by Claude 10/9/2026
     local bottomGrooveClearance = options.bottomGrooveClearance
     local bottomRabbetDepthCorrection = options.bottomRabbetDepthCorrection
 
@@ -387,10 +387,10 @@ end
       -- optional clearance ("Luft") shortens how far the panel reaches into
       -- each of those 3 grooves, for an easier slide fit; an optional
       -- correction fine-tunes the resulting rabbet depth.        -- by Claude 9/21/2026
-      local clearance = 0
-      if (bottomSameMaterial) then
-        clearance = bottomGrooveClearance or 0
-      end
+      -- 10/9/2026: "same material" is now a free Bottom Thickness (default = material
+      -- thickness). The clearance always applies; the rabbet only where the panel is
+      -- thicker than the groove width.                          -- by Claude 10/9/2026
+      local clearance = bottomGrooveClearance or 0
       local reach = math.max(0, groove_depth - clearance)
 
       local blc = start_point + Vector2D(thickness - reach, thickness - reach)
@@ -415,8 +415,8 @@ end
 
       local rabbet_contours = nil
       local rabbet_depth = 0
-      if (bottomSameMaterial) then
-        rabbet_depth = math.max(0, thickness - groove_width + (bottomRabbetDepthCorrection or 0))
+      if (bottomThickness - groove_width > 0.0001) then
+        rabbet_depth = math.max(0, bottomThickness - groove_width + (bottomRabbetDepthCorrection or 0))
         -- The rabbet band's width is the full groove_depth, NOT "reach" (which is
         -- groove_depth minus the lateral clearance/"Luft"). The clearance only
         -- pulls the panel's own tip back a bit for an easier slide fit - it must
@@ -425,32 +425,25 @@ end
         if (rabbet_depth > 0.0001 and groove_depth > 0.0001) then
           rabbet_contours = ContourGroup(true)
 
-          -- Left edge band
-          local r1 = Contour(0.0)
-          r1:AppendPoint(Point2D(blc.x, blc.y))
-          r1:LineTo(Point2D(blc.x + groove_depth, blc.y))
-          r1:LineTo(Point2D(blc.x + groove_depth, blc.y + panel_depth))
-          r1:LineTo(Point2D(blc.x, blc.y + panel_depth))
-          r1:LineTo(Point2D(blc.x, blc.y))
-          rabbet_contours:AddTail(r1)
-
-          -- Right edge band
-          local r2 = Contour(0.0)
-          r2:AppendPoint(Point2D(blc.x + panel_width - groove_depth, blc.y))
-          r2:LineTo(Point2D(blc.x + panel_width, blc.y))
-          r2:LineTo(Point2D(blc.x + panel_width, blc.y + panel_depth))
-          r2:LineTo(Point2D(blc.x + panel_width - groove_depth, blc.y + panel_depth))
-          r2:LineTo(Point2D(blc.x + panel_width - groove_depth, blc.y))
-          rabbet_contours:AddTail(r2)
-
-          -- Front edge band
-          local r3 = Contour(0.0)
-          r3:AppendPoint(Point2D(blc.x, blc.y))
-          r3:LineTo(Point2D(blc.x + panel_width, blc.y))
-          r3:LineTo(Point2D(blc.x + panel_width, blc.y + groove_depth))
-          r3:LineTo(Point2D(blc.x, blc.y + groove_depth))
-          r3:LineTo(Point2D(blc.x, blc.y))
-          rabbet_contours:AddTail(r3)
+          -- One U-shaped band along Left, Front and Right (Back stays full thickness).
+          -- Was three overlapping rectangles before, but VCarve's pocketing does not
+          -- cope with overlapping vectors and dropped the Front band.  -- by Claude 10/9/2026
+          local x0 = blc.x
+          local x1 = blc.x + panel_width
+          local y0 = blc.y                  -- Front edge
+          local y1 = blc.y + panel_depth    -- Back edge
+          local g  = groove_depth
+          local band = Contour(0.0)
+          band:AppendPoint(Point2D(x0, y0))
+          band:LineTo(Point2D(x1, y0))
+          band:LineTo(Point2D(x1, y1))
+          band:LineTo(Point2D(x1 - g, y1))
+          band:LineTo(Point2D(x1 - g, y0 + g))
+          band:LineTo(Point2D(x0 + g, y0 + g))
+          band:LineTo(Point2D(x0 + g, y1))
+          band:LineTo(Point2D(x0, y1))
+          band:LineTo(Point2D(x0, y0))
+          rabbet_contours:AddTail(band)
         end
       end
 
@@ -1015,8 +1008,14 @@ end
     -- cut at Front's edges - rather than relocate it, skip cutting it
     -- altogether when dovetails are selected, per the user's own machining
     -- experience with this setting.                              -- by Claude 9/19/2026
+    -- 10/9/2026: optional "End 1 groove on own sheet" (dovetails only): the groove is
+    -- still built here, but handed back as flip_groove_contours instead - the main
+    -- lua turns it into a mirrored helper part on a sheet of its own, so End 1 can be
+    -- turned over and the groove cut into its inside face.     -- by Claude 10/9/2026
     local groove_contours = nil
-    if (bottomType == FaceJointType.Grooved and is_end1 and not dovetailJoint) then
+    local flip_groove_contours = nil
+    local wantFlipGroove = dovetailJoint and options.bottomFrontGrooveFlip
+    if (bottomType == FaceJointType.Grooved and is_end1 and ((not dovetailJoint) or wantFlipGroove)) then
       local groove_width = bottomGrooveWidth or thickness
       -- bottomGrooveOffset measures up to the groove's TOP edge, so the
       -- pocket's bottom edge sits one groove-width below that. -- by Claude 9/21/2026
@@ -1034,8 +1033,13 @@ end
       groove:LineTo(Point2D(groove_x1, groove_y0 + groove_width))
       groove:LineTo(Point2D(groove_x0, groove_y0 + groove_width))
       groove:LineTo(Point2D(groove_x0, groove_y0))
-      groove_contours = ContourGroup(true)
-      groove_contours:AddTail(groove)
+      if dovetailJoint then
+        flip_groove_contours = ContourGroup(true)
+        flip_groove_contours:AddTail(groove)
+      else
+        groove_contours = ContourGroup(true)
+        groove_contours:AddTail(groove)
+      end
     end
 
     -- Gremlin added doevtail seperation for different sizes
@@ -1167,7 +1171,9 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
+    local end_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
+    end_face.flip_groove_contours = flip_groove_contours  -- dovetail End 1 groove for its own (flip) sheet -- by Claude 10/9/2026
+    return end_face
   end
 
   -- Splits a comma‑separated string into a numeric array.

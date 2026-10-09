@@ -627,7 +627,7 @@ function CreateFingerSideToolpath(fingerSideLayerName, roundover_tool, job, roun
 end
 
 
-function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects)
+function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exact_objects, toolpath_name)
 
   if not Tool_ok(tool) then
     DisplayMessageBox("Cutout Toolpath: Please select a valid tool before continuing.")
@@ -666,7 +666,7 @@ function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exac
 
   local toolpath_manager = ToolpathManager()
   local toolpath = toolpath_manager:CreateProfilingToolpath(
-    "Cut Out",
+    toolpath_name or "Cut Out",  -- optional name, e.g. "Cut Out Bottom" for a thinner bottom panel -- by Claude 10/9/2026
     tool,
     profile_data,
     ramping_data,

@@ -821,7 +821,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   -- "Bottom aus gleichem Material": cut the bottom panel from the same (full)
   -- material thickness as the walls, with a rabbet (Falz) milled along Side
   -- 1/Side 2/End 1's edges down to the groove width there.   -- by Claude 9/21/2026
-  dialog:AddCheckBox("BottomSameMaterial", options.bottomSameMaterial)
+  dialog:AddCheckBox("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)  -- Dovetail only: End 1 groove on its own sheet -- by Claude 10/9/2026
+  dialog:AddDoubleField("BottomThicknessField", options.bottomThickness)  -- replaces the "Bottom same material" checkbox -- by Claude 10/9/2026
   dialog:AddDoubleField("BottomGrooveClearanceField", options.bottomGrooveClearance)
   dialog:AddDoubleField("BottomRabbetCorrectionField", options.bottomRabbetDepthCorrection)
 
@@ -875,19 +876,34 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox(string.format("Groove offset %.2f must be at least the groove width %.2f (the groove would otherwise reach below the wall's bottom edge).", options.bottomGrooveOffset, options.bottomGrooveWidth))
         return false
       end
-      -- "Bottom aus gleichem Material": validate the clearance ("Luft") the
-      -- panel's reach into each of the 3 grooves gets shortened by. The
+      -- Bottom Thickness (replaces "Bottom same material"): must be a real panel,
+      -- no thicker than the material, and - since its top sits at the top of the
+      -- groove - must not reach below the walls' bottom edge. A bottom thinner than
+      -- the groove is allowed (no rabbet, just some play); the dialog shows a live
+      -- hint for that instead of an error.                     -- by Claude 10/9/2026
+      if not (options.bottomThickness and options.bottomThickness > 0) then
+        DisplayMessageBox("Bottom thickness must be greater than 0.")
+        return false
+      end
+      if options.bottomThickness > options.thickness + 0.0001 then
+        DisplayMessageBox(string.format("Bottom thickness %.2f cannot be more than the material thickness %.2f.", options.bottomThickness, options.thickness))
+        return false
+      end
+      if options.bottomThickness > options.bottomGrooveOffset + 0.0001 then
+        DisplayMessageBox(string.format("Bottom thickness %.2f is more than the groove offset %.2f - the bottom panel would reach below the bottom edge of the walls.", options.bottomThickness, options.bottomGrooveOffset))
+        return false
+      end
+      -- Clearance ("Luft") the panel's reach into each of the 3 grooves gets
+      -- shortened by - now always used, not only for "same material". The
       -- rabbet-depth correction isn't validated here - a bad value just
-      -- yields a shallower/deeper (possibly zero) rabbet.   -- by Claude 9/21/2026
-      if (options.bottomSameMaterial) then
-        if not IsNonNeg(options.bottomGrooveClearance) then
-          DisplayMessageBox("Bottom groove clearance (Luft) must be 0 or greater.")
-          return false
-        end
-        if options.bottomGrooveClearance >= options.bottomGrooveDepth then
-          DisplayMessageBox(string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth))
-          return false
-        end
+      -- yields a shallower/deeper (possibly zero) rabbet.   -- by Claude 9/21/2026, 10/9/2026
+      if not IsNonNeg(options.bottomGrooveClearance) then
+        DisplayMessageBox("Bottom groove clearance (Luft) must be 0 or greater.")
+        return false
+      end
+      if options.bottomGrooveClearance >= options.bottomGrooveDepth then
+        DisplayMessageBox(string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth))
+        return false
       end
       -- End 2 is shortened to start at the top of the groove (bottomGrooveOffset
       -- itself, now that it measures up to the groove's top edge), so there must
@@ -995,7 +1011,8 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.partLayout = dialog:GetDropDownListValue("PartLayoutSelect")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
-  options.bottomSameMaterial   = dialog:GetCheckBox("BottomSameMaterial")
+  options.bottomFrontGrooveFlip = dialog:GetCheckBox("BottomFrontGrooveFlip")  -- by Claude 10/9/2026
+  options.bottomThickness      = dialog:GetDoubleField("BottomThicknessField")  -- by Claude 10/9/2026
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
   options.facesToMake.side2    = dialog:GetCheckBox("MakeSide2")
   options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
@@ -1168,7 +1185,8 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
   registry:SetDouble("BottomGrooveDepth", options.bottomGrooveDepth)    -- Added by Claude 9/18/2026
   registry:SetDouble("BottomGrooveWidth", options.bottomGrooveWidth)    -- Added by Claude 9/18/2026
-  registry:SetBool("BottomSameMaterial", options.bottomSameMaterial)                     -- Added by Claude 9/21/2026
+  registry:SetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)                 -- Added by Claude 10/9/2026
+  registry:SetDouble("BottomThickness", options.bottomThickness)                         -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   registry:SetDouble("BottomGrooveClearance", options.bottomGrooveClearance)             -- Added by Claude 9/21/2026
   registry:SetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
   registry:SetDouble("End1Height", options.end1Height)                             -- Added by Claude 9/20/2026
@@ -1231,7 +1249,8 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomGrooveOffset = registry:GetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
   options.bottomGrooveDepth = registry:GetDouble("BottomGrooveDepth", options.bottomGrooveDepth)      -- Added by Claude 9/18/2026
   options.bottomGrooveWidth = registry:GetDouble("BottomGrooveWidth", options.bottomGrooveWidth)      -- Added by Claude 9/18/2026
-  options.bottomSameMaterial = registry:GetBool("BottomSameMaterial", options.bottomSameMaterial)                         -- Added by Claude 9/21/2026
+  options.bottomFrontGrooveFlip = registry:GetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)            -- Added by Claude 10/9/2026
+  options.bottomThickness = registry:GetDouble("BottomThickness", options.bottomThickness)                              -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   options.bottomGrooveClearance = registry:GetDouble("BottomGrooveClearance", options.bottomGrooveClearance)              -- Added by Claude 9/21/2026
   options.bottomRabbetDepthCorrection = registry:GetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
   -- Fall back to the just-loaded options.height (not the pre-load default) so a
