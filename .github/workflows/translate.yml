@@ -104,6 +104,17 @@ jobs:
               };
             }
 
+            // Word overlap between two texts, 0 to 1. A real translation shares few words
+            // with its source; text that was already in the target language shares most.
+            function similarity(a, b) {
+              const words = (s) => new Set(s.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+              const A = words(a), B = words(b);
+              if (!A.size || !B.size) return 1;
+              let shared = 0;
+              for (const w of A) if (B.has(w)) shared++;
+              return shared / (A.size + B.size - shared);
+            }
+
             // Listed German speakers skip auto-detection: always German -> English
             const germanUsers = (process.env.GERMAN_USERS || '')
               .split(',').map((s) => s.trim().toLowerCase()).filter(Boolean);
@@ -118,8 +129,8 @@ jobs:
 
             let label, translated;
             if (detected !== 'EN') {
-              // Nothing changed, so it wasn't really in another language
-              if (en.text.trim() === body.trim()) return;
+              // Barely changed: it was already English (e.g. a German speaker writing in English)
+              if (similarity(en.text, body) >= 0.5) return;
               label = `English (translated from ${detected})`;
               translated = en.text;
             } else {
