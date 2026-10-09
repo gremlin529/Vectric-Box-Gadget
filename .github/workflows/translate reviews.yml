@@ -83,6 +83,17 @@ jobs:
               return { detected: t.detected_source_language, text: t.text };
             }
 
+            // Word overlap between two texts, 0 to 1. A real translation shares few words
+            // with its source; text that was already in the target language shares most.
+            function similarity(a, b) {
+              const words = (s) => new Set(s.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []);
+              const A = words(a), B = words(b);
+              if (!A.size || !B.size) return 1;
+              let shared = 0;
+              for (const w of A) if (B.has(w)) shared++;
+              return shared / (A.size + B.size - shared);
+            }
+
             // Returns { label, text } or null if there is nothing to post
             async function translate(rawBody, login) {
               const body = stripEmailReply(rawBody);
@@ -106,7 +117,8 @@ jobs:
 
               if (detected !== 'EN') {
                 const out = restore(en.text);
-                if (out.trim() === body.trim()) return null; // nothing changed
+                // Barely changed: it was already English (e.g. a German speaker writing in English)
+                if (similarity(out, body) >= 0.5) return null;
                 return { label: `English (translated from ${detected})`, text: out };
               }
               const de = await deeplRaw(prepared, 'DE');
