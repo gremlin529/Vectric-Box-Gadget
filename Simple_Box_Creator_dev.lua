@@ -213,7 +213,14 @@ function main(script_path)
   -- Bottom Thickness defaults to the material thickness: when nothing has been saved yet (0)
   -- or the saved value is thicker than the current material, use the material thickness.
   --                                                                       -- by Claude 10/9/2026
-  if (options.bottomThickness == nil or options.bottomThickness <= 0 or options.bottomThickness > options.thickness + 0.0001) then
+  -- Also whenever the bottom type we just loaded from the registry isn't Grooved: the field
+  -- only ever applies to a Grooved bottom, so a value saved alongside some earlier grooved
+  -- box is stale by the time the user comes back with a Flat/Inset/Fingers/None bottom.
+  -- Switching Bottom type over to Grooved should then start from the material thickness
+  -- rather than silently inheriting that leftover.                         -- by Claude 10/9/2026
+  if (options.bottomType ~= FaceJointType.Grooved
+      or options.bottomThickness == nil or options.bottomThickness <= 0
+      or options.bottomThickness > options.thickness + 0.0001) then
     options.bottomThickness = options.thickness
   end
 
@@ -674,33 +681,18 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         end
 
         -- Grooved (slide-in) bottom: the groove geometry lives on Side1/Side2/End1,
-        -- not on the Bottom face itself, so check this sheet's own faces directly
-        -- rather than jointsOnSheet (which only tracks the Bottom/Lid face's joint
-        -- type and could miss a sheet split across multiple material sheets).  -- by Claude 9/18/2026
-        local has_bottom_grooves = false
-        for i = 1, #sheet_faces do
-          if sheet_faces[i].groove_contours ~= nil then
-            has_bottom_grooves = true
-            break
-          end
-        end
-        if has_bottom_grooves then
-          CreateGroovePocketToolpath(job, options, sheet_faces, options.tool, "Bottom Groove")
-        end
+        -- not on the Bottom face itself, so this goes by what this sheet's own
+        -- faces actually carry rather than by jointsOnSheet (which only tracks the
+        -- Bottom/Lid face's joint type and could miss a sheet split across multiple
+        -- material sheets). Both of these now no-op on their own when this sheet
+        -- carries no such bands, so there's no pre-scan to do here.
+        -- by Claude 9/18/2026, pre-scans folded into the toolpath helper 10/9/2026
+        CreateGroovePocketToolpath(job, options, sheet_faces, options.tool, "Bottom Groove")
 
         -- "Bottom aus gleichem Material": rabbet (Falz) milled along the bottom
         -- panel's own Side 1/Side 2/End 1 edges, separate pass from the wall
         -- grooves above since it's cut to a different depth.  -- by Claude 9/21/2026
-        local has_bottom_rabbet = false
-        for i = 1, #sheet_faces do
-          if sheet_faces[i].rabbet_contours ~= nil then
-            has_bottom_rabbet = true
-            break
-          end
-        end
-        if has_bottom_rabbet then
-          CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
-        end
+        CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
 
         if options.dovetailJoint and fluting_objects ~= nil then
           if SelectExactObjects(job, fluting_objects) then

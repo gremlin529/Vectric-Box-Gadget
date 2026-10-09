@@ -249,11 +249,11 @@
               <div class="sub-panel-title">Bottom Panel</div>
               <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet (Falz) is milled along its Side 1, Side 2 and End 1 edges down to the groove width, so it still seats in the groove; End 2's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
                 <label for="BottomThicknessField">Bottom Thickness</label>
-                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo()"/>
+                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="'Falz Luft' - fine-tune correction added to the computed rabbet depth (bottom thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the bottom is thicker than the groove width (i.e. a rabbet is milled).">
                 <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
-                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo()"/>
+                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="'Luft seitlich' - clearance subtracted from how far the panel reaches into each of the 3 grooves (Side 1, Side 2, End 1), for an easier slide fit.">
                 <label for="BottomGrooveClearanceField" style="color: #BA2819;">Bottom Clearance</label>
@@ -269,11 +269,11 @@
               <div class="sub-panel-title">Groove</div>
               <div class="field-row" title="Width of the groove slot (vertical height of the dado), independent of material thickness - set this to the actual thickness of the bottom panel you'll slide in, e.g. 4mm for a thin plywood/hardboard bottom. If 'Same material' is checked, set this to whatever width you want the rabbeted edge to seat at (can be smaller than the material thickness).">
                 <label for="BottomGrooveWidthField">Groove width</label>
-                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo()"/>
+                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="How deep the groove is plowed into Side 1, Side 2 and End 1 (must be less than the material thickness)">
                 <label for="BottomGrooveDepthField">Groove depth</label>
-                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Distance from the outer bottom edge of the walls up to the TOP of the groove that captures the bottom panel (must be at least the groove width)">
                 <label for="BottomGrooveOffsetField">Groove offset</label>
@@ -389,6 +389,7 @@
     <input type="text" id="InvalidSideJointWidth" value=""/>
     <input type="text" id="InvalidLidJointWidth" value=""/>
     <input type="text" id="InvalidBottomJointWidth" value=""/>
+    <input type="text" id="InvalidBottomGrooveDepth" value=""/>
   </fieldset>
 
 
@@ -632,7 +633,8 @@
     "InvalidEnd1Height":       "End1HeightField",
     "InvalidEnd2Height":       "End2HeightField",
     "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
-    "InvalidEnd2ChamferAngle": "End2ChamferAngleField"
+    "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
+    "InvalidBottomGrooveDepth": "BottomGrooveDepthField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can

@@ -714,6 +714,96 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   return bottom_message == "" and lid_message == "" and side_message == "" and allowance_message == ""
 end
 
+--[[  -------------- ValidateBottomRabbetToolFit --------------------------------------------------
+|
+|  A Grooved (slide-in) bottom cut from stock thicker than the groove gets a
+|  rabbet (Falz) milled around Left, Front and Right so its edge thins down to
+|  the groove's width and can still slide in. That rabbet is machined as a
+|  POCKET inside a U-shaped band (see rabbet_contours in MakeBottomFaceContour),
+|  and the band is only as wide as the groove DEPTH - that is how far the panel
+|  reaches into the groove, so that is exactly how much of its edge has to be
+|  thinned. A cutter wider than the band has nowhere to go: the pocket comes out
+|  empty, nothing is machined, and the panel is left at its full thickness -
+|  silently too fat to slide into its own grooves. That is the failure this
+|  catches.
+|
+|  A cutter exactly as wide as the band is NOT a failure - it clears the band in
+|  one pass, which is how a rabbet this narrow normally gets cut.
+|
+|  Reported against the groove DEPTH field, since widening the band is the fix
+|  the user has in the dialog (the only alternative is a smaller bit).
+|
+|  report_as_dialog mirrors ValidateJointWidths: true pops a blocking message
+|  box for the OK/Validate flow, false writes the message (or "" when fine)
+|  into InvalidBottomGrooveDepth so the HTML marks the field red and shows the
+|  message as its tooltip.
+|
+|  Returns true when the rabbet is machinable (or when none is being cut).
+|
+|  Added by Claude 10/9/2026
+|
+]]
+local function ValidateBottomRabbetToolFit(dialog, options, report_as_dialog)
+  local message = ""
+
+  local groove_width = options.bottomGrooveWidth or 0
+  local groove_depth = options.bottomGrooveDepth or 0
+
+  -- Mirror MakeBottomFaceContour's own test for whether a rabbet gets milled at
+  -- all: only when the panel is thicker than the groove, and only if the
+  -- correction hasn't cancelled the resulting depth back out.
+  local rabbet_depth = 0
+  if (options.bottomThickness and (options.bottomThickness - groove_width) > 0.0001) then
+    rabbet_depth = math.max(0, options.bottomThickness - groove_width + (options.bottomRabbetDepthCorrection or 0))
+  end
+
+  -- A vectors-only run (no_toolpath) has no bit to be too large for anything.
+  local cutting_rabbet = (options.bottomType == FaceJointType.Grooved)
+    and (not options.no_toolpath)
+    and (rabbet_depth > 0.0001)
+    and (groove_depth > 0.0001)
+
+  if cutting_rabbet then
+    -- Same effective-diameter convention as ValidateJointWidths above.
+    local mtl_block = MaterialBlock()
+    local converted_tool_diameter = 0.25
+    if Tool_ok(options.tool) then
+      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+    end
+    local effectiveDia = converted_tool_diameter
+    if options.allowance > 0 then
+      effectiveDia = effectiveDia - 2 * options.allowance
+    end
+
+    -- effectiveDia <= 0 is an allowance-vs-tool problem, which ValidateJointWidths
+    -- already reports against the allowance field - saying it again over here
+    -- would just flag a second, innocent field.
+    --
+    -- A tool exactly as wide as the band is fine: it clears the whole band in a
+    -- single pass, which is the normal way to cut a rabbet this narrow (e.g. a
+    -- 0.25" bit in a 0.25" groove depth). Only a tool genuinely WIDER than the
+    -- band fails, hence the strict comparison with the usual 0.0001 tolerance so
+    -- unit conversion noise in converted_tool_diameter can't trip the
+    -- exactly-equal case.                                     -- by Claude 10/9/2026
+    if (effectiveDia > 0) and (effectiveDia > groove_depth + 0.0001) then
+      message = string.format(
+        "The selected tool is too large to cut the bottom's rabbet.\n\nThe rabbet is pocketed in a band only as wide as the groove depth (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the groove depth to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
+        groove_depth, effectiveDia, effectiveDia)
+    end
+  end
+
+  if report_as_dialog then
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidBottomGrooveDepth", message)
+  return message == ""
+end
+
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   G_dialogOptions = options
@@ -771,6 +861,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidEnd2Height", "")
   dialog:AddTextField("InvalidEnd1ChamferAngle", "")
   dialog:AddTextField("InvalidEnd2ChamferAngle", "")
+  dialog:AddTextField("InvalidBottomGrooveDepth", "")  -- Added by Claude 10/9/2026
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -912,6 +1003,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local top_reserved = ThicknessForFaceType(options.lidType, options.thickness)
       if (options.bottomGrooveOffset + top_reserved) >= options.height then
         DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (End 2 would have no height left).", options.height))
+        return false
+      end
+      -- The rabbet around the panel's edge is pocketed in a band only as wide as
+      -- the groove depth, so the bit has to fit in there.  -- by Claude 10/9/2026
+      if not ValidateBottomRabbetToolFit(dialog, options, true) then
         return false
       end
     end
@@ -1310,6 +1406,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
   ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
+  ValidateBottomRabbetToolFit(dialog, G_dialogOptions, false)
 
   return true
 end
