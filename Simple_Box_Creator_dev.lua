@@ -58,6 +58,10 @@ G_fingerSideLayerName = "Finger Roundover"
 G_boxLayerName = "Box"
 G_labelsLayerName = "Labels"
 G_cutoutLayerName = "CutOut"
+G_bottomLayerName = "Bottom Panel"              -- Grooved bottom thinner than the material: its own layers + cutout toolpath -- by Claude 10/9/2026
+G_bottomCutoutLayerName = "CutOut Bottom"
+G_flipOutlineLayerName = "End 1 Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
+G_flipSheetName = "End 1 Groove (flipped)"
 G_doveTailAngleDegrees = 60
 
 local libraryModule
@@ -117,9 +121,10 @@ function main(script_path)
   options.bottomGrooveWidth = options.thickness --- Grooved bottom only: width of the groove slot (defaults to material thickness, set independently for e.g. a thinner slide-in panel) -- by Claude 9/18/2026
   options.bottomGrooveOffset = 0.25 + options.bottomGrooveWidth --- Grooved bottom only: distance from the wall's outer bottom edge up to the TOP of the groove (must be >= groove width)      -- by Claude 9/18/2026, updated 9/21/2026
   options.bottomGrooveDepth = 0.125         --- Grooved bottom only: how deep the groove is plowed into Side1/Side2/End1              -- by Claude 9/18/2026
-  options.bottomSameMaterial = false        --- Grooved bottom only: if true, the bottom panel is cut from the same (full) material thickness as the walls, and a rabbet (Falz) is milled along Side 1/Side 2/End 1's edges to bring it down to the groove width there -- by Claude 9/21/2026
-  options.bottomGrooveClearance = 0.01      --- Grooved bottom + bottomSameMaterial only: clearance ("Luft") subtracted from how far the panel reaches into each of the 3 grooves, for an easier slide fit -- by Claude 9/21/2026
-  options.bottomRabbetDepthCorrection = 0   --- Grooved bottom + bottomSameMaterial only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
+  options.bottomFrontGrooveFlip = false    --- Grooved bottom + Dovetail joints only: cut End 1's groove from the other side, on its own sheet (End 1 turned over, lower left corner against the sheet's X0/Y0 stops) -- by Claude 10/9/2026
+  options.bottomThickness = 0               --- Grooved bottom only: thickness of the bottom panel. 0 (nothing saved yet) or anything thicker than the material means "use the material thickness" (resolved below, before the dialog opens). A rabbet (Falz) is milled along Side 1/Side 2/End 1's edges only where the panel is thicker than the groove width -- by Claude 10/9/2026 (replaces bottomSameMaterial)
+  options.bottomGrooveClearance = 0.01      --- Grooved bottom only: clearance ("Luft") subtracted from how far the panel reaches into each of the 3 grooves, for an easier slide fit -- by Claude 9/21/2026
+  options.bottomRabbetDepthCorrection = 0   --- Grooved bottom only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
   options.end1Height = options.height       --- "Side Overhang": End 1's own height. Equal to options.height by default (no overhang). Set it lower than
   options.end2Height = options.height       --- the box height and Side 1/Side 2 (always cut "height" tall) will overhang End 1/End 2 by their own difference,
                                              --- independently - so Front and Back can each have their own overhang. Only used when Lid Type = Open Chamfer. -- by Claude 9/20/2026
@@ -197,11 +202,26 @@ function main(script_path)
     options.bottomGrooveWidth = Truncate(options.bottomGrooveWidth * multiplier, 2)
     options.bottomGrooveClearance = Truncate(options.bottomGrooveClearance * multiplier, 2)
     options.bottomRabbetDepthCorrection = Truncate(options.bottomRabbetDepthCorrection * multiplier, 2)
+    options.bottomThickness = Truncate(options.bottomThickness * multiplier, 2)
     options.end1Height = Truncate(options.end1Height * multiplier, 2)
     options.end2Height = Truncate(options.end2Height * multiplier, 2)
     -- end1ChamferAngle/end2ChamferAngle are in degrees, not a length, so they
     -- don't get rescaled when switching between inches and mm.  -- by Claude 9/20/2026
     options.InMM = job.InMM
+  end
+
+  -- Bottom Thickness defaults to the material thickness: when nothing has been saved yet (0)
+  -- or the saved value is thicker than the current material, use the material thickness.
+  --                                                                       -- by Claude 10/9/2026
+  -- Also whenever the bottom type we just loaded from the registry isn't Grooved: the field
+  -- only ever applies to a Grooved bottom, so a value saved alongside some earlier grooved
+  -- box is stale by the time the user comes back with a Flat/Inset/Fingers/None bottom.
+  -- Switching Bottom type over to Grooved should then start from the material thickness
+  -- rather than silently inheriting that leftover.                         -- by Claude 10/9/2026
+  if (options.bottomType ~= FaceJointType.Grooved
+      or options.bottomThickness == nil or options.bottomThickness <= 0
+      or options.bottomThickness > options.thickness + 0.0001) then
+    options.bottomThickness = options.thickness
   end
 
   local tool = Tool("0.25 Inch End Mill", Tool.END_MILL)
@@ -281,13 +301,13 @@ function main(script_path)
     converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
   end
 
-  local required_sheets
-  faces, required_sheets = LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
+  local required_sheets, sheet_names
+  faces, required_sheets, sheet_names = LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
   if not required_sheets then
     return false
   end
 
-  CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name)
+  CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name, sheet_names)
 
   SetSheet(job, base_sheet_name)
 
@@ -398,6 +418,31 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
   local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
   local required_sheets = 1
+
+  -- A Grooved bottom thinner than the material is cut from separate stock, so it is
+  -- laid out on a sheet of its own ("Bottom Panel <thickness>") after the normal sheets.  -- by Claude 10/9/2026
+  -- Dovetail End 1 groove to be cut from the other side: build the helper part now,
+  -- while End 1 is still in its original (unarranged) position.  -- by Claude 10/9/2026
+  local flip_face = nil
+  for i = 1, #faces do
+    if faces[i].flip_groove_contours ~= nil then
+      flip_face = MakeFrontGrooveFlipFace(faces[i])
+      break
+    end
+  end
+
+  local bottom_faces = {}
+  if IsSeparateBottom(options) then
+    local main_faces = {}
+    for i = 1, #faces do
+      if faces[i].facetype == FaceType.Bottom then
+        bottom_faces[#bottom_faces + 1] = faces[i]
+      else
+        main_faces[#main_faces + 1] = faces[i]
+      end
+    end
+    faces = main_faces
+  end
   if options.useSingleSheet then
     -- Best effort: pack everything onto the starting sheet. Pieces that don't
     -- fit are still laid out (overhanging the material) rather than opening
@@ -410,13 +455,111 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
     faces, required_sheets = ArrangeContoursToSheets(faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
   end
 
+  local sheet_names = {}
   for sheet_num = 1, required_sheets do
     if not SheetEnsureExists(job, base_sheet_id, base_sheet_name, sheet_num) then
       return nil
     end
+    sheet_names[sheet_num] = SheetNameForIndex(base_sheet_name, sheet_num)
   end
 
-  return faces, required_sheets
+  if #bottom_faces > 0 then
+    if #faces == 0 then
+      required_sheets = 0  -- only the bottom is being made: it gets the only sheet
+    end
+    bottom_faces = ArrangeContours(bottom_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
+    local bottom_sheet_num = required_sheets + 1
+    local bottom_sheet_name = string.format("Bottom Panel %g", options.bottomThickness)
+    if not SheetEnsureExists(job, base_sheet_id, bottom_sheet_name, 1) then
+      return nil
+    end
+    sheet_names[bottom_sheet_num] = bottom_sheet_name
+    for i = 1, #bottom_faces do
+      bottom_faces[i].sheet_number = bottom_sheet_num
+      faces[#faces + 1] = bottom_faces[i]
+    end
+    required_sheets = bottom_sheet_num
+  end
+
+  if flip_face ~= nil then
+    local flip_sheet_num = required_sheets + 1
+    if not SheetEnsureExists(job, base_sheet_id, G_flipSheetName, 1) then
+      return nil
+    end
+    sheet_names[flip_sheet_num] = G_flipSheetName
+    flip_face.sheet_number = flip_sheet_num
+    faces[#faces + 1] = flip_face
+    required_sheets = flip_sheet_num
+  end
+
+  return faces, required_sheets, sheet_names
+end
+
+--[[  -------------- MakeFrontGrooveFlipFace --------------------------------------------------
+|
+|  Dovetail + Grooved bottom: End 1's groove belongs on the face that lies down on
+|  the spoilboard when End 1 is cut, so it is cut in a second setup instead: End 1
+|  is turned over (about its vertical axis) and pushed into the sheet's lower left
+|  corner (X0/Y0 stops). This helper part is End 1's bounding rectangle at (0,0),
+|  with the groove mirrored left/right to match the turned-over part. Its outline
+|  is reference only (no cutout); only the groove is machined.  -- by Claude 10/9/2026
+|  The part stands upright on that sheet (turned 270 degrees): End 1's bottom
+|  edge lies against the left (X0) stop.                          -- by Claude 10/9/2026
+|
+]]
+function MakeFrontGrooveFlipFace(front)
+  local fb = front.contour.BoundingBox2D
+  local fx1 = fb.MaxX
+  local fy0 = fb.MinY
+  local part_w = fb.MaxX - fb.MinX
+  local part_h = fb.MaxY - fb.MinY
+
+  -- turn 270 degrees (counter-clockwise) and keep the lower left corner at (0,0):
+  -- (x, y) -> (y, part_w - x), so the part is part_h wide and part_w tall
+  local function Upright(x, y)
+    return y, part_w - x
+  end
+
+  local outline = Contour(0.0)
+  outline:AppendPoint(Point2D(0, 0))
+  outline:LineTo(Point2D(part_h, 0))
+  outline:LineTo(Point2D(part_h, part_w))
+  outline:LineTo(Point2D(0, part_w))
+  outline:LineTo(Point2D(0, 0))
+
+  local grooves = ContourGroup(true)
+  local pos = front.flip_groove_contours:GetHeadPosition()
+  while pos ~= nil do
+    local c
+    c, pos = front.flip_groove_contours:GetNext(pos)
+    local b = c.BoundingBox2D
+    -- mirror x about the part's own centre line, then move its lower left to (0,0)
+    local ax, ay = Upright(fx1 - b.MaxX, b.MinY - fy0)
+    local bx, by = Upright(fx1 - b.MinX, b.MaxY - fy0)
+    local gx0 = math.min(ax, bx)
+    local gx1 = math.max(ax, bx)
+    local gy0 = math.min(ay, by)
+    local gy1 = math.max(ay, by)
+    local g = Contour(0.0)
+    g:AppendPoint(Point2D(gx0, gy0))
+    g:LineTo(Point2D(gx1, gy0))
+    g:LineTo(Point2D(gx1, gy1))
+    g:LineTo(Point2D(gx0, gy1))
+    g:LineTo(Point2D(gx0, gy0))
+    grooves:AddTail(g)
+  end
+
+  local f = Face(outline, nil, {}, {}, "End1GrooveFlip", FaceType.End, FaceJointType.Grooved, {}, nil, grooves)
+  f.is_flip_helper = true
+  return f
+end
+
+-- Grooved bottom thinner than the material: cut from separate stock, so it gets its own
+-- sheet, its own layers and its own (shallower) cutout toolpath.  -- by Claude 10/9/2026
+function IsSeparateBottom(options)
+  return (options.bottomType == FaceJointType.Grooved)
+    and (options.bottomThickness ~= nil)
+    and (options.bottomThickness < options.thickness - 0.0001)
 end
 
 --[[  -------------- CreateBoxToolpaths --------------------------------------------------
@@ -426,11 +569,17 @@ end
 |  to skip toolpaths) create the pocket, fluting and cutout toolpaths for it.
 |
 ]]
-function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name)
+function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesToMake, converted_tool_diameter, base_sheet_name, sheet_names)
   local offset_radius = 0.5 * converted_tool_diameter - options.allowance
 
+  -- Grooved bottom thinner than the material: it has to be cut from separate stock,
+  -- so its vectors go on their own layers with their own (shallower) cutout toolpath
+  -- (and LayoutFacesOnSheets already put it on its own sheet).
+  -- Same thickness as the material -> everything stays on the normal layers as before.  -- by Claude 10/9/2026
+  local separateBottom = IsSeparateBottom(options)
+
   for sheet_num = 1, required_sheets do
-    local sheet_name = SheetNameForIndex(base_sheet_name, sheet_num)
+    local sheet_name = (sheet_names and sheet_names[sheet_num]) or SheetNameForIndex(base_sheet_name, sheet_num)
     if not SetSheet(job, sheet_name) then
       return false
     end
@@ -441,30 +590,58 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
     local jointsOnSheet = {false, false, false, false}
 
     local sheet_faces = {}
+    local main_faces = {}    -- everything cut from the full material thickness
+    local bottom_faces = {}  -- a Grooved bottom thinner than the material (own layers + own cutout depth)
+    local real_faces = {}    -- everything except the End 1 flip helper (labels, fluting)
+    local flip_faces = {}    -- End 1 flip helper: outline for reference + groove only
     for i = 1, #faces do
       if (faces[i].sheet_number or 1) == sheet_num then
         sheet_faces[#sheet_faces + 1] = faces[i]
         jointsOnSheet[faces[i].jointtype] = true
+        if not faces[i].is_flip_helper then
+          real_faces[#real_faces + 1] = faces[i]
+        end
+        if faces[i].is_flip_helper then
+          flip_faces[#flip_faces + 1] = faces[i]
+        elseif separateBottom and faces[i].facetype == FaceType.Bottom then
+          bottom_faces[#bottom_faces + 1] = faces[i]
+        else
+          main_faces[#main_faces + 1] = faces[i]
+        end
       end
     end
 
     if #sheet_faces > 0 then
       -- Original 12.3 Beta3 geometry logic, now scoped to this sheet's faces.
-      local vdcontours = GetAllProfileContours(sheet_faces)
-      local cdcontours = GetAllProfileCadContours(sheet_faces)
       local fingerSideContours = GetAllFingerSides(sheet_faces)
 
-      local cutout_cadcontours
-      if options.create_dogbones or options.dovetailJoint then
-        local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-        cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
-      else
-        local offset_contours = vdcontours:Offset(offset_radius, 0, 1, true)
-        cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
+      -- Profile vectors + tabbed cutout vectors for a group of faces on the given layers.
+      -- Returns the cutout objects (for the cutout toolpath), or nil if the group is empty.
+      local function AddProfileAndCutoutVectors(group_faces, profile_layer, cutout_layer)
+        if #group_faces == 0 then
+          return nil
+        end
+        local vdcontours = GetAllProfileContours(group_faces)
+        local cdcontours = GetAllProfileCadContours(group_faces)
+        local cutout_cadcontours
+        if options.create_dogbones or options.dovetailJoint then
+          local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
+          cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+        else
+          local offset_contours = vdcontours:Offset(offset_radius, 0, 1, true)
+          cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
+        end
+        AddCadListToJob(job, cdcontours, profile_layer)
+        return AddCadListToJob(job, cutout_cadcontours, cutout_layer)
       end
 
-      AddCadListToJob(job, cdcontours, G_boxLayerName)
-      local cutout_objects = AddCadListToJob(job, cutout_cadcontours, G_cutoutLayerName)
+      local cutout_objects = AddProfileAndCutoutVectors(main_faces, G_boxLayerName, G_cutoutLayerName)
+      local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, G_bottomLayerName, G_bottomCutoutLayerName)
+
+      -- End 1 flip helper: outline only as a placement reference, no cutout
+      if #flip_faces > 0 then
+        AddCadListToJob(job, GetAllProfileCadContours(flip_faces), G_flipOutlineLayerName)
+      end
 
       if not options.create_dogbones and not options.dovetailJoint then
         local finger_side_objects = {}
@@ -484,13 +661,15 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       end
 
       if options.label_faces then
-        AddPartsLabelsToJob(job, sheet_faces, G_labelsLayerName, options.thickness)
+        if #real_faces > 0 then
+          AddPartsLabelsToJob(job, real_faces, G_labelsLayerName, options.thickness)
+        end
       end
 
       local fluting_objects = nil
-      if options.dovetailJoint then
+      if options.dovetailJoint and #real_faces > 0 then
         fluting_objects = AddFlutingVectorsForFaces(
-          job, sheet_faces, FLUTE_LAYER_NAME, options.tool)
+          job, real_faces, FLUTE_LAYER_NAME, options.tool)
       end
 
       if (not options.no_toolpath) then
@@ -502,48 +681,47 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         end
 
         -- Grooved (slide-in) bottom: the groove geometry lives on Side1/Side2/End1,
-        -- not on the Bottom face itself, so check this sheet's own faces directly
-        -- rather than jointsOnSheet (which only tracks the Bottom/Lid face's joint
-        -- type and could miss a sheet split across multiple material sheets).  -- by Claude 9/18/2026
-        local has_bottom_grooves = false
-        for i = 1, #sheet_faces do
-          if sheet_faces[i].groove_contours ~= nil then
-            has_bottom_grooves = true
-            break
-          end
-        end
-        if has_bottom_grooves then
-          CreateGroovePocketToolpath(job, options, sheet_faces, options.tool, "Bottom Groove")
-        end
+        -- not on the Bottom face itself, so this goes by what this sheet's own
+        -- faces actually carry rather than by jointsOnSheet (which only tracks the
+        -- Bottom/Lid face's joint type and could miss a sheet split across multiple
+        -- material sheets). Both of these now no-op on their own when this sheet
+        -- carries no such bands, so there's no pre-scan to do here.
+        -- by Claude 9/18/2026, pre-scans folded into the toolpath helper 10/9/2026
+        CreateGroovePocketToolpath(job, options, sheet_faces, options.tool, "Bottom Groove")
 
         -- "Bottom aus gleichem Material": rabbet (Falz) milled along the bottom
         -- panel's own Side 1/Side 2/End 1 edges, separate pass from the wall
         -- grooves above since it's cut to a different depth.  -- by Claude 9/21/2026
-        local has_bottom_rabbet = false
-        for i = 1, #sheet_faces do
-          if sheet_faces[i].rabbet_contours ~= nil then
-            has_bottom_rabbet = true
-            break
-          end
-        end
-        if has_bottom_rabbet then
-          CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
-        end
+        CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
 
-        if options.dovetailJoint then
+        if options.dovetailJoint and fluting_objects ~= nil then
           if SelectExactObjects(job, fluting_objects) then
             CreateFlutingToolpath(
               "Fluting Dovetails", 0.0, options.thickness, options.tool)
           end
         end
 
-        CreateCutoutToolpath(
-          options.tool,
-          job,
-          options.thickness,
-          options.sideOrAllTabWidth,
-          G_cutoutLayerName,
-          cutout_objects)
+        if cutout_objects ~= nil then
+          CreateCutoutToolpath(
+            options.tool,
+            job,
+            options.thickness,
+            options.sideOrAllTabWidth,
+            G_cutoutLayerName,
+            cutout_objects)
+        end
+
+        -- Thinner bottom panel: separate cutout, only as deep as the bottom is thick
+        if bottom_cutout_objects ~= nil then
+          CreateCutoutToolpath(
+            options.tool,
+            job,
+            options.bottomThickness,
+            options.sideOrAllTabWidth,
+            G_bottomCutoutLayerName,
+            bottom_cutout_objects,
+            string.format("Cut Out Bottom (%g)", options.bottomThickness))
+        end
       end -- not options.no_toolpath
 
     end -- if #sheet_faces > 0 then

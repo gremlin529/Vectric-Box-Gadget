@@ -163,27 +163,65 @@ function GetAllFingerSides(faces)
   return fingerSideArray
 end
 
-function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
+--[[  -------------- CreatePocketToolpathForFaces --------------------------------------------------
+|
+|  Shared body for every "pocket a band of contours carried on the faces"
+|  toolpath: the rabbet for an inset lid/bottom, the dado grooves that capture
+|  a slide-in (Grooved) bottom, and the rabbet milled around a same-material
+|  slide-in bottom panel. Those three only ever differed in three things, so
+|  they are now thin wrappers passing them in:
+|
+|    contour_picker(face) -> the ContourGroup of pocket bands this face
+|                            carries, or nil if it carries none of this kind
+|    depth_for(face)      -> how deep this face's bands are cut; the deepest
+|                            across every matched face wins, since they all
+|                            go in a single pocket pass
+|    toolpath_name        -> names both the toolpath itself and the "select a
+|                            valid tool" prompt
+|
+|  Nothing is added to the job unless at least one band was actually harvested
+|  AND it came out with a non-zero depth, so a sheet carrying no bands of this
+|  kind no longer leaves behind an empty layer and an empty pocket pass. (Only
+|  the rabbet pass used to guard on this.)
+|
+|  Extracted from the three near-identical copies by Claude 10/9/2026
+|
+]]
+local function CreatePocketToolpathForFaces(job, options, faces, tool, layer_name,
+    toolpath_name, contour_picker, depth_for)
 
-  if not Tool_ok(tool) then
-    DisplayMessageBox("Pocket Toolpath: Please select a valid tool before continuing.")
+  -- Create cad contours from every face carrying a band of this kind, so they
+  -- can all be selected together on the one layer.
+  local cad_object_list = CadObjectList(true)
+  local cut_depth = 0
+  local band_count = 0
+  for i=1,#faces do
+    local cur_face = faces[i]
+    local band_contours = contour_picker(cur_face)
+    if (band_contours ~= nil) then
+      cut_depth = math.max(cut_depth, depth_for(cur_face) or 0)
+      local pos = band_contours:GetHeadPosition()
+      while pos ~= nil do
+        local contour
+        contour, pos = band_contours:GetNext(pos)
+        local cad_contour = CreateCadContour(contour)
+        cad_object_list:AddTail(cad_contour)
+        band_count = band_count + 1
+      end
+    end
+  end
+
+  if (band_count == 0 or cut_depth <= 0.0001) then
     return false
   end
 
-  -- first we must create cad contours from any face which has a lid and select all on that layer
-  local cad_object_list = CadObjectList(true)
-  for i=1,#faces do
-    local cur_face = faces[i]
-    if (cur_face.jointtype == FaceJointType.Inset) then
-      local pos = cur_face.inset_contours:GetHeadPosition()
-      while pos ~= nil do
-        local contour
-        contour, pos = cur_face.inset_contours:GetNext(pos)
-        local cad_contour = CreateCadContour(contour)
-        cad_object_list:AddTail(cad_contour)
-      end
-
-    end
+  -- Deliberately checked only AFTER establishing there is something to cut:
+  -- callers no longer pre-scan for their own band kind, so an unconditional
+  -- check here would pop a "select a valid tool" dialog for every pass that
+  -- has no work to do on this box at all.  -- by Claude 10/9/2026
+  if not Tool_ok(tool) then
+    DisplayMessageBox(toolpath_name .. " Toolpath: Please select a valid tool before continuing.")
+    return false
   end
 
   local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
@@ -192,7 +230,7 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
   local pos_data = ToolpathPosData()
   local pocket_data = PocketParameterData()
   pocket_data.start_depth = 0
-  pocket_data.CutDepth = 0.5*options.thickness
+  pocket_data.CutDepth = cut_depth
   pocket_data.Allowance = -options.allowance
   pocket_data.DoRaster = false
   pocket_data.DoRamping = true
@@ -204,7 +242,7 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
 
   local toolpath_manager = ToolpathManager()
   toolpath_manager:CreatePocketingToolpath(
-    "Pocket",
+    toolpath_name,
     tool,
     area_clear_tool,
     pocket_data,
@@ -212,6 +250,28 @@ function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
     geometry_selector,
     true,
     true)
+
+  return true
+end
+
+--[[  -------------- CreateInsetPocketToolpath --------------------------------------------------
+|
+|  Pocket the rabbet that lets an Inset lid or bottom drop into the box, cut to
+|  half the material thickness.
+|
+]]
+function CreateInsetPocketToolpath(job, options, faces, tool, layer_name)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Pocket",
+    function(face)
+      -- only an Inset lid/bottom carries one of these
+      if (face.jointtype == FaceJointType.Inset) then
+        return face.inset_contours
+      end
+      return nil
+    end,
+    function()
+      return 0.5*options.thickness
+    end)
 end
 
 --[[  -------------- CreateGroovePocketToolpath --------------------------------------------------
@@ -226,52 +286,13 @@ end
 |
 ]]
 function CreateGroovePocketToolpath(job, options, faces, tool, layer_name)
-
-  if not Tool_ok(tool) then
-    DisplayMessageBox("Bottom Groove Toolpath: Please select a valid tool before continuing.")
-    return false
-  end
-
-  local cad_object_list = CadObjectList(true)
-  for i=1,#faces do
-    local cur_face = faces[i]
-    if (cur_face.groove_contours ~= nil) then
-      local pos = cur_face.groove_contours:GetHeadPosition()
-      while pos ~= nil do
-        local contour
-        contour, pos = cur_face.groove_contours:GetNext(pos)
-        local cad_contour = CreateCadContour(contour)
-        cad_object_list:AddTail(cad_contour)
-      end
-    end
-  end
-
-  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
-  SelectExactObjects(job, pocket_objects)
-
-  local pos_data = ToolpathPosData()
-  local pocket_data = PocketParameterData()
-  pocket_data.start_depth = 0
-  pocket_data.CutDepth = options.bottomGrooveDepth
-  pocket_data.Allowance = -options.allowance
-  pocket_data.DoRaster = false
-  pocket_data.DoRamping = true
-  pocket_data.RampDistance = 0.3*options.height
-
-  local geometry_selector = GeometrySelector()
-
-  local area_clear_tool = nil
-
-  local toolpath_manager = ToolpathManager()
-  toolpath_manager:CreatePocketingToolpath(
-    "Bottom Groove",
-    tool,
-    area_clear_tool,
-    pocket_data,
-    pos_data,
-    geometry_selector,
-    true,
-    true)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Bottom Groove",
+    function(face)
+      return face.groove_contours
+    end,
+    function()
+      return options.bottomGrooveDepth
+    end)
 end
 
 --[[  -------------- CreateBottomRabbetToolpath --------------------------------------------------
@@ -289,58 +310,13 @@ end
 |
 ]]
 function CreateBottomRabbetToolpath(job, options, faces, tool, layer_name)
-
-  if not Tool_ok(tool) then
-    DisplayMessageBox("Bottom Rabbet Toolpath: Please select a valid tool before continuing.")
-    return false
-  end
-
-  local cad_object_list = CadObjectList(true)
-  local rabbet_depth = 0
-  for i=1,#faces do
-    local cur_face = faces[i]
-    if (cur_face.rabbet_contours ~= nil) then
-      rabbet_depth = math.max(rabbet_depth, cur_face.rabbet_depth or 0)
-      local pos = cur_face.rabbet_contours:GetHeadPosition()
-      while pos ~= nil do
-        local contour
-        contour, pos = cur_face.rabbet_contours:GetNext(pos)
-        local cad_contour = CreateCadContour(contour)
-        cad_object_list:AddTail(cad_contour)
-      end
-    end
-  end
-
-  if (rabbet_depth <= 0.0001) then
-    return false
-  end
-
-  local pocket_objects = AddCadListToJob(job, cad_object_list, layer_name)
-  SelectExactObjects(job, pocket_objects)
-
-  local pos_data = ToolpathPosData()
-  local pocket_data = PocketParameterData()
-  pocket_data.start_depth = 0
-  pocket_data.CutDepth = rabbet_depth
-  pocket_data.Allowance = -options.allowance
-  pocket_data.DoRaster = false
-  pocket_data.DoRamping = true
-  pocket_data.RampDistance = 0.3*options.height
-
-  local geometry_selector = GeometrySelector()
-
-  local area_clear_tool = nil
-
-  local toolpath_manager = ToolpathManager()
-  toolpath_manager:CreatePocketingToolpath(
-    "Bottom Rabbet",
-    tool,
-    area_clear_tool,
-    pocket_data,
-    pos_data,
-    geometry_selector,
-    true,
-    true)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Bottom Rabbet",
+    function(face)
+      return face.rabbet_contours
+    end,
+    function(face)
+      return face.rabbet_depth
+    end)
 end
 
 --[[  -------------- MakeBottomFace --------------------------------------------------
@@ -361,7 +337,7 @@ end
     local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
     local bottomGrooveDepth = options.bottomGrooveDepth
     local bottomGrooveWidth = options.bottomGrooveWidth
-    local bottomSameMaterial = options.bottomSameMaterial
+    local bottomThickness = options.bottomThickness or options.thickness  -- replaces bottomSameMaterial -- by Claude 10/9/2026
     local bottomGrooveClearance = options.bottomGrooveClearance
     local bottomRabbetDepthCorrection = options.bottomRabbetDepthCorrection
 
@@ -387,10 +363,10 @@ end
       -- optional clearance ("Luft") shortens how far the panel reaches into
       -- each of those 3 grooves, for an easier slide fit; an optional
       -- correction fine-tunes the resulting rabbet depth.        -- by Claude 9/21/2026
-      local clearance = 0
-      if (bottomSameMaterial) then
-        clearance = bottomGrooveClearance or 0
-      end
+      -- 10/9/2026: "same material" is now a free Bottom Thickness (default = material
+      -- thickness). The clearance always applies; the rabbet only where the panel is
+      -- thicker than the groove width.                          -- by Claude 10/9/2026
+      local clearance = bottomGrooveClearance or 0
       local reach = math.max(0, groove_depth - clearance)
 
       local blc = start_point + Vector2D(thickness - reach, thickness - reach)
@@ -415,8 +391,8 @@ end
 
       local rabbet_contours = nil
       local rabbet_depth = 0
-      if (bottomSameMaterial) then
-        rabbet_depth = math.max(0, thickness - groove_width + (bottomRabbetDepthCorrection or 0))
+      if (bottomThickness - groove_width > 0.0001) then
+        rabbet_depth = math.max(0, bottomThickness - groove_width + (bottomRabbetDepthCorrection or 0))
         -- The rabbet band's width is the full groove_depth, NOT "reach" (which is
         -- groove_depth minus the lateral clearance/"Luft"). The clearance only
         -- pulls the panel's own tip back a bit for an easier slide fit - it must
@@ -425,32 +401,36 @@ end
         if (rabbet_depth > 0.0001 and groove_depth > 0.0001) then
           rabbet_contours = ContourGroup(true)
 
-          -- Left edge band
-          local r1 = Contour(0.0)
-          r1:AppendPoint(Point2D(blc.x, blc.y))
-          r1:LineTo(Point2D(blc.x + groove_depth, blc.y))
-          r1:LineTo(Point2D(blc.x + groove_depth, blc.y + panel_depth))
-          r1:LineTo(Point2D(blc.x, blc.y + panel_depth))
-          r1:LineTo(Point2D(blc.x, blc.y))
-          rabbet_contours:AddTail(r1)
-
-          -- Right edge band
-          local r2 = Contour(0.0)
-          r2:AppendPoint(Point2D(blc.x + panel_width - groove_depth, blc.y))
-          r2:LineTo(Point2D(blc.x + panel_width, blc.y))
-          r2:LineTo(Point2D(blc.x + panel_width, blc.y + panel_depth))
-          r2:LineTo(Point2D(blc.x + panel_width - groove_depth, blc.y + panel_depth))
-          r2:LineTo(Point2D(blc.x + panel_width - groove_depth, blc.y))
-          rabbet_contours:AddTail(r2)
-
-          -- Front edge band
-          local r3 = Contour(0.0)
-          r3:AppendPoint(Point2D(blc.x, blc.y))
-          r3:LineTo(Point2D(blc.x + panel_width, blc.y))
-          r3:LineTo(Point2D(blc.x + panel_width, blc.y + groove_depth))
-          r3:LineTo(Point2D(blc.x, blc.y + groove_depth))
-          r3:LineTo(Point2D(blc.x, blc.y))
-          rabbet_contours:AddTail(r3)
+          -- One U-shaped band along Left, Front and Right (Back stays full thickness).
+          -- Was three overlapping rectangles before, but VCarve's pocketing does not
+          -- cope with overlapping vectors and dropped the Front band.  -- by Claude 10/9/2026
+          --
+          -- The rabbet sits on the panel's open edge, so the band reaches one tool
+          -- diameter OUT past the panel (and past its Back edge) into the waste
+          -- around it: any bit then fits, however narrow the groove depth, and the
+          -- rabbet's inner edge (the only edge that matters) is still exactly at
+          -- groove_depth. The extra cut only removes waste the cutout takes away
+          -- anyway; parts are spaced at least 2 tool diameters apart.  -- by Claude 10/9/2026
+          local ext = thickness
+          if Tool_ok(options.tool) then
+            ext = ConvertUnitsFrom(options.tool.ToolDia, options.tool, MaterialBlock())
+          end
+          local x0 = blc.x
+          local x1 = blc.x + panel_width
+          local y0 = blc.y                  -- Front edge
+          local y1 = blc.y + panel_depth    -- Back edge
+          local g  = groove_depth
+          local band = Contour(0.0)
+          band:AppendPoint(Point2D(x0 - ext, y0 - ext))
+          band:LineTo(Point2D(x1 + ext, y0 - ext))
+          band:LineTo(Point2D(x1 + ext, y1 + ext))
+          band:LineTo(Point2D(x1 - g, y1 + ext))
+          band:LineTo(Point2D(x1 - g, y0 + g))
+          band:LineTo(Point2D(x0 + g, y0 + g))
+          band:LineTo(Point2D(x0 + g, y1 + ext))
+          band:LineTo(Point2D(x0 - ext, y1 + ext))
+          band:LineTo(Point2D(x0 - ext, y0 - ext))
+          rabbet_contours:AddTail(band)
         end
       end
 
@@ -1015,8 +995,14 @@ end
     -- cut at Front's edges - rather than relocate it, skip cutting it
     -- altogether when dovetails are selected, per the user's own machining
     -- experience with this setting.                              -- by Claude 9/19/2026
+    -- 10/9/2026: optional "End 1 groove on own sheet" (dovetails only): the groove is
+    -- still built here, but handed back as flip_groove_contours instead - the main
+    -- lua turns it into a mirrored helper part on a sheet of its own, so End 1 can be
+    -- turned over and the groove cut into its inside face.     -- by Claude 10/9/2026
     local groove_contours = nil
-    if (bottomType == FaceJointType.Grooved and is_end1 and not dovetailJoint) then
+    local flip_groove_contours = nil
+    local wantFlipGroove = dovetailJoint and options.bottomFrontGrooveFlip
+    if (bottomType == FaceJointType.Grooved and is_end1 and ((not dovetailJoint) or wantFlipGroove)) then
       local groove_width = bottomGrooveWidth or thickness
       -- bottomGrooveOffset measures up to the groove's TOP edge, so the
       -- pocket's bottom edge sits one groove-width below that. -- by Claude 9/21/2026
@@ -1034,8 +1020,13 @@ end
       groove:LineTo(Point2D(groove_x1, groove_y0 + groove_width))
       groove:LineTo(Point2D(groove_x0, groove_y0 + groove_width))
       groove:LineTo(Point2D(groove_x0, groove_y0))
-      groove_contours = ContourGroup(true)
-      groove_contours:AddTail(groove)
+      if dovetailJoint then
+        flip_groove_contours = ContourGroup(true)
+        flip_groove_contours:AddTail(groove)
+      else
+        groove_contours = ContourGroup(true)
+        groove_contours:AddTail(groove)
+      end
     end
 
     -- Gremlin added doevtail seperation for different sizes
@@ -1167,7 +1158,9 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
+    local end_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
+    end_face.flip_groove_contours = flip_groove_contours  -- dovetail End 1 groove for its own (flip) sheet -- by Claude 10/9/2026
+    return end_face
   end
 
   -- Splits a comma‑separated string into a numeric array.
