@@ -58,6 +58,95 @@
     end
   end
 
+-- "Side Overhang" + Grooved bottom combined: a Grooved End 2 is genuinely
+-- shorter than the reference corner height (its material starts at the top
+-- of the groove, not the true bottom). The finger PITCH must stay identical
+-- to every other corner (same tab_space/min_width), so the shortfall is
+-- trimmed off right next to the groove - shrinking/dropping flaps only at
+-- that one end of the sequence - rather than recomputing a different
+-- (mismatched) pitch for the whole edge, which was the actual bug: End 2's
+-- own tabs came out a different size than the corner Side 1/Side 2 cut for
+-- it.                                                              -- by Claude 9/19/2026
+  function ComputeFingerTrim(num_flaps, tab_space, min_width, shortfall)
+    local n = num_flaps
+    local remaining = shortfall or 0
+    -- Drop a whole flap+gap unit whenever what's left over would eat into the
+    -- flap that follows it (remaining > tab_space) - not only when a WHOLE
+    -- extra flap+gap is available to drop (the old "remaining >= tab_space +
+    -- min_width" test). A shortfall bigger than one gap but smaller than a
+    -- full flap+gap unit used to fall through untouched, clamping edge_gap to
+    -- 0 below and silently discarding the difference (tab_space - remaining,
+    -- a negative number thrown away by math.max) instead of accounting for
+    -- it - corrupting the pattern by exactly that amount. That was the real
+    -- bug behind "Zinken sind um X mm verschoben"/mis-sized tabs whenever the
+    -- groove offset+width landed in that gap.                    -- by Claude 9/20/2026
+    while remaining > (tab_space + 0.0001) and n > 0 do
+      remaining = remaining - (tab_space + min_width)
+      n = n - 1
+    end
+    local edge_gap = math.max(0, tab_space - remaining)
+    return n, edge_gap
+  end
+
+-- Like AddFemaleDoveTailsAlongLine, but the gap AFTER the last flap uses
+-- `last_space_dist` instead of the uniform `space_dist` - for trimming the
+-- end of the sequence that is drawn last (see ComputeFingerTrim above).
+-- by Claude 9/19/2026
+  function AddFemaleDoveTailsAlongLineTrimEnd(thickness, dovetail, along, out, contour, num_tails, space_dist, last_space_dist,
+                                                markers, flute_sockets, fingerSides)
+    if num_tails <= 0 then return end
+    if num_tails > 1 then
+      AddFemaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails - 1, space_dist, markers, flute_sockets, fingerSides)
+    end
+    local start_pos = contour.EndPoint2D
+    AddFemaleDoveTail(thickness, dovetail.min_width, out, along, contour)
+    if markers then
+      markers[#markers + 1] = MakeLine(start_pos, contour.EndPoint2D)
+    end
+    if flute_sockets then
+      local end_pos = contour.EndPoint2D
+      flute_sockets[#flute_sockets + 1] = {
+        start_pt  = Point2D(start_pos.x, start_pos.y),
+        end_pt    = Point2D(end_pos.x, end_pos.y),
+        along     = Vector2D(along.x, along.y),
+        out       = Vector2D(out.x, out.y),
+        thickness = thickness,
+        angle     = dovetail.angle
+      }
+    end
+    if fingerSides then
+      local end_vector = thickness*out
+      local end_pt = Point2D(start_pos.x + end_vector.x, start_pos.y + end_vector.y)
+      fingerSides:AddTail(MakeLine(start_pos, end_pt))
+      local second_side_start = Point2D(end_pt.x + dovetail.min_width*along.x, end_pt.y + dovetail.min_width*along.y)
+      local second_side_end = Point2D(second_side_start.x - end_vector.x, second_side_start.y - end_vector.y)
+      fingerSides:AddTail(MakeLine(second_side_start, second_side_end))
+    end
+    LineToVector(contour, last_space_dist*along)
+  end
+
+-- Like AddFlapsAlongLine, but the gap after the last flap uses
+-- `last_space_dist` instead of the uniform `space_dist`.           -- by Claude 9/19/2026
+  function AddFlapsAlongLineTrimEnd(flap_height, flap_width, space_dist, last_space_dist, along, out, contour, num_flaps, fingerSides)
+    if num_flaps <= 0 then return end
+    if num_flaps > 1 then
+      AddFlapsAlongLine(flap_height, flap_width, space_dist, along, out, contour, num_flaps - 1, fingerSides)
+    end
+    AddFemaleDoveTail(flap_height, flap_width, out, along, contour, fingerSides)
+    LineToVector(contour, last_space_dist*along)
+  end
+
+-- Like AddMaleDoveTailsAlongLine, but the gap after the last tail uses
+-- `last_space_dist` instead of the uniform `space_dist`.           -- by Claude 9/19/2026
+  function AddMaleDoveTailsAlongLineTrimEnd(thickness, dovetail, along, out, contour, num_tails, space_dist, last_space_dist)
+    if num_tails <= 0 then return end
+    if num_tails > 1 then
+      AddMaleDoveTailsAlongLine(thickness, dovetail, along, out, contour, num_tails - 1, space_dist)
+    end
+    AddMaleDoveTail(thickness, dovetail.max_width, out, along, dovetail.angle, contour)
+    LineToVector(contour, last_space_dist*along)
+  end
+
   function AddMaleDoveTail(thickness, max_dovetail_width, out, along, angle, contour)
     local along_dist  = (thickness/ math.tan(angle))
     local diag_vector = (-along_dist)*along + thickness*out
@@ -196,16 +285,47 @@
         bisector:Normalize()
 
         local shift = radius / math.sin(0.5*corner_angle)
-        local sharp = vertex + (-shift)*bisector
 
-        AddPoint(sharp)
+        -- A pure miter join is exact, but it stretches further from the
+        -- vertex the MILDER (more open) the turn is - shift grows without
+        -- bound as corner_angle shrinks toward 0 (a nearly-straight bend).
+        -- Every corner this function used to see was a sharp turn (90-degree
+        -- box corners, ~100-degree dovetail tips), so shift always stayed
+        -- close to 1-1.5x the tool radius and this never mattered. The Side
+        -- Overhang chamfer is different: it splits its own corner into two
+        -- new convex turns of corner_angle and (90-corner_angle) - and even
+        -- the friendly 45/45 default is only a 45-degree turn, giving shift =
+        -- radius/sin(22.5) = 2.6x the tool radius (more than a full tool
+        -- WIDTH past the true corner, instead of the expected half-width) -
+        -- growing further still for shallower chamfer angles. This is what
+        -- was showing up in VCarve as an oversized gap/spike in the CutOut
+        -- toolpath right at the chamfer, on every Side Overhang test
+        -- regardless of angle chosen. Past MITER_LIMIT, bevel the corner
+        -- instead: stop each edge's own offset line exactly `radius` away
+        -- (perpendicular to that edge) from the true vertex and join those
+        -- two points directly, rather than extending both out to their
+        -- (possibly very distant) sharp intersection. Only convex corners
+        -- need this - every concave corner in this codebase comes from a
+        -- box/dovetail joint, always a sharp near-90-degree turn.
+        -- by Claude 9/26/2026
+        local MITER_LIMIT = 2.5
+        if (cross > 0 and shift > MITER_LIMIT*radius) then
+          local normal_in  = Vector2D(dir_in.y, -dir_in.x)
+          local normal_out = Vector2D(dir_out.y, -dir_out.x)
+          AddPoint(vertex + radius*normal_in)
+          AddPoint(vertex + radius*normal_out)
+        else
+          local sharp = vertex + (-shift)*bisector
 
-        if cross < 0 then
-          -- Concave corner: splice in the dogbone relief, poking further
-          -- into the material past the sharp corner, then back out.
-          local dogbone_tip = sharp + (shift - radius)*bisector
-          result:LineTo(dogbone_tip)
-          result:LineTo(sharp)
+          AddPoint(sharp)
+
+          if cross < 0 then
+            -- Concave corner: splice in the dogbone relief, poking further
+            -- into the material past the sharp corner, then back out.
+            local dogbone_tip = sharp + (shift - radius)*bisector
+            result:LineTo(dogbone_tip)
+            result:LineTo(sharp)
+          end
         end
       end
     end
