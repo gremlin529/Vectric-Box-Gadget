@@ -42,7 +42,7 @@
           </div>
           <div class="field-row" title="Top to bottom height of the box outside">
             <label for="HeightField">Height</label>
-            <input type="number" step="any" id="HeightField" placeholder="Height of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
           </div>
           <div class="field-row" id="showHideDovetailAngle" style="display: none" title="Angle of the dovetail joint, between 45 and 85 degrees">
             <label for="DovetailAngleField">Dovetail Angle</label>
@@ -148,6 +148,7 @@
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
             <option value="None">None</option>
+            <option value="OpenChamfer">Open Chamfer</option>
           </select>
           <div class="type-dropdown-preview">
             <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
@@ -160,20 +161,134 @@
       <div class="type-panel">
         <div class="type-panel-header">Bottom Type</div>
         <div class="type-dropdown-content">
-          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)">
+          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" title="&#10;Grooved: a dado groove is cut into Side 1, Side 2 and End 1 near the bottom edge so a flat bottom panel can be slid in from the open End 2 before it is glued on." style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
             <option value="Inset">Inset</option>
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
             <option value="None">None</option>
+            <option value="Grooved">Grooved</option>
           </select>
           <div class="type-dropdown-preview">
             <img id="BottomTypeImage" src="Images/InsetBottom.png" alt="Bottom type preview" />
           </div>
         </div>
-
       </div>
     </div>
 
+  </div>
+
+  <!-- ── Open Chamfer Options (Side Overhang) ──────────────────────
+       Only shown when Lid Type = Open Chamfer, regardless of Bottom Type. Front/Back
+       heights and chamfer angles can each be set below the box height, tapered
+       by a chamfer. Shares the groove sketch, same as the Grooved options.
+                                                               -- by Claude 10/6/2026 -->
+  <div class="section-header" id="showHideOpenChamferSectionHeader" style="display: none;">Open Chamfer Options</div>
+  <div class="card" id="showHideOpenChamferOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Side Overhang: Front &amp; Back can each get their own height below the box height, tapered by a chamfer. Only available with Lid Type = Open Chamfer (a lidless box with chamfered Front and Back).</div>
+
+      <!-- Backside (left) and Frontside (right) fields in the same grey-blue sub-panel / field-row
+           style as Box Dimensions etc. above, with the sketch in between. Using the shared field-row
+           CSS also gives the inputs a fixed font size instead of the system default (which looked
+           oversized on some machines). Plain 3-column table, no absolute positions, so it scales with
+           the Zoom Level like the rest of the dialog. Sketch: ChamferedTop_276.png (276x117).
+                                                                         -- by Claude 10/9/2026 -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Backside</div>
+              <div class="field-row" title="Angle of Back (End 2)'s own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
+                <label for="End2ChamferAngleField">Chamfer Angle</label>
+                <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Height of Back (End 2). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+                <label for="End2HeightField">Height</label>
+                <input type="number" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+            </div>
+          </td>
+          <td style="vertical-align: middle; padding: 0 6px;">
+            <img src="Images/ChamferedTop_276.png" alt="Sketch: Chamfer Angle, Height" />
+          </td>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Frontside</div>
+              <div class="field-row" title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
+                <label for="End1ChamferAngleField">Chamfer Angle</label>
+                <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+                <label for="End1HeightField">Height</label>
+                <input type="number" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+      <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center;" id="SideOverhangComputedText"></div>
+    </div>
+  </div>
+
+  <!-- ── Grooved Bottom Options ───────────────────────────────────
+       Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
+  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
+  <div class="card" id="showHideGrooveOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Side 1, Side 2 &amp; End 1 (with Dovetail joints, End 1's groove has to be cut from its other side - tick "Reverse End 1 (Front) for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). End 2 is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+
+      <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
+           field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
+           absolute positions (those did not survive IE's Zoom Level and lost their labels), so it
+           scales like the rest of the dialog. Panels are 245px wide like the geometry columns.
+                                                                         -- by Claude 10/9/2026 -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Bottom Panel</div>
+              <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Side 1, Side 2 and End 1 edges down to the groove width, so it still seats in the groove; End 2's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
+                <label for="BottomThicknessField">Bottom Thickness</label>
+                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (bottom thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the bottom is thicker than the groove width (i.e. a rabbet is milled).">
+                <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
+                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Side 1, Side 2, End 1), for an easier slide fit.">
+                <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
+                <input type="number" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              </div>
+            </div>
+          </td>
+          <td style="vertical-align: middle; padding: 0 20px;">
+            <img src="Images/GroovedOverhangSketch_174.png" alt="Sketch: Side, Chamfer Angle, Height, Groove offset, Groove width, Groove depth, rabbet correction, Bottom Clearance" />
+          </td>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Groove</div>
+              <div class="field-row" title="Width of the groove slot (vertical height of the dado), independent of material thickness - set this to the actual thickness of the bottom panel you'll slide in, e.g. 4mm for a thin plywood/hardboard bottom. If 'Same material' is checked, set this to whatever width you want the rabbeted edge to seat at (can be smaller than the material thickness).">
+                <label for="BottomGrooveWidthField">Groove width</label>
+                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="How deep the groove is plowed into Side 1, Side 2 and End 1 (must be less than the material thickness)">
+                <label for="BottomGrooveDepthField">Groove depth</label>
+                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Distance from the outer bottom edge of the walls up to the TOP of the groove that captures the bottom panel (must be at least the groove width)">
+                <label for="BottomGrooveOffsetField">Groove offset</label>
+                <input type="number" step="any" id="BottomGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              </div>
+              <div class="checkbox-row" id="showHideFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: End 1's groove has to go into the face that lies on the spoilboard when End 1 is cut. When checked, an extra sheet 'End 1 Groove (flipped)' is created: turn the cut End 1 over (left/right), stand it upright with its bottom edge against the left (X0) stop and push it into the sheet's lower left corner (against the Y0 stop) and run the groove toolpath there. The outline on that sheet is for reference only.">
+                <input type="checkbox" class="LuaButton" id="BottomFrontGrooveFlip" />
+                <label for="BottomFrontGrooveFlip">Reverse End 1 (Front) for groove on own sheet</label>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+      <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center; margin-top: 6px;" id="BottomRabbetInfoText"></div>
+    </div>
   </div>
 
   <!-- ── Tools ─────────────────────────────────────────────────────────── -->
@@ -215,10 +330,10 @@
     <div class="card-body clearfix">
       <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
       <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Side 1</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Side 2</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />End 1</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />End 2</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
       <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
         <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
     </div>
@@ -267,9 +382,14 @@
     <input type="text" id="InvalidHeight" value=""/>
     <input type="text" id="InvalidDovetailAngle" value=""/>
     <input type="text" id="InvalidAllowance" value=""/>
+    <input type="text" id="InvalidEnd1Height" value=""/>
+    <input type="text" id="InvalidEnd2Height" value=""/>
+    <input type="text" id="InvalidEnd1ChamferAngle" value=""/>
+    <input type="text" id="InvalidEnd2ChamferAngle" value=""/>
     <input type="text" id="InvalidSideJointWidth" value=""/>
     <input type="text" id="InvalidLidJointWidth" value=""/>
     <input type="text" id="InvalidBottomJointWidth" value=""/>
+    <input type="text" id="InvalidBottomGrooveWidth" value=""/>
   </fieldset>
 
 
@@ -303,6 +423,44 @@
     } else {
       document.body.className = document.body.className.replace(" dark-mode", "").replace("dark-mode", "");
     }
+    applyThemedLabelColors(checkbox.checked);
+  }
+
+  // Labels that carry the colour of their dimension in the sketch (blue). The dark
+  // text colours are hard to read on the dark background, so each gets a lighter variant
+  // there: [light mode, dark mode]. Plain DOM calls only, so it stays IE7-safe.
+  // -- by Claude 10/7/2026
+  var g_themedLabels = {
+    "BottomGrooveClearanceField":  ["#1155A2", "#7DB4F5"],
+    "BottomRabbetCorrectionField": ["#1155A2", "#7DB4F5"]
+  };
+  function applyThemedLabelColors(isDark) {
+    var labels = document.getElementsByTagName("label");
+    for (var i = 0; i < labels.length; i++) {
+      var colors = g_themedLabels[labels[i].htmlFor];
+      if (colors) { labels[i].style.color = isDark ? colors[1] : colors[0]; }
+    }
+  }
+
+  // Shows or hides a section header and its card together, so the header never
+  // shows on its own. Only uses getElementById and style, so it stays IE7-safe.
+  // -- by Claude 10/6/2026
+  function setSectionVisible(headerId, bodyId, visible) {
+    var header = document.getElementById(headerId);
+    var body = document.getElementById(bodyId);
+    var display = visible ? "block" : "none";
+    if (header) { header.style.display = display; }
+    if (body) { body.style.display = display; }
+  }
+
+  // Lid Type dropdown option indexes (see LidTypeSelect). Only Open Chamfer
+  // allows Side Overhang; None is a plain open box without it.
+  var LID_INDEX_NONE = 3;
+  var LID_INDEX_OPEN_CHAMFER = 4;
+
+  // True for either lid type that leaves the top of the box open.
+  function isOpenLidIndex(index) {
+    return index === LID_INDEX_NONE || index === LID_INDEX_OPEN_CHAMFER;
   }
 
   // Lid type changes which faces validation even looks at (cuttingLidJoint
@@ -313,7 +471,7 @@
     var selectedIndex = select ? select.selectedIndex : 0;
 
     var imgFiles = ["Images/InsetLid.png", "Images/tabbedlid.png",
-                    "Images/FlatLid.png",  ""];
+                    "Images/FlatLid.png",  "", "Images/ChamferLid.png"];
     var img = document.getElementById("LidTypeImage");
     if (img) {
       var src = imgFiles[selectedIndex] || "";
@@ -324,19 +482,101 @@
     var lidJointRow = document.getElementById("showHideLidJointWidth");
     if (lidJointRow) { lidJointRow.style.display = (selectedIndex === 1) ? "block" : "none"; }
 
+    // Both open lid types (None and Open Chamfer) have no lid to make.
     var lidCheckItem = document.getElementById("MakeLidCheckItem");
-    if (lidCheckItem) { lidCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
+    if (lidCheckItem) { lidCheckItem.style.display = isOpenLidIndex(selectedIndex) ? "none" : "block"; }
 
+    // Open Chamfer options (Side Overhang) only apply with Lid Type = Open Chamfer.
+    setSectionVisible("showHideOpenChamferSectionHeader", "showHideOpenChamferOptions", selectedIndex === LID_INDEX_OPEN_CHAMFER);
+
+    onSideOverhangFieldsChanged();
     onGeometryFieldChanged();
   }
 
+  // Side Overhang (End 1/End 2 height + chamfer) only makes sense with Lid Type =
+  // Open Chamfer (ValidateOpenChamferOptions on the Lua side rejects it otherwise)
+  // - rather than let the user set it up and only find out on OK, lock Front/Back
+  // height to the box height and greyed out (no overhang possible) for any other
+  // Lid Type, same for the chamfer angle fields. Called on every Lid Type change
+  // and on init, so the lock is always in sync.  -- by Claude 9/26/2026, 10/6/2026
+  function updateSideOverhangLidLock() {
+    var lidSelect = document.getElementById("LidTypeSelect");
+    var heightEl = document.getElementById("HeightField");
+    var end1HeightEl = document.getElementById("End1HeightField");
+    var end2HeightEl = document.getElementById("End2HeightField");
+    var end1ChamferEl = document.getElementById("End1ChamferAngleField");
+    var end2ChamferEl = document.getElementById("End2ChamferAngleField");
+    if (!lidSelect || !heightEl || !end1HeightEl || !end2HeightEl) { return; }
+
+    var overhangLocked = lidSelect.selectedIndex !== LID_INDEX_OPEN_CHAMFER;
+
+    if (overhangLocked) {
+      end1HeightEl.value = heightEl.value;
+      end2HeightEl.value = heightEl.value;
+    }
+    end1HeightEl.disabled = overhangLocked;
+    end2HeightEl.disabled = overhangLocked;
+    if (end1ChamferEl) { end1ChamferEl.disabled = overhangLocked; }
+    if (end2ChamferEl) { end2ChamferEl.disabled = overhangLocked; }
+  }
+
+  // Shows the resulting overhang(s) (Height - End height) as the user types, purely
+  // informational - the Lua side does the real calculation and validation. Front and
+  // Back can now each have their own End height, so each gets its own reading, only
+  // shown when that side actually has an overhang.                -- by Claude 9/20/2026
+  function onSideOverhangFieldsChanged() {
+    updateSideOverhangLidLock();
+
+    var heightEl = document.getElementById("HeightField");
+    var end1HeightEl = document.getElementById("End1HeightField");
+    var end2HeightEl = document.getElementById("End2HeightField");
+    var out = document.getElementById("SideOverhangComputedText");
+    if (!out || !heightEl || !end1HeightEl || !end2HeightEl) { return; }
+    var height = parseFloat(heightEl.value);
+    var end1Height = parseFloat(end1HeightEl.value);
+    var end2Height = parseFloat(end2HeightEl.value);
+    var parts = [];
+    if (isFinite(height) && isFinite(end1Height) && (height - end1Height) > 0.0001) {
+      parts.push("Front " + (height - end1Height).toFixed(2));
+    }
+    if (isFinite(height) && isFinite(end2Height) && (height - end2Height) > 0.0001) {
+      parts.push("Back " + (height - end2Height).toFixed(2));
+    }
+    out.textContent = parts.length ? ("→ Overhang: " + parts.join(", ")) : "";
+  }
+
   // Same reasoning as onLidTypeChanged, for the bottom.
+  // Live hint under the Grooved Bottom fields: how deep the rabbet will be, or - for a
+  // bottom that is not thicker than the groove - that no rabbet is milled and how much
+  // play it has. Purely informational, the Lua side does the real calculation. Uses
+  // innerHTML (numbers only) since IE7 has no textContent.     -- by Claude 10/9/2026
+  function updateBottomRabbetInfo() {
+    var out = document.getElementById("BottomRabbetInfoText");
+    var tEl = document.getElementById("BottomThicknessField");
+    var wEl = document.getElementById("BottomGrooveWidthField");
+    var cEl = document.getElementById("BottomRabbetCorrectionField");
+    if (!out || !tEl || !wEl) { return; }
+    var t = parseFloat(tEl.value);
+    var w = parseFloat(wEl.value);
+    var c = cEl ? parseFloat(cEl.value) : 0;
+    if (!isFinite(c)) { c = 0; }
+    if (!isFinite(t) || !isFinite(w)) { out.innerHTML = ""; return; }
+    var diff = t - w;
+    if (diff > 0.0001) {
+      out.innerHTML = "Rabbet depth " + Math.max(0, diff + c).toFixed(2) + " (bottom thickness - groove width + rabbet correction)";
+    } else if (diff > -0.0001) {
+      out.innerHTML = "Bottom thickness equals the groove width - no rabbet needed.";
+    } else {
+      out.innerHTML = "Bottom is " + (-diff).toFixed(2) + " thinner than the groove width - no rabbet, it will have that much play in the groove. Reduce the groove width if that is too loose.";
+    }
+  }
+
   function onBottomTypeChanged(el) {
     var select = document.getElementById("BottomTypeSelect");
     var selectedIndex = select ? select.selectedIndex : 0;
 
     var imgFiles = ["Images/InsetBottom.png", "Images/tabbedbottom.png",
-                    "Images/FlatBottom.png",  "" ];
+                    "Images/FlatBottom.png",  "", "" ];
     var img = document.getElementById("BottomTypeImage");
     if (img) {
       var src = imgFiles[selectedIndex] || "";
@@ -349,6 +589,21 @@
 
     var bottomCheckItem = document.getElementById("MakeBottomCheckItem");
     if (bottomCheckItem) { bottomCheckItem.style.display = (selectedIndex === 3) ? "none" : "block"; }
+
+    // Grooved (slide-in) bottom: index 4 -- by Claude 9/18/2026
+    setSectionVisible("showHideGrooveSectionHeader", "showHideGrooveOptions", selectedIndex === 4);
+
+    // For a Grooved bottom, unchecking "Bottom" still cuts the slide-in groove into
+    // Side 1, Side 2 & End 1 (and still shortens End 2) - it only skips cutting the
+    // bottom panel itself, e.g. when you want to slide in your own material (glass,
+    // a different thickness, ...) instead of the one the gadget would cut. -- by Claude 9/18/2026
+    if (bottomCheckItem) {
+      if (selectedIndex === 4) {
+        bottomCheckItem.title = "Uncheck to skip cutting the bottom panel while still cutting the slide-in groove into Side 1, Side 2 & End 1 (and still shortening End 2) - useful if you want to slide in your own bottom material instead of the one this gadget would cut.";
+      } else {
+        bottomCheckItem.title = "Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type";
+      }
+    }
 
     onGeometryFieldChanged();
   }
@@ -374,7 +629,12 @@
     "InvalidAllowance":        "AllowanceField",
     "InvalidSideJointWidth":   "SideTabWidthField",
     "InvalidLidJointWidth":    "TopTabWidthField",
-    "InvalidBottomJointWidth": "BottomTabWidthField"
+    "InvalidBottomJointWidth": "BottomTabWidthField",
+    "InvalidEnd1Height":       "End1HeightField",
+    "InvalidEnd2Height":       "End2HeightField",
+    "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
+    "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
+    "InvalidBottomGrooveWidth": "BottomGrooveWidthField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -476,6 +736,10 @@
     var dovetailAngleRow = document.getElementById("showHideDovetailAngle");
     if (dovetailAngleRow) { dovetailAngleRow.style.display = isBoxJoint ? "none" : "block"; }
 
+    // End 1 groove on its own (flip) sheet - dovetails only
+    var flipRow = document.getElementById("showHideFrontGrooveFlip");
+    if (flipRow) { flipRow.style.display = isBoxJoint ? "none" : "block"; }
+
     updateRoundoverToolVisibility();
     onGeometryFieldChanged();
   }
@@ -519,6 +783,7 @@
     if (bottomSelect) {
       onBottomTypeChanged(bottomSelect);
     }
+    updateBottomRabbetInfo();
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

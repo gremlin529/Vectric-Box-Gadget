@@ -714,6 +714,70 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   return bottom_message == "" and lid_message == "" and side_message == "" and allowance_message == ""
 end
 
+--[[  -------------- ValidateBottomGrooveToolFit --------------------------------------------------
+|
+|  The dado grooves that capture a Grooved (slide-in) bottom are pocketed into
+|  Side 1, Side 2 and End 1 as closed slots only as wide as the groove WIDTH.
+|  A cutter wider than that has nowhere to go: the pocket comes out empty, the
+|  walls get no groove at all and the bottom can't be slid in. That is the
+|  failure this catches. A cutter exactly as wide as the groove is fine (one
+|  pass), hence the strict comparison with the usual 0.0001 tolerance.
+|
+|  (Replaces the earlier rabbet tool-fit check: the rabbet on the bottom panel's edge
+|  is open to the outside, and its pocket band now reaches one tool diameter out
+|  past the panel - see MakeBottomFaceContour - so any bit fits there.)
+|
+|  report_as_dialog mirrors ValidateJointWidths: true pops a blocking message
+|  box for the OK/Validate flow, false writes the message (or "" when fine)
+|  into InvalidBottomGrooveWidth so the HTML marks the field red and shows the
+|  message as its tooltip.
+|
+|  Rabbet check added by gremlin/Claude 10/9/2026, turned into the groove check by Claude 10/9/2026
+|
+]]
+local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog)
+  local message = ""
+
+  local groove_width = options.bottomGrooveWidth or 0
+
+  -- A vectors-only run (no_toolpath) has no bit to be too large for anything.
+  local cutting_groove = (options.bottomType == FaceJointType.Grooved)
+    and (not options.no_toolpath)
+    and (groove_width > 0.0001)
+
+  if cutting_groove then
+    -- Same effective-diameter convention as ValidateJointWidths above.
+    local mtl_block = MaterialBlock()
+    local converted_tool_diameter = 0.25
+    if Tool_ok(options.tool) then
+      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+    end
+    local effectiveDia = converted_tool_diameter
+    if options.allowance > 0 then
+      effectiveDia = effectiveDia - 2 * options.allowance
+    end
+
+    -- effectiveDia <= 0 is an allowance-vs-tool problem, which ValidateJointWidths
+    -- already reports against the allowance field.
+    if (effectiveDia > 0) and (effectiveDia > groove_width + 0.0001) then
+      message = string.format(
+        "The selected tool is too large to cut the bottom groove.\n\nThe groove in Side 1, Side 2 and End 1 is a closed slot only as wide as the groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
+        groove_width, effectiveDia, effectiveDia)
+    end
+  end
+
+  if report_as_dialog then
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidBottomGrooveWidth", message)
+  return message == ""
+end
+
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   G_dialogOptions = options
@@ -771,6 +835,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidEnd2Height", "")
   dialog:AddTextField("InvalidEnd1ChamferAngle", "")
   dialog:AddTextField("InvalidEnd2ChamferAngle", "")
+  dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -821,7 +886,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   -- "Bottom aus gleichem Material": cut the bottom panel from the same (full)
   -- material thickness as the walls, with a rabbet (Falz) milled along Side
   -- 1/Side 2/End 1's edges down to the groove width there.   -- by Claude 9/21/2026
-  dialog:AddCheckBox("BottomSameMaterial", options.bottomSameMaterial)
+  dialog:AddCheckBox("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)  -- Dovetail only: End 1 groove on its own sheet -- by Claude 10/9/2026
+  dialog:AddDoubleField("BottomThicknessField", options.bottomThickness)  -- replaces the "Bottom same material" checkbox -- by Claude 10/9/2026
   dialog:AddDoubleField("BottomGrooveClearanceField", options.bottomGrooveClearance)
   dialog:AddDoubleField("BottomRabbetCorrectionField", options.bottomRabbetDepthCorrection)
 
@@ -875,19 +941,34 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox(string.format("Groove offset %.2f must be at least the groove width %.2f (the groove would otherwise reach below the wall's bottom edge).", options.bottomGrooveOffset, options.bottomGrooveWidth))
         return false
       end
-      -- "Bottom aus gleichem Material": validate the clearance ("Luft") the
-      -- panel's reach into each of the 3 grooves gets shortened by. The
+      -- Bottom Thickness (replaces "Bottom same material"): must be a real panel,
+      -- no thicker than the material, and - since its top sits at the top of the
+      -- groove - must not reach below the walls' bottom edge. A bottom thinner than
+      -- the groove is allowed (no rabbet, just some play); the dialog shows a live
+      -- hint for that instead of an error.                     -- by Claude 10/9/2026
+      if not (options.bottomThickness and options.bottomThickness > 0) then
+        DisplayMessageBox("Bottom thickness must be greater than 0.")
+        return false
+      end
+      if options.bottomThickness > options.thickness + 0.0001 then
+        DisplayMessageBox(string.format("Bottom thickness %.2f cannot be more than the material thickness %.2f.", options.bottomThickness, options.thickness))
+        return false
+      end
+      if options.bottomThickness > options.bottomGrooveOffset + 0.0001 then
+        DisplayMessageBox(string.format("Bottom thickness %.2f is more than the groove offset %.2f - the bottom panel would reach below the bottom edge of the walls.", options.bottomThickness, options.bottomGrooveOffset))
+        return false
+      end
+      -- Clearance ("Luft") the panel's reach into each of the 3 grooves gets
+      -- shortened by - now always used, not only for "same material". The
       -- rabbet-depth correction isn't validated here - a bad value just
-      -- yields a shallower/deeper (possibly zero) rabbet.   -- by Claude 9/21/2026
-      if (options.bottomSameMaterial) then
-        if not IsNonNeg(options.bottomGrooveClearance) then
-          DisplayMessageBox("Bottom groove clearance (Luft) must be 0 or greater.")
-          return false
-        end
-        if options.bottomGrooveClearance >= options.bottomGrooveDepth then
-          DisplayMessageBox(string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth))
-          return false
-        end
+      -- yields a shallower/deeper (possibly zero) rabbet.   -- by Claude 9/21/2026, 10/9/2026
+      if not IsNonNeg(options.bottomGrooveClearance) then
+        DisplayMessageBox("Bottom groove clearance (Luft) must be 0 or greater.")
+        return false
+      end
+      if options.bottomGrooveClearance >= options.bottomGrooveDepth then
+        DisplayMessageBox(string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth))
+        return false
       end
       -- End 2 is shortened to start at the top of the groove (bottomGrooveOffset
       -- itself, now that it measures up to the groove's top edge), so there must
@@ -896,6 +977,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       local top_reserved = ThicknessForFaceType(options.lidType, options.thickness)
       if (options.bottomGrooveOffset + top_reserved) >= options.height then
         DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (End 2 would have no height left).", options.height))
+        return false
+      end
+      -- The groove in the walls is a closed slot as wide as the groove width,
+      -- so the bit has to fit in there.  -- by Claude 10/9/2026
+      if not ValidateBottomGrooveToolFit(dialog, options, true) then
         return false
       end
     end
@@ -995,7 +1081,8 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.partLayout = dialog:GetDropDownListValue("PartLayoutSelect")
   options.facesToMake.lid      = dialog:GetCheckBox("MakeLid")
   options.facesToMake.bottom   = dialog:GetCheckBox("MakeBottom")
-  options.bottomSameMaterial   = dialog:GetCheckBox("BottomSameMaterial")
+  options.bottomFrontGrooveFlip = dialog:GetCheckBox("BottomFrontGrooveFlip")  -- by Claude 10/9/2026
+  options.bottomThickness      = dialog:GetDoubleField("BottomThicknessField")  -- by Claude 10/9/2026
   options.facesToMake.side1    = dialog:GetCheckBox("MakeSide1")
   options.facesToMake.side2    = dialog:GetCheckBox("MakeSide2")
   options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
@@ -1168,7 +1255,8 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
   registry:SetDouble("BottomGrooveDepth", options.bottomGrooveDepth)    -- Added by Claude 9/18/2026
   registry:SetDouble("BottomGrooveWidth", options.bottomGrooveWidth)    -- Added by Claude 9/18/2026
-  registry:SetBool("BottomSameMaterial", options.bottomSameMaterial)                     -- Added by Claude 9/21/2026
+  registry:SetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)                 -- Added by Claude 10/9/2026
+  registry:SetDouble("BottomThickness", options.bottomThickness)                         -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   registry:SetDouble("BottomGrooveClearance", options.bottomGrooveClearance)             -- Added by Claude 9/21/2026
   registry:SetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
   registry:SetDouble("End1Height", options.end1Height)                             -- Added by Claude 9/20/2026
@@ -1231,7 +1319,8 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomGrooveOffset = registry:GetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
   options.bottomGrooveDepth = registry:GetDouble("BottomGrooveDepth", options.bottomGrooveDepth)      -- Added by Claude 9/18/2026
   options.bottomGrooveWidth = registry:GetDouble("BottomGrooveWidth", options.bottomGrooveWidth)      -- Added by Claude 9/18/2026
-  options.bottomSameMaterial = registry:GetBool("BottomSameMaterial", options.bottomSameMaterial)                         -- Added by Claude 9/21/2026
+  options.bottomFrontGrooveFlip = registry:GetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)            -- Added by Claude 10/9/2026
+  options.bottomThickness = registry:GetDouble("BottomThickness", options.bottomThickness)                              -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   options.bottomGrooveClearance = registry:GetDouble("BottomGrooveClearance", options.bottomGrooveClearance)              -- Added by Claude 9/21/2026
   options.bottomRabbetDepthCorrection = registry:GetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
   -- Fall back to the just-loaded options.height (not the pre-load default) so a
@@ -1291,6 +1380,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
   ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
+  ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
 
   return true
 end
