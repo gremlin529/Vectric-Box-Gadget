@@ -778,6 +778,45 @@ local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog)
   return message == ""
 end
 
+--[[  -------------- Groove offset reference (#86) --------------------------------------------------
+|
+|  The dialog's Groove offset is measured from the outer bottom edge of the walls
+|  either up to the BOTTOM (floor) of the groove ("Groove"), or up to the UNDERSIDE
+|  of the bottom panel ("Bottom" - e.g. the clearance under a drawer). Internally
+|  options.bottomGrooveOffset keeps meaning "up to the TOP of the groove", so the
+|  geometry code in CreateFaces is unchanged; it is worked out here.
+|
+|  Panel position in the groove: a panel not thicker than the groove lies on the
+|  groove floor. A thicker panel has a rabbet milled on its underside, leaving a
+|  tongue of (groove width - rabbet correction); that tongue rests on the groove
+|  floor, so the panel's underside sits (thickness - tongue) below the floor.
+|                                                                 -- by Claude 10/15/2026
+]]
+local function BottomPanelHangsBelowFloor(options)
+  local t = options.bottomThickness or options.thickness or 0
+  local w = options.bottomGrooveWidth or 0
+  local c = options.bottomRabbetDepthCorrection or 0
+  if (t - w > 0.0001) then
+    return math.max(0, t - w + c)   -- = thickness - tongue, i.e. the rabbet depth
+  end
+  return 0
+end
+
+function GrooveTopOffsetFromInput(options)
+  local input = options.bottomGrooveOffsetInput or 0
+  local w = options.bottomGrooveWidth or 0
+  if options.bottomGrooveOffsetRef == "Bottom" then
+    return input + BottomPanelHangsBelowFloor(options) + w
+  end
+  return input + w
+end
+
+-- Height of the bottom panel's underside above the walls' bottom edge.
+function BottomPanelUndersideHeight(options)
+  local floor = (options.bottomGrooveOffset or 0) - (options.bottomGrooveWidth or 0)
+  return floor - BottomPanelHangsBelowFloor(options)
+end
+
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   G_dialogOptions = options
@@ -879,7 +918,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDropDownList("BottomTypeSelect", bottomString)
 
   -- Grooved (slide-in) bottom options -- by Claude 9/18/2026
-  dialog:AddDoubleField("BottomGrooveOffsetField", options.bottomGrooveOffset)
+  dialog:AddDoubleField("BottomGrooveOffsetField", options.bottomGrooveOffsetInput)   -- as entered, see bottomGrooveOffsetRef (#86) -- by Claude 10/15/2026
+  dialog:AddDropDownList("BottomGrooveOffsetRef", options.bottomGrooveOffsetRef)        -- "Groove" / "Bottom" -- by Claude 10/15/2026
   dialog:AddDoubleField("BottomGrooveDepthField", options.bottomGrooveDepth)
   dialog:AddDoubleField("BottomGrooveWidthField", options.bottomGrooveWidth)
 
@@ -926,8 +966,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox(string.format("Groove depth %.2f must be less than the material thickness %.2f.", options.bottomGrooveDepth, options.thickness))
         return false
       end
-      if not IsNonNeg(options.bottomGrooveOffset) then
-        DisplayMessageBox("Groove offset from the bottom edge (to the top of the groove) must be 0 or greater.")
+      if not IsNonNeg(options.bottomGrooveOffsetInput) then
+        DisplayMessageBox("Groove offset must be 0 or greater.")
         return false
       end
       if not IsNonNeg(options.bottomGrooveWidth) or options.bottomGrooveWidth <= 0 then
@@ -937,8 +977,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       -- Groove offset now measures up to the groove's TOP edge (was: bottom
       -- edge), so the groove itself (extending downward by groove width from
       -- there) must not reach below the wall's true bottom edge. -- by Claude 9/21/2026
-      if options.bottomGrooveOffset < options.bottomGrooveWidth then
-        DisplayMessageBox(string.format("Groove offset %.2f must be at least the groove width %.2f (the groove would otherwise reach below the wall's bottom edge).", options.bottomGrooveOffset, options.bottomGrooveWidth))
+      -- (options.bottomGrooveOffset is now worked out from the entered offset, #86)
+      if options.bottomGrooveOffset < options.bottomGrooveWidth - 0.0001 then
+        DisplayMessageBox("The groove would reach below the bottom edge of the walls - increase the groove offset.")
         return false
       end
       -- Bottom Thickness (replaces "Bottom same material"): must be a real panel,
@@ -954,8 +995,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
         DisplayMessageBox(string.format("Bottom thickness %.2f cannot be more than the material thickness %.2f.", options.bottomThickness, options.thickness))
         return false
       end
-      if options.bottomThickness > options.bottomGrooveOffset + 0.0001 then
-        DisplayMessageBox(string.format("Bottom thickness %.2f is more than the groove offset %.2f - the bottom panel would reach below the bottom edge of the walls.", options.bottomThickness, options.bottomGrooveOffset))
+      local underside = BottomPanelUndersideHeight(options)   -- by Claude 10/15/2026 (#86)
+      if underside < -0.0001 then
+        DisplayMessageBox(string.format("The bottom panel would reach %.2f below the bottom edge of the walls - increase the groove offset.", -underside))
         return false
       end
       -- Clearance ("Luft") the panel's reach into each of the 3 grooves gets
@@ -1144,11 +1186,16 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   end
 
   -- Grooved (slide-in) bottom options -- by Claude 9/18/2026
-  options.bottomGrooveOffset = dialog:GetDoubleField("BottomGrooveOffsetField")
+  options.bottomGrooveOffsetInput = dialog:GetDoubleField("BottomGrooveOffsetField")   -- by Claude 10/15/2026 (#86)
+  options.bottomGrooveOffsetRef = dialog:GetDropDownListValue("BottomGrooveOffsetRef")
+  if options.bottomGrooveOffsetRef ~= "Bottom" then options.bottomGrooveOffsetRef = "Groove" end
   options.bottomGrooveDepth = dialog:GetDoubleField("BottomGrooveDepthField")
   options.bottomGrooveWidth = dialog:GetDoubleField("BottomGrooveWidthField")
   options.bottomGrooveClearance = dialog:GetDoubleField("BottomGrooveClearanceField")
   options.bottomRabbetDepthCorrection = dialog:GetDoubleField("BottomRabbetCorrectionField")
+  -- Internal offset to the TOP of the groove, from what was entered (needs the groove
+  -- width, bottom thickness and rabbet correction read above).  -- by Claude 10/15/2026 (#86)
+  options.bottomGrooveOffset = GrooveTopOffsetFromInput(options)
 
   -- "Side Overhang": End 1's and End 2's own heights
   -- (independent of each other), plus the chamfer's horizontal run. If a
@@ -1253,6 +1300,8 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("LidType", options.lidType)
   registry:SetDouble("BottomType", options.bottomType)
   registry:SetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
+  registry:SetDouble("BottomGrooveOffsetInput", options.bottomGrooveOffsetInput)  -- by Claude 10/15/2026 (#86)
+  registry:SetString("BottomGrooveOffsetRef", options.bottomGrooveOffsetRef)      -- by Claude 10/15/2026 (#86)
   registry:SetDouble("BottomGrooveDepth", options.bottomGrooveDepth)    -- Added by Claude 9/18/2026
   registry:SetDouble("BottomGrooveWidth", options.bottomGrooveWidth)    -- Added by Claude 9/18/2026
   registry:SetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)                 -- Added by Claude 10/9/2026
@@ -1319,6 +1368,18 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomGrooveOffset = registry:GetDouble("BottomGrooveOffset", options.bottomGrooveOffset)  -- Added by Claude 9/18/2026
   options.bottomGrooveDepth = registry:GetDouble("BottomGrooveDepth", options.bottomGrooveDepth)      -- Added by Claude 9/18/2026
   options.bottomGrooveWidth = registry:GetDouble("BottomGrooveWidth", options.bottomGrooveWidth)      -- Added by Claude 9/18/2026
+  -- Groove offset as entered (#86). Saves from before this change only have the
+  -- internal "to the top of the groove" value - turn that into "to the bottom of
+  -- the groove", so the groove ends up exactly where it was.   -- by Claude 10/15/2026
+  options.bottomGrooveOffsetRef = registry:GetString("BottomGrooveOffsetRef", options.bottomGrooveOffsetRef)
+  if options.bottomGrooveOffsetRef ~= "Bottom" then options.bottomGrooveOffsetRef = "Groove" end
+  local savedOffsetInput = registry:GetDouble("BottomGrooveOffsetInput", -1)
+  if savedOffsetInput >= 0 then
+    options.bottomGrooveOffsetInput = savedOffsetInput
+  else
+    options.bottomGrooveOffsetRef = "Groove"
+    options.bottomGrooveOffsetInput = math.max(0, (options.bottomGrooveOffset or 0) - (options.bottomGrooveWidth or 0))
+  end
   options.bottomFrontGrooveFlip = registry:GetBool("BottomFrontGrooveFlip", options.bottomFrontGrooveFlip)            -- Added by Claude 10/9/2026
   options.bottomThickness = registry:GetDouble("BottomThickness", options.bottomThickness)                              -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   options.bottomGrooveClearance = registry:GetDouble("BottomGrooveClearance", options.bottomGrooveClearance)              -- Added by Claude 9/21/2026
