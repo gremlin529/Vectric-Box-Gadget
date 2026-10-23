@@ -120,6 +120,8 @@ function main(script_path)
   options.bottomType = FaceJointType.Fingers -- default bottom type is tabbed
   options.bottomGrooveWidth = options.thickness --- Grooved bottom only: width of the groove slot (defaults to material thickness, set independently for e.g. a thinner slide-in panel) -- by Claude 9/18/2026
   options.bottomGrooveOffset = 0.25 + options.bottomGrooveWidth --- Grooved bottom only: distance from the wall's outer bottom edge up to the TOP of the groove (must be >= groove width)      -- by Claude 9/18/2026, updated 9/21/2026
+  options.bottomGrooveOffsetRef = "Groove"    --- Grooved bottom only: what the groove offset in the dialog is measured to - "Groove" (bottom of the groove) or "Bottom" (underside of the bottom panel). Internally options.bottomGrooveOffset stays "to the TOP of the groove" (#86) -- by Claude 10/15/2026
+  options.bottomGrooveOffsetInput = 0.25      --- Grooved bottom only: the groove offset as entered in the dialog, see bottomGrooveOffsetRef -- by Claude 10/15/2026
   options.bottomGrooveDepth = 0.125         --- Grooved bottom only: how deep the groove is plowed into Side1/Side2/End1              -- by Claude 9/18/2026
   options.bottomFrontGrooveFlip = false    --- Grooved bottom + Dovetail joints only: cut End 1's groove from the other side, on its own sheet (End 1 turned over, lower left corner against the sheet's X0/Y0 stops) -- by Claude 10/9/2026
   options.bottomThickness = 0               --- Grooved bottom only: thickness of the bottom panel. 0 (nothing saved yet) or anything thicker than the material means "use the material thickness" (resolved below, before the dialog opens). A rabbet (Falz) is milled along Side 1/Side 2/End 1's edges only where the panel is thicker than the groove width -- by Claude 10/9/2026 (replaces bottomSameMaterial)
@@ -198,6 +200,7 @@ function main(script_path)
     options.partSpacing = Truncate(options.partSpacing * multiplier, 2)
     options.roundover_cut_depth = Truncate(options.roundover_cut_depth * multiplier, 2)
     options.bottomGrooveOffset = Truncate(options.bottomGrooveOffset * multiplier, 2)
+    options.bottomGrooveOffsetInput = Truncate(options.bottomGrooveOffsetInput * multiplier, 2)  -- by Claude 10/15/2026
     options.bottomGrooveDepth = Truncate(options.bottomGrooveDepth * multiplier, 2)
     options.bottomGrooveWidth = Truncate(options.bottomGrooveWidth * multiplier, 2)
     options.bottomGrooveClearance = Truncate(options.bottomGrooveClearance * multiplier, 2)
