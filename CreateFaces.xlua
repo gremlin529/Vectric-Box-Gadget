@@ -108,6 +108,11 @@ function TransformFace(face, xform)
     face.groove_contours:Transform(xform)
   end
 
+  -- Transform the sliding lid groove (Grooved lid) -- by Claude 10/25/2026
+  if (face.lid_groove_contours ~= nil) then
+    face.lid_groove_contours:Transform(xform)
+  end
+
   -- Transform the bottom panel's own rabbet band (Falz), only present when
   -- "Bottom aus gleichem Material" is on -- by Claude 9/21/2026
   if (face.rabbet_contours ~= nil) then
@@ -312,11 +317,289 @@ end
 function CreateBottomRabbetToolpath(job, options, faces, tool, layer_name)
   return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Bottom Rabbet",
     function(face)
-      return face.rabbet_contours
+      -- the Grooved lid carries a rabbet band too, cut in its own pass -- by Claude 10/25/2026
+      if (face.facetype == FaceType.Bottom) then
+        return face.rabbet_contours
+      end
+      return nil
     end,
     function(face)
       return face.rabbet_depth
     end)
+end
+
+--[[  -------------- CreateLidGroovePocketToolpath --------------------------------------------------
+|
+|  Grooved (sliding) lid: cut the grooves near the top edge of Side 1, Side 2
+|  and End 1 that the lid slides in. End 2 gets no groove - it is shortened to
+|  the underside of the lid instead, so the lid slides in over it from the back.
+|  Own pass, since the lid groove can have another depth than the bottom groove.
+|
+|  Added by Claude 10/25/2026
+|
+]]
+function CreateLidGroovePocketToolpath(job, options, faces, tool, layer_name)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Lid Groove",
+    function(face)
+      return face.lid_groove_contours
+    end,
+    function()
+      return options.lidGrooveDepth
+    end)
+end
+
+--[[  -------------- CreateLidRabbetToolpath --------------------------------------------------
+|
+|  Grooved (sliding) lid thicker than the lid groove: rabbet milled on the lid's
+|  top face along its Side 1, Side 2 and End 1 edges, down to the groove width,
+|  so the lid's underside runs on the groove floor and its top can sit flush
+|  with the top of the walls.
+|
+|  Added by Claude 10/25/2026
+|
+]]
+function CreateLidRabbetToolpath(job, options, faces, tool, layer_name)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Lid Rabbet",
+    function(face)
+      if (face.facetype == FaceType.Lid) then
+        return face.rabbet_contours
+      end
+      return nil
+    end,
+    function(face)
+      return face.rabbet_depth
+    end)
+end
+
+--[[  -------------- Grooved (sliding) lid helpers --------------------------------------------------
+|
+|  ComputeFingerTrimBoth: like ComputeFingerTrim (Dovetails.xlua), but trims the
+|  finger pattern at BOTH ends - End 2 is short at the bottom (Grooved bottom)
+|  and at the top (Grooved lid) at the same time. The pitch stays the same as on
+|  every other corner. Returns the number of flaps left, the first gap at the
+|  start (bottom) end and the last gap at the end (top) end.
+|
+|  Added by Claude 10/25/2026
+|
+]]
+function ComputeFingerTrimBoth(num_flaps, tab_space, min_width, shortfall_start, shortfall_end)
+  local n, e_start = ComputeFingerTrim(num_flaps, tab_space, min_width, math.max(0, shortfall_start or 0))
+  local n2, e_end = ComputeFingerTrim(n, tab_space, min_width, math.max(0, shortfall_end or 0))
+  return n2, e_start, e_end
+end
+
+-- LineTo that skips a (near) zero length span.
+local function LineToIfNeeded(contour, pt)
+  local cur = contour.EndPoint2D
+  if (math.abs(cur.x - pt.x) > 0.000001 or math.abs(cur.y - pt.y) > 0.000001) then
+    contour:LineTo(pt)
+  end
+end
+
+-- Which sign of ArcTo's bulge gives an anti-clockwise arc - worked out once
+-- with a tiny probe contour instead of assuming it. false when ArcTo cannot be
+-- used at all: the arcs are then drawn as short line segments.
+local g_arcBulgeSign = nil
+local function ArcBulgeSign()
+  if (g_arcBulgeSign == nil) then
+    local ok, ccw = pcall(function()
+      local probe = Contour(0.0)
+      probe:AppendPoint(Point2D(-1, 0))
+      probe:LineTo(Point2D(1, 0))
+      probe:ArcTo(Point2D(-1, 0), 1.0)
+      return probe.IsCCW
+    end)
+    if ok then
+      g_arcBulgeSign = ccw and 1 or -1
+    else
+      g_arcBulgeSign = false
+    end
+  end
+  return g_arcBulgeSign
+end
+
+-- Arc around (cx, cy) with radius r from angle a0 to a1 (radians, a1 > a0 =
+-- anti-clockwise). The contour must already end at the arc's start point.
+local function AppendArc(contour, cx, cy, r, a0, a1)
+  local end_pt = Point2D(cx + r*math.cos(a1), cy + r*math.sin(a1))
+  local sweep = a1 - a0
+  if (r < 0.000001 or math.abs(sweep) < 0.000001) then
+    LineToIfNeeded(contour, end_pt)
+    return
+  end
+  local sign = ArcBulgeSign()
+  if sign then
+    contour:ArcTo(end_pt, sign*math.tan(sweep/4))
+  else
+    local segments = 16
+    for i = 1, segments do
+      local a = a0 + sweep*i/segments
+      contour:LineTo(Point2D(cx + r*math.cos(a), cy + r*math.sin(a)))
+    end
+  end
+end
+
+--[[  -------------- AddLidGripTab --------------------------------------------------
+|
+|  Draws the grip tab at the lid's back edge (y = yb), centred on cx, while the
+|  contour runs from right to left along that edge (anti-clockwise outline).
+|  Starts with a line to the tab's right root and ends at its left root.
+|  Shapes: "Square", "Rounded" (corner radius) and "Arc" (one circular arc
+|  through both roots and the tip; an arc taller than half the grip width
+|  becomes a half circle on straight flanks).
+|
+|  Added by Claude 10/25/2026
+|
+]]
+function AddLidGripTab(contour, cx, yb, grip_width, overhang, radius, shape)
+  local hx = 0.5*(grip_width or 0)
+  local ov = overhang or 0
+  if (hx < 0.0001 or ov < 0.0001) then
+    return
+  end
+  local xr = cx + hx
+  local xl = cx - hx
+  LineToIfNeeded(contour, Point2D(xr, yb))
+
+  local r = 0
+  if (shape == "Rounded") then
+    r = math.min(radius or 0, hx, ov)
+  elseif (shape == "Arc") then
+    if (ov < hx) then
+      -- one arc through (xr, yb), (cx, yb + ov) and (xl, yb)
+      local R = (hx*hx + ov*ov) / (2*ov)
+      local cy = yb + ov - R
+      local a0 = math.atan2 and math.atan2(yb - cy, hx) or math.atan(yb - cy, hx)
+      AppendArc(contour, cx, cy, R, a0, math.pi - a0)
+      return
+    end
+    r = hx
+  end
+
+  if (r < 0.0001) then
+    contour:LineTo(Point2D(xr, yb + ov))
+    contour:LineTo(Point2D(xl, yb + ov))
+    contour:LineTo(Point2D(xl, yb))
+    return
+  end
+
+  LineToIfNeeded(contour, Point2D(xr, yb + ov - r))
+  AppendArc(contour, xr - r, yb + ov - r, r, 0, 0.5*math.pi)
+  LineToIfNeeded(contour, Point2D(xl + r, yb + ov))
+  AppendArc(contour, xl + r, yb + ov - r, r, 0.5*math.pi, math.pi)
+  LineToIfNeeded(contour, Point2D(xl, yb))
+end
+
+--[[  -------------- MakeGroovedLid --------------------------------------------------
+|
+|  Grooved (sliding) lid: a plain panel that runs in the lid grooves of Side 1,
+|  Side 2 and End 1 and slides in from the back over the shortened End 2 - the
+|  mirror image of the Grooved bottom. It reaches (groove depth - clearance)
+|  into the three grooves and runs through to End 2's outer face. Behind that,
+|  only the grip tab sticks out (the overhang is cut flush left and right).
+|
+|  If the lid is thicker than the groove width, a rabbet is milled on its TOP
+|  face along Side 1, Side 2 and End 1 (U-shaped band, open towards the back,
+|  reaching one tool diameter out into the waste like the bottom's). The lid's
+|  underside then runs on the groove floor and its top can sit flush with the
+|  walls. Drawn top face up: Front at the bottom of the drawing, grip tab at the top.
+|  With dovetails End 1 has no lid groove, so the lid then stops at End 1's
+|  inside face instead.
+|
+|  Added by Claude 10/25/2026
+|
+]]
+function MakeGroovedLid(options, facesToMake, name)
+  local width = options.width
+  local depth = options.depth
+  local thickness = options.thickness
+  local start_point = options.start_point
+  local groove_depth = options.lidGrooveDepth or 0
+  local groove_width = options.lidGrooveWidth or thickness
+  local lid_thickness = options.lidThickness or thickness
+  local clearance = options.lidGrooveClearance or 0
+  local reach = math.max(0, groove_depth - clearance)
+
+  local tablist = {}
+  local fingerSides = ContourGroup(true)
+
+  -- With dovetails End 1 gets no lid groove (see MakeEndFace), so the lid stops
+  -- at End 1's inside face (less the clearance) and has no rabbet along its front.
+  local front_groove = not options.dovetailJoint
+  local front_reach = reach
+  if not front_groove then
+    front_reach = -clearance
+  end
+
+  local blc = start_point + Vector2D(thickness - reach, thickness - front_reach)
+  local panel_width = (width - 2*thickness) + 2*reach                   -- reaches into Side 1 and Side 2
+  local panel_depth = (depth - 2*thickness) + front_reach + thickness  -- reaches into End 1, runs over End 2 to its outer face
+  local x0 = blc.x
+  local x1 = blc.x + panel_width
+  local y0 = blc.y                  -- Front edge
+  local y1 = blc.y + panel_depth    -- Back edge (flush with End 2's outer face)
+
+  -- grip tab can never be wider than the panel itself
+  local grip_width = math.min(options.lidGripWidth or 0, panel_width)
+
+  local contour = Contour(0.0)
+  contour:AppendPoint(blc)
+  contour:LineTo(Point2D(x1, y0))
+  AddMiddleOfLastSpanToList(contour, tablist)
+  contour:LineTo(Point2D(x1, y1))
+  AddMiddleOfLastSpanToList(contour, tablist)
+  AddLidGripTab(contour, 0.5*(x0 + x1), y1, grip_width, options.lidGripOverhang, options.lidGripRadius, options.lidGripShape)
+  LineToIfNeeded(contour, Point2D(x0, y1))
+  contour:LineTo(blc)
+  AddMiddleOfLastSpanToList(contour, tablist)
+
+  local rabbet_contours = nil
+  local rabbet_depth = 0
+  if (lid_thickness - groove_width > 0.0001) then
+    rabbet_depth = math.max(0, lid_thickness - groove_width + (options.lidRabbetDepthCorrection or 0))
+    if (rabbet_depth > 0.0001 and groove_depth > 0.0001) then
+      -- same U band as the Grooved bottom (see MakeBottomFaceContour): full groove
+      -- depth wide, reaching one tool diameter out past the panel's open edges.
+      -- Behind the back edge it runs beside the grip tab, which the dialog keeps
+      -- clear of the band (grip width <= inside width - 2 x groove depth).
+      local ext = thickness
+      if Tool_ok(options.tool) then
+        ext = ConvertUnitsFrom(options.tool.ToolDia, options.tool, MaterialBlock())
+      end
+      local g = groove_depth
+      rabbet_contours = ContourGroup(true)
+      if front_groove then
+        local band = Contour(0.0)
+        band:AppendPoint(Point2D(x0 - ext, y0 - ext))
+        band:LineTo(Point2D(x1 + ext, y0 - ext))
+        band:LineTo(Point2D(x1 + ext, y1 + ext))
+        band:LineTo(Point2D(x1 - g, y1 + ext))
+        band:LineTo(Point2D(x1 - g, y0 + g))
+        band:LineTo(Point2D(x0 + g, y0 + g))
+        band:LineTo(Point2D(x0 + g, y1 + ext))
+        band:LineTo(Point2D(x0 - ext, y1 + ext))
+        band:LineTo(Point2D(x0 - ext, y0 - ext))
+        rabbet_contours:AddTail(band)
+      else
+        -- no front groove: two separate bands along Side 1 and Side 2 only
+        local xs = { {x0 - ext, x0 + g}, {x1 - g, x1 + ext} }
+        for i = 1, 2 do
+          local band = Contour(0.0)
+          band:AppendPoint(Point2D(xs[i][1], y0 - ext))
+          band:LineTo(Point2D(xs[i][2], y0 - ext))
+          band:LineTo(Point2D(xs[i][2], y1 + ext))
+          band:LineTo(Point2D(xs[i][1], y1 + ext))
+          band:LineTo(Point2D(xs[i][1], y0 - ext))
+          rabbet_contours:AddTail(band)
+        end
+      end
+    end
+  end
+
+  local lid_face = Face(contour, nil, {}, tablist, name, FaceType.Lid, FaceJointType.Grooved, {}, fingerSides)
+  lid_face.rabbet_contours = rabbet_contours
+  lid_face.rabbet_depth = rabbet_depth
+  return lid_face
 end
 
 --[[  -------------- MakeBottomFace --------------------------------------------------
@@ -610,6 +893,10 @@ end
     local top_thickness = thickness
     if IsOpenLidType(lidType) then
       top_thickness = 0
+    elseif (lidType == FaceJointType.Grooved) then
+      -- sliding lid runs in a groove near the top edge, so the wall itself stays
+      -- full height at the top, same as no lid at all -- by Claude 10/25/2026
+      top_thickness = 0
     elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
     elseif (lidType == FaceJointType.Flat) then
@@ -681,6 +968,35 @@ end
       groove_contours:AddTail(groove)
     end
 
+    -- Grooved (sliding) lid: the same kind of groove near the TOP edge. It runs
+    -- out through the Back corner (the lid slides in from there, over the
+    -- shortened End 2) and stops half a material thickness short of the Front
+    -- corner, like the bottom groove. options.lidGrooveOffset measures from the
+    -- wall's top edge down to the groove's LOWER edge (= the lid's underside).
+    --                                                          -- by Claude 10/25/2026
+    local lidGrooveOffset = options.lidGrooveOffset or 0
+    local lid_groove_contours = nil
+    if (lidType == FaceJointType.Grooved) then
+      local lid_groove_width = options.lidGrooveWidth or thickness
+      local top_y = inner_blc.y + inner_height
+      local lg_y0 = top_y - lidGrooveOffset
+      local lg_x0 = start_point.x
+      local lg_x1 = start_point.x + depth
+      if (is_side1) then
+        lg_x0 = lg_x0 + 0.5*thickness    -- Left wall: near corner = Front
+      else
+        lg_x1 = lg_x1 - 0.5*thickness    -- Right wall: far corner = Front
+      end
+      local lid_groove = Contour(0.0)
+      lid_groove:AppendPoint(Point2D(lg_x0, lg_y0))
+      lid_groove:LineTo(Point2D(lg_x1, lg_y0))
+      lid_groove:LineTo(Point2D(lg_x1, lg_y0 + lid_groove_width))
+      lid_groove:LineTo(Point2D(lg_x0, lg_y0 + lid_groove_width))
+      lid_groove:LineTo(Point2D(lg_x0, lg_y0))
+      lid_groove_contours = ContourGroup(true)
+      lid_groove_contours:AddTail(lid_groove)
+    end
+
     -- Gremlin added bottom and top dovetails separate from side
     local num_flaps_bottom = math.floor((0.5*inner_depth) / bottomdovetail.min_width )
     local num_flaps_top = math.floor((0.5*inner_depth) / topdovetail.min_width )
@@ -715,14 +1031,24 @@ end
     local left_shortfall = EndGrooveShortfall(is_side1)
     local right_shortfall = EndGrooveShortfall(not is_side1)
 
-    local trimmed_num_flaps_side_left, trimmed_edge_gap_side_left = num_flaps_side_left, tab_space_side_left
-    if (left_shortfall > 0.0001) then
-      trimmed_num_flaps_side_left, trimmed_edge_gap_side_left = ComputeFingerTrim(num_flaps_side_left, tab_space_side_left, sidedovetail.min_width, left_shortfall)
+    -- Grooved (sliding) lid: End 2 is also short at the TOP (it ends at the lid's
+    -- underside), so the corner facing it is trimmed at its top end as well, and
+    -- the wall gets a solid margin out to the outer corner there - the lid groove
+    -- runs out through it.                                     -- by Claude 10/25/2026
+    local function LidTopShortfall(is_this_end1)
+      if (lidType == FaceJointType.Grooved and not is_this_end1) then
+        return lidGrooveOffset
+      end
+      return 0
     end
-    local trimmed_num_flaps_side_right, trimmed_edge_gap_side_right = num_flaps_side_right, tab_space_side_right
-    if (right_shortfall > 0.0001) then
-      trimmed_num_flaps_side_right, trimmed_edge_gap_side_right = ComputeFingerTrim(num_flaps_side_right, tab_space_side_right, sidedovetail.min_width, right_shortfall)
-    end
+    local left_top_shortfall = LidTopShortfall(is_side1)
+    local right_top_shortfall = LidTopShortfall(not is_side1)
+
+    -- trimmed_edge_gap_* = gap at the BOTTOM end, top_edge_gap_* = gap at the TOP end
+    local trimmed_num_flaps_side_left, trimmed_edge_gap_side_left, top_edge_gap_side_left =
+      ComputeFingerTrimBoth(num_flaps_side_left, tab_space_side_left, sidedovetail.min_width, left_shortfall, left_top_shortfall)
+    local trimmed_num_flaps_side_right, trimmed_edge_gap_side_right, top_edge_gap_side_right =
+      ComputeFingerTrimBoth(num_flaps_side_right, tab_space_side_right, sidedovetail.min_width, right_shortfall, right_top_shortfall)
 
     -- Create the contour
     local contour = Contour(0.0)
@@ -788,13 +1114,26 @@ end
       -- right after its inner_brc.                                 -- by Claude 9/20/2026
       LineToVector(contour, trimmed_edge_gap_side_right*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
+      -- TrimEnd: the last gap is the (possibly shrunk) top one - identical to
+      -- the plain version when there is no Grooved lid.        -- by Claude 10/25/2026
       if dovetailJoint then
-        AddMaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, unit_x, contour, trimmed_num_flaps_side_right, tab_space_side_right)
+        AddMaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, unit_y, unit_x, contour, trimmed_num_flaps_side_right, tab_space_side_right, top_edge_gap_side_right)
       else
-        AddFlapsAlongLine(thickness, sidedovetail.min_width, tab_space_side_right, unit_y, unit_x, contour, trimmed_num_flaps_side_right, fingerSides)
+        AddFlapsAlongLineTrimEnd(thickness, sidedovetail.min_width, tab_space_side_right, top_edge_gap_side_right, unit_y, unit_x, contour, trimmed_num_flaps_side_right, fingerSides)
       end
-      contour:LineTo(inner_trc)
-      AddMiddleOfLastSpanToList(contour, tablist)
+      if (right_top_shortfall > 0.0001) then
+        -- Grooved lid: no End 2 material above its top edge - solid margin out to
+        -- the outer corner, up to the top of the wall.         -- by Claude 10/25/2026
+        LineToIfNeeded(contour, Point2D(inner_trc.x, inner_trc.y - right_top_shortfall))
+        LineToVector(contour, thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, right_top_shortfall*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -thickness*unit_x)
+      else
+        contour:LineTo(inner_trc)
+        AddMiddleOfLastSpanToList(contour, tablist)
+      end
     else
       LineToVector(contour, tab_space_side_right*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
@@ -881,7 +1220,17 @@ end
     -- the top of the groove when the adjoining end is a Grooved Back - so
     -- any trim sits at the END, right before inner_blc.           -- by Claude 9/19/2026
     if (makeTabsForLeftFace) then
-      LineToVector(contour, -tab_space_side_left*unit_y)
+      if (left_top_shortfall > 0.0001) then
+        -- Grooved lid: solid margin at the top, where End 2 has no material
+        -- (mirrors the brc->trc margin above).                 -- by Claude 10/25/2026
+        LineToVector(contour, -thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, -left_top_shortfall*unit_y)
+        AddMiddleOfLastSpanToList(contour, tablist)
+        LineToVector(contour, thickness*unit_x)
+        AddMiddleOfLastSpanToList(contour, tablist)
+      end
+      LineToVector(contour, -top_edge_gap_side_left*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (dovetailJoint) then
         AddMaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, -unit_y, -unit_x, contour, trimmed_num_flaps_side_left, tab_space_side_left, trimmed_edge_gap_side_left)
@@ -913,7 +1262,9 @@ end
       AddMiddleOfLastSpanToList(contour, tablist)
     end
 
-    return Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides, groove_contours)
+    local side_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.Side, FaceJointType.Fingers, nil, fingerSides, groove_contours)
+    side_face.lid_groove_contours = lid_groove_contours  -- Grooved lid -- by Claude 10/25/2026
+    return side_face
   end
 
 -- Make an end face
@@ -969,6 +1320,16 @@ end
     local top_thickness = 0
     if IsOpenLidType(lidType) then
       top_thickness = 0
+    elseif (lidType == FaceJointType.Grooved) then
+      if is_end1 then
+        -- Front stays full height; it gets the lid groove (below) as the lid's
+        -- front stop.                                          -- by Claude 10/25/2026
+        top_thickness = 0
+      else
+        -- Back is the insertion side: it ends at the lid's underside (the lid
+        -- groove's lower edge), so the lid slides in over it.  -- by Claude 10/25/2026
+        top_thickness = options.lidGrooveOffset or 0
+      end
     elseif (lidType == FaceJointType.Inset) then
       top_thickness = 0.5*thickness
     elseif (lidType == FaceJointType.Flat) then
@@ -1029,6 +1390,27 @@ end
       end
     end
 
+    -- Grooved (sliding) lid: Front gets the lid groove near its top edge, stopped
+    -- half a material thickness short of each corner like the bottom groove.
+    -- Skipped with dovetails, same as the bottom groove (no flip sheet for the
+    -- lid groove yet).                                          -- by Claude 10/25/2026
+    local lid_groove_contours = nil
+    if (lidType == FaceJointType.Grooved and is_end1 and not dovetailJoint) then
+      local lid_groove_width = options.lidGrooveWidth or thickness
+      local top_y = inner_blc.y + inner_height
+      local lg_y0 = top_y - (options.lidGrooveOffset or 0)
+      local lg_x0 = inner_blc.x + 0.5*thickness
+      local lg_x1 = inner_brc.x - 0.5*thickness
+      local lid_groove = Contour(0.0)
+      lid_groove:AppendPoint(Point2D(lg_x0, lg_y0))
+      lid_groove:LineTo(Point2D(lg_x1, lg_y0))
+      lid_groove:LineTo(Point2D(lg_x1, lg_y0 + lid_groove_width))
+      lid_groove:LineTo(Point2D(lg_x0, lg_y0 + lid_groove_width))
+      lid_groove:LineTo(Point2D(lg_x0, lg_y0))
+      lid_groove_contours = ContourGroup(true)
+      lid_groove_contours:AddTail(lid_groove)
+    end
+
     -- Gremlin added doevtail seperation for different sizes
     local num_flaps_bottom = math.floor((0.5*inner_width)/ bottomdovetail.min_width)
     local num_flaps_top = math.floor((0.5*inner_width) / topdovetail.min_width)
@@ -1053,15 +1435,22 @@ end
     else
       reference_bottom_thickness = thickness
     end
-    local reference_side_height = height - (top_thickness + reference_bottom_thickness)
-    local side_shortfall = reference_side_height - inner_height
+    -- Grooved (sliding) lid: same idea at the top - Front's full height is the
+    -- reference, Back's shortfall there (lidGrooveOffset) is trimmed off at the
+    -- top end only.                                            -- by Claude 10/25/2026
+    local reference_top_thickness = top_thickness
+    if (lidType == FaceJointType.Grooved) then
+      reference_top_thickness = 0
+    end
+    local reference_side_height = height - (reference_top_thickness + reference_bottom_thickness)
+    local bottom_side_shortfall = bottom_thickness - reference_bottom_thickness
+    local top_side_shortfall = top_thickness - reference_top_thickness
 
     local num_flaps_side = math.floor((0.5*reference_side_height) / sidedovetail.min_width)
     local tab_space_side = (reference_side_height - num_flaps_side*sidedovetail.min_width) / (num_flaps_side + 1)
-    local trimmed_num_flaps_side, trimmed_edge_gap_side = num_flaps_side, tab_space_side
-    if (side_shortfall > 0.0001) then
-      trimmed_num_flaps_side, trimmed_edge_gap_side = ComputeFingerTrim(num_flaps_side, tab_space_side, sidedovetail.min_width, side_shortfall)
-    end
+    -- trimmed_edge_gap_side = gap at the BOTTOM end, top_edge_gap_side = gap at the TOP end
+    local trimmed_num_flaps_side, trimmed_edge_gap_side, top_edge_gap_side =
+      ComputeFingerTrimBoth(num_flaps_side, tab_space_side, sidedovetail.min_width, bottom_side_shortfall, top_side_shortfall)
 
     local tab_space_bottom = (inner_width - num_flaps_bottom*bottomdovetail.min_width) / (num_flaps_bottom + 1)
     local tab_space_top = (inner_width - num_flaps_top*topdovetail.min_width) / (num_flaps_top + 1)
@@ -1095,7 +1484,8 @@ end
     if (makeTabsForRightEnd) then
       LineToVector(contour,  (trimmed_edge_gap_side)*unit_y)
       AddMiddleOfLastSpanToList(contour, tablist)
-      AddFemaleDoveTailsAlongLine(thickness, sidedovetail, unit_y, -unit_x, contour, trimmed_num_flaps_side, tab_space_side, dovetail_markers, flute_sockets, fingerSides)
+      -- TrimEnd: last gap = the (possibly shrunk) top one (Grooved lid) -- by Claude 10/25/2026
+      AddFemaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, unit_y, -unit_x, contour, trimmed_num_flaps_side, tab_space_side, top_edge_gap_side, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(inner_trc)
       AddMiddleOfLastSpanToList(contour, tablist)
     else
@@ -1146,7 +1536,7 @@ end
     -- to the top of the groove, so any trim goes at the END, right before
     -- inner_blc (AddFemaleDoveTailsAlongLineTrimEnd).             -- by Claude 9/19/2026
     if (makeTabsForLeftEnd) then
-      LineToVector(contour, (tab_space_side*-unit_y))
+      LineToVector(contour, (top_edge_gap_side*-unit_y))  -- first gap = top one (Grooved lid) -- by Claude 10/25/2026
       AddMiddleOfLastSpanToList(contour, tablist)
       AddFemaleDoveTailsAlongLineTrimEnd(thickness, sidedovetail, -unit_y, unit_x, contour, trimmed_num_flaps_side, tab_space_side, trimmed_edge_gap_side, dovetail_markers, flute_sockets, fingerSides)
       contour:LineTo(inner_blc)
@@ -1160,6 +1550,7 @@ end
 
     local end_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
     end_face.flip_groove_contours = flip_groove_contours  -- dovetail End 1 groove for its own (flip) sheet -- by Claude 10/9/2026
+    end_face.lid_groove_contours = lid_groove_contours    -- Grooved lid -- by Claude 10/25/2026
     return end_face
   end
 
@@ -1340,6 +1731,11 @@ end
     local lidType = options.lidType
     local create_tabs_for_missing_faces = options.create_tabs_for_missing_faces
     local use_dovetails = options.dovetailJoint
+
+    -- Grooved (sliding) lid: plain panel with grip tab -- by Claude 10/25/2026
+    if (lidType == FaceJointType.Grooved) then
+      return MakeGroovedLid(options, facesToMake, name)
+    end
 
     local noLidTabs = (lidType == FaceJointType.Flat) or IsOpenLidType(lidType) or (lidType == FaceJointType.Inset)
 

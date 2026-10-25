@@ -143,12 +143,13 @@
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
         <div class="type-dropdown-content">
-          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)">
+          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" title="&#10;Grooved: a sliding lid - a groove is cut into Side 1, Side 2 and End 1 near the top edge and End 2 is shortened to the underside of the lid, so the lid slides in from the back. A grip tab can stick out behind End 2.">
             <option value="Inset">Inset</option>
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
             <option value="None">None</option>
             <option value="OpenChamfer">Open Chamfer</option>
+            <option value="Grooved">Grooved</option>
           </select>
           <div class="type-dropdown-preview">
             <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
@@ -299,6 +300,103 @@
     </div>
   </div>
 
+  <!-- ── Grooved Lid Options ──────────────────────────────────────
+       Only shown when Lid Type = Grooved (sliding lid). Same layout as the Grooved
+       Bottom Options: lid panel fields | Detail B (LidGroovedSketch_174.png, 174x182) |
+       groove fields, then grip tab fields | grip sketch (LidGripSketch_*.png, 174x130) |
+       grip shape.                                                -- by Claude 10/25/2026 -->
+  <div class="section-header" id="showHideLidGrooveSectionHeader" style="display: none;">Grooved Lid Options</div>
+  <div class="card" id="showHideLidGrooveOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Side 1, Side 2 &amp; End 1 near the top edge (with Dovetail joints End 1 gets no groove and the lid stops at its inside face). End 2 is shortened to the underside of the lid, so the lid slides in from the back over End 2. Behind End 2 only the grip tab sticks out - the rest of the overhang is cut flush left and right.</div>
+
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Lid Panel</div>
+              <div class="field-row" title="Thickness of the lid - defaults to the material thickness. If it is thinner than the material, the lid is cut from separate stock: it is placed on its own sheet (Lid Panel + thickness) and its own layers (Lid Panel / CutOut Lid), with its own cutout toolpath at the lid thickness. If it is thicker than the lid groove width, a rabbet is milled on the lid's TOP face along its Side 1, Side 2 and End 1 edges down to the groove width, so the lid's underside runs on the groove floor and its top can sit flush with the walls.">
+                <label for="LidThicknessField">Lid Thickness</label>
+                <input type="number" step="any" id="LidThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (lid thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the lid is thicker than the groove width (i.e. a rabbet is milled).">
+                <label for="LidRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
+                <input type="number" step="any" id="LidRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the lid reaches into each of the 3 grooves (Side 1, Side 2, End 1), for an easier slide fit.">
+                <label for="LidGrooveClearanceField" style="color: #1155A2;">Lid Clearance</label>
+                <input type="number" step="any" id="LidGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+            </div>
+          </td>
+          <td style="vertical-align: middle; padding: 0 20px;">
+            <img id="LidGrooveSketchImage" src="Images/LidGroovedSketch_174.png" alt="Sketch: Lid, Groove offset, Groove width, Groove depth, rabbet correction, Lid Clearance" />
+          </td>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Lid Groove</div>
+              <div class="field-row" title="Width of the lid groove slot. A lid thicker than this gets a rabbet on its top face down to this width.">
+                <label for="LidGrooveWidthField">Groove width</label>
+                <input type="number" step="any" id="LidGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="How deep the lid groove is cut into Side 1, Side 2 and End 1 (must be less than the material thickness)">
+                <label for="LidGrooveDepthField">Groove depth</label>
+                <input type="number" step="any" id="LidGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" title="Distance from the top edge of the walls down to the top of the lid groove, or down to the top face of the lid - see 'Offset to' below. 0 with 'Lid' = lid flush with the top of the walls.">
+                <label for="LidGrooveOffsetField">Groove offset</label>
+                <input type="number" step="any" id="LidGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="What the lid groove offset is measured to, from the top edge of the walls. Groove: down to the top of the groove. Lid: down to the top face of the lid - the groove position is then worked out from the lid thickness.">
+                <label for="LidGrooveOffsetRef">Offset to</label>
+                <select id="LidGrooveOffsetRef" onchange="onLidGrooveOffsetRefChanged(); onGeometryFieldChanged();">
+                  <option value="Groove">Groove</option>
+                  <option value="Lid">Lid</option>
+                </select>
+              </div>
+            </div>
+          </td>
+        </tr>
+        <tr>
+          <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Grip Tab</div>
+              <div class="field-row" title="How far the grip tab sticks out behind End 2 (0 = no grip tab, the lid ends flush with End 2).">
+                <label for="LidGripOverhangField">Grip overhang</label>
+                <input type="number" step="any" id="LidGripOverhangField" placeholder="Overhang" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Width of the grip tab, centred on the lid. The rest of the overhang is cut flush left and right. At most the inside width minus twice the lid groove depth.">
+                <label for="LidGripWidthField">Grip width</label>
+                <input type="number" step="any" id="LidGripWidthField" placeholder="Grip width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+            </div>
+          </td>
+          <td style="vertical-align: middle; padding: 10px 20px 0 20px;">
+            <img id="LidGripSketchImage" src="Images/LidGripSketch_Rounded.png" alt="Sketch: Grip tab, Grip overhang, Grip width, Corner radius" />
+          </td>
+          <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Grip Shape</div>
+              <div class="field-row" title="Shape of the grip tab. Square: plain rectangle. Rounded: rectangle with rounded outer corners. Arc: one circular arc from root to root through the tip (a half circle on straight flanks if the overhang is more than half the grip width).">
+                <label for="LidGripShape">Shape</label>
+                <select id="LidGripShape" onchange="onLidGripShapeChanged(); onGeometryFieldChanged();">
+                  <option value="Square">Square</option>
+                  <option value="Rounded">Rounded</option>
+                  <option value="Arc">Arc</option>
+                </select>
+              </div>
+              <div class="field-row" id="showHideLidGripRadius" style="margin-bottom: 0;" title="Radius of the two outer corners of a Rounded grip tab (limited to half the grip width and to the overhang).">
+                <label for="LidGripRadiusField">Corner radius</label>
+                <input type="number" step="any" id="LidGripRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+      <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center; margin-top: 6px;" id="LidRabbetInfoText"></div>
+    </div>
+  </div>
+
   <!-- ── Tools ─────────────────────────────────────────────────────────── -->
   <div class="section-header">Tools</div>
   <div class="card">
@@ -398,6 +496,7 @@
     <input type="text" id="InvalidLidJointWidth" value=""/>
     <input type="text" id="InvalidBottomJointWidth" value=""/>
     <input type="text" id="InvalidBottomGrooveWidth" value=""/>
+    <input type="text" id="InvalidLidGrooveWidth" value=""/>
   </fieldset>
 
 
@@ -440,7 +539,9 @@
   // -- by Claude 10/7/2026
   var g_themedLabels = {
     "BottomGrooveClearanceField":  ["#1155A2", "#7DB4F5"],
-    "BottomRabbetCorrectionField": ["#1155A2", "#7DB4F5"]
+    "BottomRabbetCorrectionField": ["#1155A2", "#7DB4F5"],
+    "LidGrooveClearanceField":     ["#1155A2", "#7DB4F5"],
+    "LidRabbetCorrectionField":    ["#1155A2", "#7DB4F5"]
   };
   function applyThemedLabelColors(isDark) {
     var labels = document.getElementsByTagName("label");
@@ -465,6 +566,7 @@
   // allows Side Overhang; None is a plain open box without it.
   var LID_INDEX_NONE = 3;
   var LID_INDEX_OPEN_CHAMFER = 4;
+  var LID_INDEX_GROOVED = 5;   // sliding lid -- by Claude 10/25/2026
 
   // True for either lid type that leaves the top of the box open.
   function isOpenLidIndex(index) {
@@ -479,7 +581,7 @@
     var selectedIndex = select ? select.selectedIndex : 0;
 
     var imgFiles = ["Images/InsetLid.png", "Images/tabbedlid.png",
-                    "Images/FlatLid.png",  "", "Images/ChamferLid.png"];
+                    "Images/FlatLid.png",  "", "Images/ChamferLid.png", ""];
     var img = document.getElementById("LidTypeImage");
     if (img) {
       var src = imgFiles[selectedIndex] || "";
@@ -496,6 +598,16 @@
 
     // Open Chamfer options (Side Overhang) only apply with Lid Type = Open Chamfer.
     setSectionVisible("showHideOpenChamferSectionHeader", "showHideOpenChamferOptions", selectedIndex === LID_INDEX_OPEN_CHAMFER);
+
+    // Grooved (sliding) lid options -- by Claude 10/25/2026
+    setSectionVisible("showHideLidGrooveSectionHeader", "showHideLidGrooveOptions", selectedIndex === LID_INDEX_GROOVED);
+    if (lidCheckItem) {
+      if (selectedIndex === LID_INDEX_GROOVED) {
+        lidCheckItem.title = "Uncheck to skip cutting the lid while still cutting the lid groove into Side 1, Side 2 & End 1 (and still shortening End 2) - e.g. to slide in a lid of your own material.";
+      } else {
+        lidCheckItem.title = "Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type";
+      }
+    }
 
     onSideOverhangFieldsChanged();
     onGeometryFieldChanged();
@@ -589,6 +701,48 @@
     img.src = toBottom ? "Images/GroovedOverhangSketch_174_bottom.png" : "Images/GroovedOverhangSketch_174.png";
   }
 
+  // Live hint under the Grooved Lid fields, same as updateBottomRabbetInfo.  -- by Claude 10/25/2026
+  function updateLidRabbetInfo() {
+    var out = document.getElementById("LidRabbetInfoText");
+    var tEl = document.getElementById("LidThicknessField");
+    var wEl = document.getElementById("LidGrooveWidthField");
+    var cEl = document.getElementById("LidRabbetCorrectionField");
+    if (!out || !tEl || !wEl) { return; }
+    var t = parseFloat(tEl.value);
+    var w = parseFloat(wEl.value);
+    var c = cEl ? parseFloat(cEl.value) : 0;
+    if (!isFinite(c)) { c = 0; }
+    if (!isFinite(t) || !isFinite(w)) { out.innerHTML = ""; return; }
+    var diff = t - w;
+    if (diff > 0.0001) {
+      out.innerHTML = "Lid rabbet depth " + Math.max(0, diff + c).toFixed(2) + " on the top face (lid thickness - groove width + rabbet correction)";
+    } else if (diff > -0.0001) {
+      out.innerHTML = "Lid thickness equals the groove width - no rabbet needed.";
+    } else {
+      out.innerHTML = "Lid is " + (-diff).toFixed(2) + " thinner than the groove width - no rabbet, it will have that much play in the groove. Reduce the groove width if that is too loose.";
+    }
+  }
+
+  // Detail B shows the lid groove offset to whatever "Offset to" is set to.  -- by Claude 10/25/2026
+  function onLidGrooveOffsetRefChanged() {
+    var sel = document.getElementById("LidGrooveOffsetRef");
+    var img = document.getElementById("LidGrooveSketchImage");
+    if (!sel || !img) { return; }
+    var toLid = sel.selectedIndex >= 0 && sel.options[sel.selectedIndex].value === "Lid";
+    img.src = toLid ? "Images/LidGroovedSketch_174_lid.png" : "Images/LidGroovedSketch_174.png";
+  }
+
+  // Grip sketch follows the shape; the corner radius only applies to Rounded.  -- by Claude 10/25/2026
+  function onLidGripShapeChanged() {
+    var sel = document.getElementById("LidGripShape");
+    var img = document.getElementById("LidGripSketchImage");
+    var radiusRow = document.getElementById("showHideLidGripRadius");
+    var shape = (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex].value : "Rounded";
+    if (shape !== "Square" && shape !== "Arc") { shape = "Rounded"; }
+    if (img) { img.src = "Images/LidGripSketch_" + shape + ".png"; }
+    if (radiusRow) { radiusRow.style.display = (shape === "Rounded") ? "block" : "none"; }
+  }
+
   function onBottomTypeChanged(el) {
     var select = document.getElementById("BottomTypeSelect");
     var selectedIndex = select ? select.selectedIndex : 0;
@@ -652,7 +806,8 @@
     "InvalidEnd2Height":       "End2HeightField",
     "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
     "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
-    "InvalidBottomGrooveWidth": "BottomGrooveWidthField"
+    "InvalidBottomGrooveWidth": "BottomGrooveWidthField",
+    "InvalidLidGrooveWidth":    "LidGrooveWidthField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -803,6 +958,9 @@
     }
     updateBottomRabbetInfo();
     onGrooveOffsetRefChanged();
+    updateLidRabbetInfo();
+    onLidGrooveOffsetRefChanged();
+    onLidGripShapeChanged();
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

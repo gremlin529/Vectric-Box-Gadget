@@ -489,9 +489,14 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   if (options.bottomType == FaceJointType.Grooved) then
     bottom_thickness_end2 = options.bottomGrooveOffset or 0
   end
+  -- Grooved (sliding) lid: End 2 ends at the lid's underside -- by Claude 10/25/2026
+  local top_reserved_end2 = top_reserved_for_corner
+  if (options.lidType == FaceJointType.Grooved) then
+    top_reserved_end2 = options.lidGrooveOffset or 0
+  end
   local inner_height = math.min(
     (options.end1Height or options.height) - top_reserved_for_corner - bottom_thickness_end1,
-    (options.end2Height or options.height) - top_reserved_for_corner - bottom_thickness_end2)
+    (options.end2Height or options.height) - top_reserved_end2 - bottom_thickness_end2)
 
   local cuttingBottomJoint = (options.bottomType == FaceJointType.Fingers) and
     (options.facesToMake.bottom or options.create_tabs_for_missing_faces)
@@ -817,6 +822,133 @@ function BottomPanelUndersideHeight(options)
   return floor - BottomPanelHangsBelowFloor(options)
 end
 
+--[[  -------------- Grooved (sliding) lid --------------------------------------------------
+|
+|  The mirror image of the Grooved bottom. The dialog's lid groove offset is
+|  measured from the TOP edge of the walls down to the top (near) edge of the
+|  groove ("Groove"), or down to the top face of the lid ("Lid"). Internally
+|  options.lidGrooveOffset is "from the top edge down to the groove's LOWER
+|  edge", which is where the lid's underside runs (a lid thicker than the
+|  groove has its rabbet on the top face, so its underside stays on the
+|  groove floor). End 2 is shortened to exactly that height.
+|                                                                 -- by Claude 10/25/2026
+]]
+function LidGrooveFarEdgeFromInput(options)
+  local input = options.lidGrooveOffsetInput or 0
+  if options.lidGrooveOffsetRef == "Lid" then
+    return input + (options.lidThickness or options.thickness or 0)
+  end
+  return input + (options.lidGrooveWidth or 0)
+end
+
+-- Same as ValidateBottomGrooveToolFit, for the lid groove.  -- by Claude 10/25/2026
+local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
+  local message = ""
+  local groove_width = options.lidGrooveWidth or 0
+  local cutting_groove = (options.lidType == FaceJointType.Grooved)
+    and (not options.no_toolpath)
+    and (groove_width > 0.0001)
+
+  if cutting_groove then
+    local mtl_block = MaterialBlock()
+    local converted_tool_diameter = 0.25
+    if Tool_ok(options.tool) then
+      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
+    end
+    local effectiveDia = converted_tool_diameter
+    if options.allowance > 0 then
+      effectiveDia = effectiveDia - 2 * options.allowance
+    end
+    if (effectiveDia > 0) and (effectiveDia > groove_width + 0.0001) then
+      message = string.format(
+        "The selected tool is too large to cut the lid groove.\n\nThe groove in Side 1, Side 2 and End 1 is a closed slot only as wide as the lid groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the lid groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
+        groove_width, effectiveDia, effectiveDia)
+    end
+  end
+
+  if report_as_dialog then
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidLidGrooveWidth", message)
+  return message == ""
+end
+
+-- All the Grooved lid checks for the OK button. Returns false after showing
+-- the first problem found.                                    -- by Claude 10/25/2026
+local function ValidateGroovedLidOptions(dialog, options)
+  if (options.lidType ~= FaceJointType.Grooved) then
+    return true
+  end
+  local function fail(msg)
+    DisplayMessageBox(msg)
+    return false
+  end
+  if not IsNonNeg(options.lidGrooveDepth) or options.lidGrooveDepth <= 0 then
+    return fail("Lid groove depth must be greater than 0.")
+  end
+  if options.lidGrooveDepth >= options.thickness then
+    return fail(string.format("Lid groove depth %.2f must be less than the material thickness %.2f.", options.lidGrooveDepth, options.thickness))
+  end
+  if not IsNonNeg(options.lidGrooveWidth) or options.lidGrooveWidth <= 0 then
+    return fail("Lid groove width must be greater than 0.")
+  end
+  if not IsNonNeg(options.lidGrooveOffsetInput) then
+    return fail("Lid groove offset must be 0 or greater.")
+  end
+  if not (options.lidThickness and options.lidThickness > 0) then
+    return fail("Lid thickness must be greater than 0.")
+  end
+  if options.lidThickness > options.thickness + 0.0001 then
+    return fail(string.format("Lid thickness %.2f cannot be more than the material thickness %.2f.", options.lidThickness, options.thickness))
+  end
+  -- "Offset to Lid" with a lid thinner than the groove: the groove's top edge
+  -- must still be inside the wall.
+  if options.lidGrooveOffset < options.lidGrooveWidth - 0.0001 then
+    return fail("The lid groove would reach above the top edge of the walls - increase the lid groove offset.")
+  end
+  if not IsNonNeg(options.lidGrooveClearance) then
+    return fail("Lid clearance must be 0 or greater.")
+  end
+  if options.lidGrooveClearance >= options.lidGrooveDepth then
+    return fail(string.format("Lid clearance %.2f must be less than the lid groove depth %.2f.", options.lidGrooveClearance, options.lidGrooveDepth))
+  end
+  -- End 2 runs from its bottom (top of the bottom groove, or above the bottom's
+  -- joint) up to the lid's underside - it must still be a real panel, which also
+  -- keeps the lid groove clear of the bottom groove.
+  local bottom_reserved = ThicknessForFaceType(options.bottomType, options.thickness)
+  if (options.bottomType == FaceJointType.Grooved) then
+    bottom_reserved = options.bottomGrooveOffset or 0
+  end
+  if (options.lidGrooveOffset + bottom_reserved) >= options.height - 0.0001 then
+    return fail(string.format("The lid groove offset is too large for the box height %.2f (End 2 would have no height left below the lid).", options.height))
+  end
+  if not IsNonNeg(options.lidGripOverhang) then
+    return fail("Grip overhang must be 0 or greater.")
+  end
+  if not IsNonNeg(options.lidGripWidth) then
+    return fail("Grip width must be 0 or greater.")
+  end
+  if options.lidGripOverhang > 0.0001 then
+    if options.lidGripWidth <= 0.0001 then
+      return fail("Grip width must be greater than 0 when there is a grip overhang.")
+    end
+    -- the grip tab must stay clear of the rabbet bands along Side 1 / Side 2
+    local max_grip = (options.width - 2*options.thickness) - 2*options.lidGrooveDepth
+    if options.lidGripWidth > max_grip + 0.0001 then
+      return fail(string.format("Grip width %.2f is too wide - at most %.2f (inside width minus twice the lid groove depth).", options.lidGripWidth, max_grip))
+    end
+    if options.lidGripShape == "Rounded" and not IsNonNeg(options.lidGripRadius) then
+      return fail("Grip corner radius must be 0 or greater.")
+    end
+  end
+  return ValidateLidGrooveToolFit(dialog, options, true)
+end
+
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   G_dialogOptions = options
@@ -875,6 +1007,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidEnd1ChamferAngle", "")
   dialog:AddTextField("InvalidEnd2ChamferAngle", "")
   dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
+  dialog:AddTextField("InvalidLidGrooveWidth", "")     -- Added by Claude 10/25/2026
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -930,6 +1063,19 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("BottomThicknessField", options.bottomThickness)  -- replaces the "Bottom same material" checkbox -- by Claude 10/9/2026
   dialog:AddDoubleField("BottomGrooveClearanceField", options.bottomGrooveClearance)
   dialog:AddDoubleField("BottomRabbetCorrectionField", options.bottomRabbetDepthCorrection)
+
+  -- Grooved (sliding) lid options -- by Claude 10/25/2026
+  dialog:AddDoubleField("LidThicknessField", options.lidThickness)
+  dialog:AddDoubleField("LidRabbetCorrectionField", options.lidRabbetDepthCorrection)
+  dialog:AddDoubleField("LidGrooveClearanceField", options.lidGrooveClearance)
+  dialog:AddDoubleField("LidGrooveWidthField", options.lidGrooveWidth)
+  dialog:AddDoubleField("LidGrooveDepthField", options.lidGrooveDepth)
+  dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
+  dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
+  dialog:AddDoubleField("LidGripOverhangField", options.lidGripOverhang)
+  dialog:AddDoubleField("LidGripWidthField", options.lidGripWidth)
+  dialog:AddDropDownList("LidGripShape", options.lidGripShape)               -- "Square" / "Rounded" / "Arc"
+  dialog:AddDoubleField("LidGripRadiusField", options.lidGripRadius)
 
   -- "Side Overhang" (Side 1/Side 2 only, Lid Type None only).
   -- The user sets End 1's and End 2's own height directly and independently;
@@ -1017,6 +1163,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       -- still be enough height left above that for End 2 itself (and for the
       -- lid's own reserved thickness, if any) to be a real panel. -- by Claude 9/21/2026
       local top_reserved = ThicknessForFaceType(options.lidType, options.thickness)
+      if (options.lidType == FaceJointType.Grooved) then
+        top_reserved = options.lidGrooveOffset or 0   -- End 2 ends at the lid's underside -- by Claude 10/25/2026
+      end
       if (options.bottomGrooveOffset + top_reserved) >= options.height then
         DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (End 2 would have no height left).", options.height))
         return false
@@ -1026,6 +1175,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       if not ValidateBottomGrooveToolFit(dialog, options, true) then
         return false
       end
+    end
+
+    -- Grooved (sliding) lid -- by Claude 10/25/2026
+    if not ValidateGroovedLidOptions(dialog, options) then
+      return false
     end
 
     -- Tool must be chosen and valid (only when creating toolpaths)
@@ -1197,6 +1351,23 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   -- width, bottom thickness and rabbet correction read above).  -- by Claude 10/15/2026 (#86)
   options.bottomGrooveOffset = GrooveTopOffsetFromInput(options)
 
+  -- Grooved (sliding) lid options -- by Claude 10/25/2026
+  options.lidThickness = dialog:GetDoubleField("LidThicknessField")
+  options.lidRabbetDepthCorrection = dialog:GetDoubleField("LidRabbetCorrectionField")
+  options.lidGrooveClearance = dialog:GetDoubleField("LidGrooveClearanceField")
+  options.lidGrooveWidth = dialog:GetDoubleField("LidGrooveWidthField")
+  options.lidGrooveDepth = dialog:GetDoubleField("LidGrooveDepthField")
+  options.lidGrooveOffsetInput = dialog:GetDoubleField("LidGrooveOffsetField")
+  options.lidGrooveOffsetRef = dialog:GetDropDownListValue("LidGrooveOffsetRef")
+  if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidGripOverhang = dialog:GetDoubleField("LidGripOverhangField")
+  options.lidGripWidth = dialog:GetDoubleField("LidGripWidthField")
+  options.lidGripShape = dialog:GetDropDownListValue("LidGripShape")
+  if options.lidGripShape ~= "Square" and options.lidGripShape ~= "Arc" then options.lidGripShape = "Rounded" end
+  options.lidGripRadius = dialog:GetDoubleField("LidGripRadiusField")
+  -- internal: from the top edge down to the groove's lower edge (= lid underside)
+  options.lidGrooveOffset = LidGrooveFarEdgeFromInput(options)
+
   -- "Side Overhang": End 1's and End 2's own heights
   -- (independent of each other), plus the chamfer's horizontal run. If a
   -- field is empty/invalid, fall back to the box height (i.e. no overhang
@@ -1308,6 +1479,17 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("BottomThickness", options.bottomThickness)                         -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   registry:SetDouble("BottomGrooveClearance", options.bottomGrooveClearance)             -- Added by Claude 9/21/2026
   registry:SetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
+  registry:SetDouble("LidThickness", options.lidThickness)                         -- Grooved lid, by Claude 10/25/2026
+  registry:SetDouble("LidRabbetDepthCorrection", options.lidRabbetDepthCorrection)
+  registry:SetDouble("LidGrooveClearance", options.lidGrooveClearance)
+  registry:SetDouble("LidGrooveWidth", options.lidGrooveWidth)
+  registry:SetDouble("LidGrooveDepth", options.lidGrooveDepth)
+  registry:SetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
+  registry:SetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
+  registry:SetDouble("LidGripOverhang", options.lidGripOverhang)
+  registry:SetDouble("LidGripWidth", options.lidGripWidth)
+  registry:SetString("LidGripShape", options.lidGripShape)
+  registry:SetDouble("LidGripRadius", options.lidGripRadius)
   registry:SetDouble("End1Height", options.end1Height)                             -- Added by Claude 9/20/2026
   registry:SetDouble("End2Height", options.end2Height)                             -- Added by Claude 9/20/2026
   registry:SetDouble("End1ChamferAngle", options.end1ChamferAngle)                 -- Added by Claude 9/20/2026
@@ -1384,6 +1566,20 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.bottomThickness = registry:GetDouble("BottomThickness", options.bottomThickness)                              -- Added by Claude 10/9/2026 (replaces BottomSameMaterial)
   options.bottomGrooveClearance = registry:GetDouble("BottomGrooveClearance", options.bottomGrooveClearance)              -- Added by Claude 9/21/2026
   options.bottomRabbetDepthCorrection = registry:GetDouble("BottomRabbetDepthCorrection", options.bottomRabbetDepthCorrection) -- Added by Claude 9/21/2026
+  -- Grooved (sliding) lid -- by Claude 10/25/2026
+  options.lidThickness = registry:GetDouble("LidThickness", options.lidThickness)
+  options.lidRabbetDepthCorrection = registry:GetDouble("LidRabbetDepthCorrection", options.lidRabbetDepthCorrection)
+  options.lidGrooveClearance = registry:GetDouble("LidGrooveClearance", options.lidGrooveClearance)
+  options.lidGrooveWidth = registry:GetDouble("LidGrooveWidth", options.lidGrooveWidth)
+  options.lidGrooveDepth = registry:GetDouble("LidGrooveDepth", options.lidGrooveDepth)
+  options.lidGrooveOffsetInput = registry:GetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
+  options.lidGrooveOffsetRef = registry:GetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
+  if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidGripOverhang = registry:GetDouble("LidGripOverhang", options.lidGripOverhang)
+  options.lidGripWidth = registry:GetDouble("LidGripWidth", options.lidGripWidth)
+  options.lidGripShape = registry:GetString("LidGripShape", options.lidGripShape)
+  if options.lidGripShape ~= "Square" and options.lidGripShape ~= "Arc" then options.lidGripShape = "Rounded" end
+  options.lidGripRadius = registry:GetDouble("LidGripRadius", options.lidGripRadius)
   -- Fall back to the just-loaded options.height (not the pre-load default) so a
   -- registry with no saved End1Height/End2Height yet (e.g. right after
   -- upgrading) comes up as "no overhang" instead of accidentally showing a
@@ -1442,6 +1638,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
   ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
   ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
+  ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
 
   return true
 end
