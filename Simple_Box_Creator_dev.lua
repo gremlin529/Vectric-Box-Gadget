@@ -140,6 +140,7 @@ function main(script_path)
   options.lidGrooveOffset = options.lidGrooveOffsetInput + options.lidGrooveWidth
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
+  options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut End 1's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
   options.lidGripEnabled = true             --- Grooved lid only: make a grip tab behind End 2 (off = the lid ends flush with End 2)
   options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out behind End 2 (0 = no grip tab)
   options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
@@ -462,7 +463,7 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
   -- while End 1 is still in its original (unarranged) position.  -- by Claude 10/9/2026
   local flip_face = nil
   for i = 1, #faces do
-    if faces[i].flip_groove_contours ~= nil then
+    if faces[i].flip_groove_contours ~= nil or faces[i].flip_lid_groove_contours ~= nil then  -- lid groove too, by Claude 10/26/2026
       flip_face = MakeFrontGrooveFlipFace(faces[i])
       break
     end
@@ -598,29 +599,39 @@ function MakeFrontGrooveFlipFace(front)
   outline:LineTo(Point2D(0, part_w))
   outline:LineTo(Point2D(0, 0))
 
-  local grooves = ContourGroup(true)
-  local pos = front.flip_groove_contours:GetHeadPosition()
-  while pos ~= nil do
-    local c
-    c, pos = front.flip_groove_contours:GetNext(pos)
-    local b = c.BoundingBox2D
-    -- mirror x about the part's own centre line, then move its lower left to (0,0)
-    local ax, ay = Upright(fx1 - b.MaxX, b.MinY - fy0)
-    local bx, by = Upright(fx1 - b.MinX, b.MaxY - fy0)
-    local gx0 = math.min(ax, bx)
-    local gx1 = math.max(ax, bx)
-    local gy0 = math.min(ay, by)
-    local gy1 = math.max(ay, by)
-    local g = Contour(0.0)
-    g:AppendPoint(Point2D(gx0, gy0))
-    g:LineTo(Point2D(gx1, gy0))
-    g:LineTo(Point2D(gx1, gy1))
-    g:LineTo(Point2D(gx0, gy1))
-    g:LineTo(Point2D(gx0, gy0))
-    grooves:AddTail(g)
+  -- Bottom groove and (Grooved lid) lid groove are mirrored the same way, but kept
+  -- in separate groups: they are cut in separate passes at their own depths.
+  --                                                             -- by Claude 10/26/2026
+  local function MirrorGrooves(source)
+    if source == nil then
+      return nil
+    end
+    local grooves = ContourGroup(true)
+    local pos = source:GetHeadPosition()
+    while pos ~= nil do
+      local c
+      c, pos = source:GetNext(pos)
+      local b = c.BoundingBox2D
+      -- mirror x about the part's own centre line, then move its lower left to (0,0)
+      local ax, ay = Upright(fx1 - b.MaxX, b.MinY - fy0)
+      local bx, by = Upright(fx1 - b.MinX, b.MaxY - fy0)
+      local gx0 = math.min(ax, bx)
+      local gx1 = math.max(ax, bx)
+      local gy0 = math.min(ay, by)
+      local gy1 = math.max(ay, by)
+      local g = Contour(0.0)
+      g:AppendPoint(Point2D(gx0, gy0))
+      g:LineTo(Point2D(gx1, gy0))
+      g:LineTo(Point2D(gx1, gy1))
+      g:LineTo(Point2D(gx0, gy1))
+      g:LineTo(Point2D(gx0, gy0))
+      grooves:AddTail(g)
+    end
+    return grooves
   end
 
-  local f = Face(outline, nil, {}, {}, "End1GrooveFlip", FaceType.End, FaceJointType.Grooved, {}, nil, grooves)
+  local f = Face(outline, nil, {}, {}, "End1GrooveFlip", FaceType.End, FaceJointType.Grooved, {}, nil, MirrorGrooves(front.flip_groove_contours))
+  f.lid_groove_contours = MirrorGrooves(front.flip_lid_groove_contours)
   f.is_flip_helper = true
   return f
 end

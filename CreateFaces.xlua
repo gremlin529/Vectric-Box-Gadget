@@ -549,9 +549,10 @@ function MakeGroovedLid(options, facesToMake, name)
   local tablist = {}
   local fingerSides = ContourGroup(true)
 
-  -- With dovetails End 1 gets no lid groove (see MakeEndFace), so the lid stops
-  -- at End 1's inside face (less the clearance) and has no rabbet along its front.
-  local front_groove = not options.dovetailJoint
+  -- With dovetails End 1 gets no lid groove (see MakeEndFace) unless it is cut on
+  -- the flip sheet, so the lid then stops at End 1's inside face (less the
+  -- clearance) and has no rabbet along its front.          -- updated by Claude 10/26/2026
+  local front_groove = (not options.dovetailJoint) or (options.lidFrontGrooveFlip == true)
   local front_reach = reach
   if not front_groove then
     front_reach = -clearance
@@ -1423,10 +1424,13 @@ end
 
     -- Grooved (sliding) lid: Front gets the lid groove near its top edge, stopped
     -- half a material thickness short of each corner like the bottom groove.
-    -- Skipped with dovetails, same as the bottom groove (no flip sheet for the
-    -- lid groove yet).                                          -- by Claude 10/25/2026
+    -- With dovetails it is skipped, unless "Reverse End 1 for lid groove on own
+    -- sheet" is ticked: then it is handed back as flip_lid_groove_contours for the
+    -- same flipped helper part the bottom groove uses.     -- by Claude 10/25/2026, 10/26/2026
     local lid_groove_contours = nil
-    if (lidType == FaceJointType.Grooved and is_end1 and not dovetailJoint) then
+    local flip_lid_groove_contours = nil
+    local wantFlipLidGroove = dovetailJoint and options.lidFrontGrooveFlip
+    if (lidType == FaceJointType.Grooved and is_end1 and ((not dovetailJoint) or wantFlipLidGroove)) then
       local lid_groove_width = options.lidGrooveWidth or thickness
       local top_y = inner_blc.y + inner_height
       local lg_y0 = top_y - (options.lidGrooveOffset or 0)
@@ -1438,8 +1442,13 @@ end
       lid_groove:LineTo(Point2D(lg_x1, lg_y0 + lid_groove_width))
       lid_groove:LineTo(Point2D(lg_x0, lg_y0 + lid_groove_width))
       lid_groove:LineTo(Point2D(lg_x0, lg_y0))
-      lid_groove_contours = ContourGroup(true)
-      lid_groove_contours:AddTail(lid_groove)
+      if dovetailJoint then
+        flip_lid_groove_contours = ContourGroup(true)
+        flip_lid_groove_contours:AddTail(lid_groove)
+      else
+        lid_groove_contours = ContourGroup(true)
+        lid_groove_contours:AddTail(lid_groove)
+      end
     end
 
     -- Gremlin added doevtail seperation for different sizes
@@ -1582,6 +1591,7 @@ end
     local end_face = Face(contour, nil, dovetail_markers, tablist, name, FaceType.End, FaceJointType.Fingers, flute_sockets, fingerSides, groove_contours)
     end_face.flip_groove_contours = flip_groove_contours  -- dovetail End 1 groove for its own (flip) sheet -- by Claude 10/9/2026
     end_face.lid_groove_contours = lid_groove_contours    -- Grooved lid -- by Claude 10/25/2026
+    end_face.flip_lid_groove_contours = flip_lid_groove_contours  -- dovetail End 1 lid groove for the flip sheet -- by Claude 10/26/2026
     return end_face
   end
 

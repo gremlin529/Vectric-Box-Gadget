@@ -1073,6 +1073,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("LidGrooveDepthField", options.lidGrooveDepth)
   dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
   dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
+  dialog:AddCheckBox("LidFrontGrooveFlip", options.lidFrontGrooveFlip)       -- Dovetail only: End 1 lid groove on the flip sheet -- by Claude 10/26/2026
   dialog:AddCheckBox("LidGripEnabled", options.lidGripEnabled)
   dialog:AddDoubleField("LidGripOverhangField", options.lidGripOverhang)
   dialog:AddDoubleField("LidGripWidthField", options.lidGripWidth)
@@ -1362,6 +1363,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.lidGrooveOffsetInput = dialog:GetDoubleField("LidGrooveOffsetField")
   options.lidGrooveOffsetRef = dialog:GetDropDownListValue("LidGrooveOffsetRef")
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidFrontGrooveFlip = dialog:GetCheckBox("LidFrontGrooveFlip")   -- by Claude 10/26/2026
   options.lidGripEnabled = dialog:GetCheckBox("LidGripEnabled")
   options.lidGripOverhang = dialog:GetDoubleField("LidGripOverhangField")
   options.lidGripWidth = dialog:GetDoubleField("LidGripWidthField")
@@ -1489,6 +1491,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("LidGrooveDepth", options.lidGrooveDepth)
   registry:SetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
   registry:SetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
+  registry:SetBool("LidFrontGrooveFlip", options.lidFrontGrooveFlip)
   registry:SetBool("LidGripEnabled", options.lidGripEnabled)
   registry:SetDouble("LidGripOverhang", options.lidGripOverhang)
   registry:SetDouble("LidGripWidth", options.lidGripWidth)
@@ -1579,6 +1582,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.lidGrooveOffsetInput = registry:GetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
   options.lidGrooveOffsetRef = registry:GetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidFrontGrooveFlip = registry:GetBool("LidFrontGrooveFlip", options.lidFrontGrooveFlip)
   options.lidGripEnabled = registry:GetBool("LidGripEnabled", options.lidGripEnabled)
   options.lidGripOverhang = registry:GetDouble("LidGripOverhang", options.lidGripOverhang)
   options.lidGripWidth = registry:GetDouble("LidGripWidth", options.lidGripWidth)

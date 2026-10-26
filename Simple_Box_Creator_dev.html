@@ -308,7 +308,7 @@
   <div class="section-header" id="showHideLidGrooveSectionHeader" style="display: none;">Grooved Lid Options</div>
   <div class="card" id="showHideLidGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Side 1, Side 2 &amp; End 1 near the top edge (with Dovetail joints End 1 gets no groove and the lid stops at its inside face). End 2 is shortened to the underside of the lid, so the lid slides in from the back over End 2. Behind End 2 only the grip tab sticks out - the rest of the overhang is cut flush left and right.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Side 1, Side 2 &amp; End 1 near the top edge (with Dovetail joints, End 1's lid groove has to be cut from its other side - tick "Reverse End 1 (Front) for lid groove on own sheet" to get it on the flip sheet, otherwise End 1 gets no lid groove and the lid stops at its inside face). End 2 is shortened to the underside of the lid, so the lid slides in from the back over End 2. Behind End 2 only the grip tab sticks out - the rest of the overhang is cut flush left and right.</div>
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
         <tr>
@@ -353,6 +353,11 @@
                   <option value="Groove">Groove</option>
                   <option value="Lid">Lid</option>
                 </select>
+              </div>
+              <!-- Dovetail only: End 1's lid groove on the flip sheet, like the bottom groove -- by Claude 10/26/2026 -->
+              <div class="checkbox-row" id="showHideLidFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: End 1's lid groove has to go into the face that lies on the spoilboard when End 1 is cut. When checked, it is cut on the extra sheet 'End 1 Groove (flipped)' (together with the bottom groove, if that is flipped too): turn the cut End 1 over (left/right), stand it upright with its bottom edge against the left (X0) stop, push it into the sheet's lower left corner (against the Y0 stop) and run the lid groove toolpath there. The lid then reaches into that groove. Unchecked, End 1 gets no lid groove and the lid stops at its inside face.">
+                <input type="checkbox" class="LuaButton" id="LidFrontGrooveFlip" onclick="onGeometryFieldChanged()" />
+                <label for="LidFrontGrooveFlip">Reverse End 1 (Front) for lid groove on own sheet</label>
               </div>
             </div>
           </td>
@@ -930,6 +935,8 @@
     // End 1 groove on its own (flip) sheet - dovetails only
     var flipRow = document.getElementById("showHideFrontGrooveFlip");
     if (flipRow) { flipRow.style.display = isBoxJoint ? "none" : "block"; }
+    var lidFlipRow = document.getElementById("showHideLidFrontGrooveFlip");
+    if (lidFlipRow) { lidFlipRow.style.display = isBoxJoint ? "none" : "block"; }
 
     updateRoundoverToolVisibility();
     onGeometryFieldChanged();
