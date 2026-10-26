@@ -696,8 +696,34 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         local cdcontours = GetAllProfileCadContours(group_faces)
         local cutout_cadcontours
         if options.create_dogbones or options.dovetailJoint then
-          local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-          cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+          -- A Grooved (sliding) lid has no joints to dogbone, and the dogbone offset
+          -- only handles straight spans - it turned the grip tab's arcs into chords
+          -- and notched the tab's inner corners. Offset the lid normally instead,
+          -- everything else exactly as before.                -- by Claude 10/26/2026
+          local dogbone_faces, plain_faces = {}, {}
+          for i = 1, #group_faces do
+            if group_faces[i].facetype == FaceType.Lid and group_faces[i].jointtype == FaceJointType.Grooved then
+              plain_faces[#plain_faces + 1] = group_faces[i]
+            else
+              dogbone_faces[#dogbone_faces + 1] = group_faces[i]
+            end
+          end
+          local offset_contours = ContourGroup(true)
+          local function AppendAll(group)
+            local pos = group:GetHeadPosition()
+            while pos ~= nil do
+              local c
+              c, pos = group:GetNext(pos)
+              offset_contours:AddTail(c:Clone())
+            end
+          end
+          if #dogbone_faces > 0 then
+            AppendAll(CreateDogboneProfile(GetAllProfileContours(dogbone_faces), offset_radius))
+          end
+          if #plain_faces > 0 then
+            AppendAll(GetAllProfileContours(plain_faces):Offset(offset_radius, 0, 1, true))
+          end
+          cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
         else
           local offset_contours = vdcontours:Offset(offset_radius, 0, 1, true)
           cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)

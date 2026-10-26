@@ -444,7 +444,8 @@ end
 |  Draws the grip tab at the lid's back edge (y = yb), centred on cx, while the
 |  contour runs from right to left along that edge (anti-clockwise outline).
 |  Starts with a line to the tab's right root and ends at its left root.
-|  Shapes: "Square", "Rounded" (corner radius) and "Arc" (one circular arc
+|  Shapes: "Square", "Rounded" (corner radius; a radius of at least the
+|  overhang runs out into the back edge in a swung S-curve) and "Arc" (one circular arc
 |  through both roots and the tip; an arc taller than half the grip width
 |  becomes a half circle on straight flanks).
 |
@@ -463,7 +464,32 @@ function AddLidGripTab(contour, cx, yb, grip_width, overhang, radius, shape)
 
   local r = 0
   if (shape == "Rounded") then
-    r = math.min(radius or 0, hx, ov)
+    local R = radius or 0
+    if (R >= ov - 0.0001 and hx > ov + 0.0001) then
+      -- Corner radius at least as big as the overhang: keep the radius and let
+      -- each corner run out into the back edge in a swung S-curve - a convex arc
+      -- (radius R, tangent to the tip) blended into the back edge by a concave
+      -- fillet (radius R - overhang, 0 when R = overhang = plain quarter circle).
+      -- The tab stays exactly grip_width wide at the back edge. If the tab is too
+      -- narrow for that radius, R is reduced until both sides meet at the tip.
+      --                                                     -- by Claude 10/26/2026
+      R = math.min(R, (hx*hx + 3*ov*ov) / (4*ov))
+      local rho = R - ov                         -- concave fillet radius
+      local w = math.sqrt(math.max(0, 4*R*ov - 3*ov*ov))  -- x distance fillet centre -> arc centre
+      local cy = yb - rho                        -- convex arc centres (below the back edge)
+      local fy = yb + rho                        -- fillet centres (beyond the back edge)
+      local aT = math.atan2 and math.atan2(fy - cy, w) or math.atan(fy - cy, w)  -- right arc: angle towards its fillet
+      -- right side: fillet around (xr, fy), then convex arc around (xr - w, cy)
+      AppendArc(contour, xr, fy, rho, -0.5*math.pi, aT - math.pi)
+      AppendArc(contour, xr - w, cy, R, aT, 0.5*math.pi)
+      LineToIfNeeded(contour, Point2D(xl + w, yb + ov))
+      -- left side, mirrored: convex arc around (xl + w, cy), then fillet around (xl, fy)
+      AppendArc(contour, xl + w, cy, R, 0.5*math.pi, math.pi - aT)
+      AppendArc(contour, xl, fy, rho, -aT, -0.5*math.pi)
+      LineToIfNeeded(contour, Point2D(xl, yb))
+      return
+    end
+    r = math.min(R, hx, ov)
   elseif (shape == "Arc") then
     if (ov < hx) then
       -- one arc through (xr, yb), (cx, yb + ov) and (xl, yb)

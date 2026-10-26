@@ -391,7 +391,7 @@
                   <option value="Arc">Arc</option>
                 </select>
               </div>
-              <div class="field-row" id="showHideLidGripRadius" style="margin-bottom: 0;" title="Radius of the two outer corners of a Rounded grip tab (limited to half the grip width and to the overhang).">
+              <div class="field-row" id="showHideLidGripRadius" style="margin-bottom: 0;" title="Radius of the two outer corners of a Rounded grip tab. A radius equal to or larger than the grip overhang runs out into the back edge in a smooth S-curve (the tab stays the grip width wide at the back edge); it is reduced automatically if the tab is too narrow for it.">
                 <label for="LidGripRadiusField">Corner radius</label>
                 <input type="number" step="any" id="LidGripRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
