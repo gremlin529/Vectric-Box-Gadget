@@ -141,7 +141,11 @@ function main(script_path)
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
   options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut Front's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
-  options.lidGripEnabled = true             --- Grooved lid only: make a grip tab past the Back (off = the lid ends flush with the Back)
+  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole" or "Grab Handle" (grip tab that overhangs the Back) -- by Claude 10/26/2026
+  options.lidHoleShape = "Round"            --- Grooved lid, Finger Hole: "Round" or "Rounded Square"
+  options.lidHoleSize = 1.0                 --- Grooved lid, Finger Hole: diameter / side length of the hole
+  options.lidHoleDistance = options.thickness + 0.25  --- Grooved lid, Finger Hole: from the lid's back edge to the near edge of the hole
+  options.lidHoleRadius = 0.25              --- Grooved lid, Finger Hole: corner radius of a Rounded Square hole
   options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out past the Back (0 = no grip tab)
   options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
   options.lidGripShape = "Rounded"          --- Grooved lid only: "Square", "Rounded" or "Arc"
@@ -234,6 +238,9 @@ function main(script_path)
     options.lidGripOverhang = Truncate(options.lidGripOverhang * multiplier, 2)
     options.lidGripWidth = Truncate(options.lidGripWidth * multiplier, 2)
     options.lidGripRadius = Truncate(options.lidGripRadius * multiplier, 2)
+    options.lidHoleSize = Truncate(options.lidHoleSize * multiplier, 2)          -- by Claude 10/26/2026
+    options.lidHoleDistance = Truncate(options.lidHoleDistance * multiplier, 2)
+    options.lidHoleRadius = Truncate(options.lidHoleRadius * multiplier, 2)
     options.end1Height = Truncate(options.end1Height * multiplier, 2)
     options.end2Height = Truncate(options.end2Height * multiplier, 2)
     -- end1ChamferAngle/end2ChamferAngle are in degrees, not a length, so they
@@ -838,6 +845,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         -- rabbet on the lid's top face - each its own pass/depth.  -- by Claude 10/25/2026
         CreateLidGroovePocketToolpath(job, options, sheet_faces, options.tool, "Lid Groove")
         CreateLidRabbetToolpath(job, options, sheet_faces, options.tool, "Lid Rabbet")
+        CreateLidFingerHoleToolpath(job, options, sheet_faces, options.tool, "Lid Finger Hole")  -- by Claude 10/26/2026
 
         if options.dovetailJoint and fluting_objects ~= nil then
           if SelectExactObjects(job, fluting_objects) then

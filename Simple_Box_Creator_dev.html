@@ -308,7 +308,7 @@
   <div class="section-header" id="showHideLidGrooveSectionHeader" style="display: none;">Grooved Lid Options</div>
   <div class="card" id="showHideLidGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Left, Right &amp; Front near the top edge (with Dovetail joints, Front's lid groove has to be cut from its other side - tick "Reverse Front for lid groove on own sheet" to get it on the flip sheet, otherwise Front gets no lid groove and the lid stops at its inside face). The Back is shortened to the underside of the lid, so the lid slides in over it from behind. Only the grip tab overhangs the Back - the rest of the overhang is cut flush left and right.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Left, Right &amp; Front near the top edge (with Dovetail joints, Front's lid groove has to be cut from its other side - tick "Reverse Front for lid groove on own sheet" to get it on the flip sheet, otherwise Front gets no lid groove and the lid stops at its inside face). The Back is shortened to the underside of the lid, so the lid slides in over it from behind. To pull it out, pick a Grip: a finger hole near the back end, or a grab handle - a tab that overhangs the Back (the rest of the overhang is cut flush left and right).</div>
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
         <tr>
@@ -365,10 +365,15 @@
         <tr>
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
             <div class="sub-panel">
-              <div class="sub-panel-title">Grip Tab</div>
-              <div class="checkbox-row" title="When checked, a grip tab sticks out past the Back to pull the lid out. Unchecked, the lid ends flush with the Back.">
-                <input type="checkbox" class="LuaButton" id="LidGripEnabled" onclick="onLidGripEnabledChanged(); onGeometryFieldChanged();" />
-                <label for="LidGripEnabled">Grip tab overhangs the Back</label>
+              <div class="sub-panel-title">Grip</div>
+              <!-- None / Finger Hole / Grab Handle - option texts are read back by Lua, never translate them -- by Claude 10/26/2026 -->
+              <div class="field-row" title="How the lid is pulled out. None: no grip, the lid ends flush with the Back. Finger Hole: a hole through the lid near its back end, centred. Grab Handle: a grip tab that overhangs the Back.">
+                <label for="LidGripType" style="width: 60px;">Grip</label>
+                <select id="LidGripType" style="width: 135px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
+                  <option value="None">None</option>
+                  <option value="Finger Hole">Finger Hole</option>
+                  <option value="Grab Handle">Grab Handle</option>
+                </select>
               </div>
               <div id="showHideLidGripFields">
               <div class="field-row" title="How far the grip tab sticks out past the Back (0 = no grip tab, the lid ends flush with the Back).">
@@ -380,6 +385,16 @@
                 <input type="number" step="any" id="LidGripWidthField" placeholder="Grip width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
+              <div id="showHideLidHoleFields" style="display: none;">
+              <div class="field-row" title="Diameter of a Round finger hole, or the side length of a Rounded Square one. Must be bigger than the tool and at most the inside width minus twice the lid groove depth.">
+                <label for="LidHoleSizeField">Hole size</label>
+                <input type="number" step="any" id="LidHoleSizeField" placeholder="Size" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's back edge (flush with the outside of the Back) to the near edge of the finger hole. At least the material thickness, so the hole is clear of the Back underneath.">
+                <label for="LidHoleDistanceField">Distance from edge</label>
+                <input type="number" step="any" id="LidHoleDistanceField" placeholder="Distance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              </div>
             </div>
           </td>
           <td id="showHideLidGripSketch" style="vertical-align: middle; padding: 10px 20px 0 20px;">
@@ -388,6 +403,7 @@
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
             <div class="sub-panel" id="showHideLidGripShape">
               <div class="sub-panel-title">Grip Shape</div>
+              <div id="showHideLidHandleShape">
               <div class="field-row" title="Shape of the grip tab. Square: plain rectangle. Rounded: rectangle with rounded outer corners. Arc: one circular arc from root to root through the tip (a half circle on straight flanks if the overhang is more than half the grip width).">
                 <label for="LidGripShape">Shape</label>
                 <select id="LidGripShape" onchange="onLidGripShapeChanged(); onGeometryFieldChanged();">
@@ -399,6 +415,20 @@
               <div class="field-row" id="showHideLidGripRadius" style="margin-bottom: 0;" title="Radius of the two outer corners of a Rounded grip tab. A radius equal to or larger than the grip overhang runs out into the back edge in a smooth S-curve (the tab stays the grip width wide at the back edge); it is reduced automatically if the tab is too narrow for it.">
                 <label for="LidGripRadiusField">Corner radius</label>
                 <input type="number" step="any" id="LidGripRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              </div>
+              <div id="showHideLidHoleShape" style="display: none;">
+              <div class="field-row" title="Shape of the finger hole. Round: a circle. Rounded Square: a square with rounded corners.">
+                <label for="LidHoleShape" style="width: 50px;">Shape</label>
+                <select id="LidHoleShape" style="width: 150px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
+                  <option value="Round">Round</option>
+                  <option value="Rounded Square">Rounded Square</option>
+                </select>
+              </div>
+              <div class="field-row" id="showHideLidHoleRadius" style="margin-bottom: 0;" title="Corner radius of a Rounded Square finger hole (at most half the hole size). Corners smaller than the tool radius come out with the tool radius.">
+                <label for="LidHoleRadiusField">Corner radius</label>
+                <input type="number" step="any" id="LidHoleRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
               </div>
             </div>
           </td>
@@ -509,6 +539,8 @@
     <input type="text" id="InvalidBottomGrooveWidth" value=""/>
     <input type="text" id="InvalidLidGrooveWidth" value=""/>
     <input type="text" id="InvalidLidGripWidth" value=""/>
+    <input type="text" id="InvalidLidHoleSize" value=""/>
+    <input type="text" id="InvalidLidHoleDistance" value=""/>
   </fieldset>
 
 
@@ -755,15 +787,33 @@
     if (radiusRow) { radiusRow.style.display = (shape === "Rounded") ? "block" : "none"; }
   }
 
-  // "Grip tab" checkbox: the grip fields, sketch and shape only show when it is ticked.
-  // Only the contents are hidden, not the table cells, so the columns stay where they are.  -- by Claude 10/26/2026
-  function onLidGripEnabledChanged() {
-    var cb = document.getElementById("LidGripEnabled");
-    var on = !cb || cb.checked;
-    var ids = ["showHideLidGripFields", "LidGripSketchImage", "showHideLidGripShape"];
-    for (var i = 0; i < ids.length; i++) {
-      var el = document.getElementById(ids[i]);
-      if (el) { el.style.display = on ? "" : "none"; }
+  // Grip dropdown (None / Finger Hole / Grab Handle): shows only the fields, sketch and
+  // shape options of the chosen grip. Only the contents are hidden, not the table cells,
+  // so the columns stay where they are.                 -- by Claude 10/26/2026
+  function selectedValue(id, fallback) {
+    var sel = document.getElementById(id);
+    return (sel && sel.selectedIndex >= 0) ? sel.options[sel.selectedIndex].value : fallback;
+  }
+  function onLidGripTypeChanged() {
+    var type = selectedValue("LidGripType", "Grab Handle");
+    var handle = (type === "Grab Handle");
+    var hole = (type === "Finger Hole");
+    var show = function (id, on) { var el = document.getElementById(id); if (el) { el.style.display = on ? "" : "none"; } };
+    show("showHideLidGripFields", handle);
+    show("showHideLidHandleShape", handle);
+    show("showHideLidHoleFields", hole);
+    show("showHideLidHoleShape", hole);
+    show("showHideLidGripShape", handle || hole);
+    var holeShape = selectedValue("LidHoleShape", "Round");
+    show("showHideLidHoleRadius", holeShape === "Rounded Square");
+    var img = document.getElementById("LidGripSketchImage");
+    if (img) {
+      if (handle) {
+        onLidGripShapeChanged();
+      } else if (hole) {
+        img.src = (holeShape === "Rounded Square") ? "Images/LidHoleSketch_RoundedSquare.png" : "Images/LidHoleSketch_Round.png";
+      }
+      img.style.display = (handle || hole) ? "" : "none";
     }
   }
 
@@ -832,7 +882,9 @@
     "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
     "InvalidBottomGrooveWidth": "BottomGrooveWidthField",
     "InvalidLidGrooveWidth":    "LidGrooveWidthField",
-    "InvalidLidGripWidth":      "LidGripWidthField"
+    "InvalidLidGripWidth":      "LidGripWidthField",
+    "InvalidLidHoleSize":       "LidHoleSizeField",
+    "InvalidLidHoleDistance":   "LidHoleDistanceField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -988,7 +1040,7 @@
     updateLidRabbetInfo();
     onLidGrooveOffsetRefChanged();
     onLidGripShapeChanged();
-    onLidGripEnabledChanged();
+    onLidGripTypeChanged();
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }

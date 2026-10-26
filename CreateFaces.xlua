@@ -113,6 +113,11 @@ function TransformFace(face, xform)
     face.lid_groove_contours:Transform(xform)
   end
 
+  -- Transform the Grooved lid's finger hole -- by Claude 10/26/2026
+  if (face.hole_contours ~= nil) then
+    face.hole_contours:Transform(xform)
+  end
+
   -- Transform the bottom panel's own rabbet band (Falz), only present when
   -- "Bottom aus gleichem Material" is on -- by Claude 9/21/2026
   if (face.rabbet_contours ~= nil) then
@@ -371,6 +376,28 @@ function CreateLidRabbetToolpath(job, options, faces, tool, layer_name)
     end)
 end
 
+--[[  -------------- CreateLidFingerHoleToolpath --------------------------------------------------
+|
+|  Grooved (sliding) lid with Grip = Finger Hole: the hole is pocketed right
+|  through the lid (as deep as the lid is thick), so no loose slug is left that
+|  the bit could throw.
+|
+|  Added by Claude 10/26/2026
+|
+]]
+function CreateLidFingerHoleToolpath(job, options, faces, tool, layer_name)
+  return CreatePocketToolpathForFaces(job, options, faces, tool, layer_name, "Lid Finger Hole",
+    function(face)
+      if (face.facetype == FaceType.Lid) then
+        return face.hole_contours
+      end
+      return nil
+    end,
+    function(face)
+      return face.hole_depth
+    end)
+end
+
 --[[  -------------- Grooved (sliding) lid helpers --------------------------------------------------
 |
 |  ComputeFingerTrimBoth: like ComputeFingerTrim (Dovetails.xlua), but trims the
@@ -575,9 +602,9 @@ function MakeGroovedLid(options, facesToMake, name)
   AddMiddleOfLastSpanToList(contour, tablist)
   contour:LineTo(Point2D(x1, y1))
   AddMiddleOfLastSpanToList(contour, tablist)
-  -- "Grip tab" unticked in the dialog = no tab, the lid ends flush with the Back
+  -- Grip = None or Finger Hole: no tab, the lid ends flush with the Back  -- by Claude 10/26/2026
   local grip_overhang = options.lidGripOverhang
-  if (options.lidGripEnabled == false) then
+  if (options.lidGripType ~= nil and options.lidGripType ~= "Grab Handle") then
     grip_overhang = 0
   end
   AddLidGripTab(contour, 0.5*(x0 + x1), y1, grip_width, grip_overhang, options.lidGripRadius, options.lidGripShape)
@@ -631,6 +658,39 @@ function MakeGroovedLid(options, facesToMake, name)
   local lid_face = Face(contour, nil, {}, tablist, name, FaceType.Lid, FaceJointType.Grooved, {}, fingerSides)
   lid_face.rabbet_contours = rabbet_contours
   lid_face.rabbet_depth = rabbet_depth
+
+  -- Grip = Finger Hole: a Round or Rounded Square hole through the lid, centred,
+  -- its near edge lidHoleDistance in from the back edge.     -- by Claude 10/26/2026
+  if (options.lidGripType == "Finger Hole" and (options.lidHoleSize or 0) > 0.0001) then
+    local size = options.lidHoleSize
+    local cx = 0.5*(x0 + x1)
+    local top = y1 - (options.lidHoleDistance or 0)   -- near (back) edge of the hole
+    local hole = Contour(0.0)
+    if (options.lidHoleShape == "Rounded Square") then
+      local r = math.max(0, math.min(options.lidHoleRadius or 0, 0.5*size))
+      local hxl = cx - 0.5*size
+      local hxr = cx + 0.5*size
+      local hyb = top - size
+      hole:AppendPoint(Point2D(hxl + r, hyb))
+      LineToIfNeeded(hole, Point2D(hxr - r, hyb))
+      AppendArc(hole, hxr - r, hyb + r, r, -0.5*math.pi, 0)
+      LineToIfNeeded(hole, Point2D(hxr, top - r))
+      AppendArc(hole, hxr - r, top - r, r, 0, 0.5*math.pi)
+      LineToIfNeeded(hole, Point2D(hxl + r, top))
+      AppendArc(hole, hxl + r, top - r, r, 0.5*math.pi, math.pi)
+      LineToIfNeeded(hole, Point2D(hxl, hyb + r))
+      AppendArc(hole, hxl + r, hyb + r, r, math.pi, 1.5*math.pi)
+    else
+      local R = 0.5*size
+      local cy = top - R
+      hole:AppendPoint(Point2D(cx + R, cy))
+      AppendArc(hole, cx, cy, R, 0, math.pi)
+      AppendArc(hole, cx, cy, R, math.pi, 2*math.pi)
+    end
+    lid_face.hole_contours = ContourGroup(true)
+    lid_face.hole_contours:AddTail(hole)
+    lid_face.hole_depth = lid_thickness
+  end
   return lid_face
 end
 

@@ -833,6 +833,16 @@ end
 |  groove floor). The Back is shortened to exactly that height.
 |                                                                 -- by Claude 10/25/2026
 ]]
+-- Grip of the Grooved lid: "None", "Finger Hole" or "Grab Handle" (the dropdown's
+-- visible texts, read back as they are). Anything else falls back to Grab Handle.
+--                                                              -- by Claude 10/26/2026
+function NormalizeLidGripType(value)
+  if value == "None" or value == "Finger Hole" then
+    return value
+  end
+  return "Grab Handle"
+end
+
 function LidGrooveFarEdgeFromInput(options)
   local input = options.lidGrooveOffsetInput or 0
   if options.lidGrooveOffsetRef == "Lid" then
@@ -886,7 +896,7 @@ end
 local function ValidateLidGripWidth(dialog, options, report_as_dialog)
   local message = ""
   local has_tab = (options.lidType == FaceJointType.Grooved)
-    and (options.lidGripEnabled ~= false)
+    and (options.lidGripType == "Grab Handle")
     and IsNonNeg(options.lidGripOverhang) and options.lidGripOverhang > 0.0001
   if has_tab then
     local grip_width = options.lidGripWidth
@@ -908,6 +918,57 @@ local function ValidateLidGripWidth(dialog, options, report_as_dialog)
 
   dialog:UpdateTextField("InvalidLidGripWidth", message)
   return message == ""
+end
+
+-- Finger hole of the Grooved lid (Grip = Finger Hole): the hole must be bigger
+-- than the tool, clear of the rabbet bands along Left / Right, clear of the Back
+-- underneath it (distance from the back edge >= material thickness) and must end
+-- before the Front's inside face. Size problems go to InvalidLidHoleSize, distance
+-- problems to InvalidLidHoleDistance.                          -- by Claude 10/26/2026
+local function ValidateLidFingerHole(dialog, options, report_as_dialog)
+  local size_message, dist_message = "", ""
+  if (options.lidType == FaceJointType.Grooved) and (options.lidGripType == "Finger Hole") then
+    local size = options.lidHoleSize
+    local dist = options.lidHoleDistance
+    local max_size = (options.width - 2*options.thickness) - 2*(options.lidGrooveDepth or 0)
+    local fmt = "%." .. G_decimalPlaces .. "f"
+    if not IsNonNeg(size) or size <= 0.0001 then
+      size_message = "Hole size must be greater than 0."
+    elseif size > max_size + 0.0001 then
+      size_message = string.format("Hole size " .. fmt .. " is too big - at most " .. fmt .. " (inside width minus twice the lid groove depth).", size, max_size)
+    elseif not options.no_toolpath then
+      local effectiveDia = 0.25
+      if Tool_ok(options.tool) then
+        effectiveDia = ConvertUnitsFrom(options.tool.ToolDia, options.tool, MaterialBlock())
+      end
+      if options.allowance > 0 then
+        effectiveDia = effectiveDia - 2*options.allowance
+      end
+      if effectiveDia > 0 and size <= effectiveDia + 0.0001 then
+        size_message = string.format("Hole size " .. fmt .. " must be bigger than the tool (" .. fmt .. ").", size, effectiveDia)
+      end
+    end
+    if not IsNonNeg(dist) then
+      dist_message = "Distance from edge must be 0 or greater."
+    elseif dist < options.thickness - 0.0001 then
+      dist_message = string.format("Distance from edge " .. fmt .. " is too small - at least the material thickness " .. fmt .. ", so the hole is clear of the Back underneath.", dist, options.thickness)
+    elseif IsNonNeg(size) and (dist + size) > (options.depth - options.thickness) + 0.0001 then
+      dist_message = string.format("The finger hole reaches past the Front's inside face - distance from edge + hole size must be at most " .. fmt .. ".", options.depth - options.thickness)
+    end
+  end
+
+  if report_as_dialog then
+    local message = (size_message ~= "") and size_message or dist_message
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidLidHoleSize", size_message)
+  dialog:UpdateTextField("InvalidLidHoleDistance", dist_message)
+  return size_message == "" and dist_message == ""
 end
 
 -- All the Grooved lid checks for the OK button. Returns false after showing
@@ -959,20 +1020,27 @@ local function ValidateGroovedLidOptions(dialog, options)
   if (options.lidGrooveOffset + bottom_reserved) >= options.height - 0.0001 then
     return fail(string.format("The lid groove offset is too large for the box height %.2f (the Back would have no height left below the lid).", options.height))
   end
-  -- grip values only matter with "Grip tab" ticked
-  if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripOverhang) then
+  -- grip values only matter for the chosen grip type
+  local handle = (options.lidGripType == "Grab Handle")
+  if handle and not IsNonNeg(options.lidGripOverhang) then
     return fail("Grip overhang must be 0 or greater.")
   end
-  if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripWidth) then
+  if handle and not IsNonNeg(options.lidGripWidth) then
     return fail("Grip width must be 0 or greater.")
   end
   if not ValidateLidGripWidth(dialog, options, true) then
     return false
   end
-  if options.lidGripEnabled ~= false and options.lidGripOverhang > 0.0001 then
+  if handle and options.lidGripOverhang > 0.0001 then
     if options.lidGripShape == "Rounded" and not IsNonNeg(options.lidGripRadius) then
       return fail("Grip corner radius must be 0 or greater.")
     end
+  end
+  if not ValidateLidFingerHole(dialog, options, true) then
+    return false
+  end
+  if (options.lidGripType == "Finger Hole") and options.lidHoleShape == "Rounded Square" and not IsNonNeg(options.lidHoleRadius) then
+    return fail("Hole corner radius must be 0 or greater.")
   end
   return ValidateLidGrooveToolFit(dialog, options, true)
 end
@@ -1037,6 +1105,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
   dialog:AddTextField("InvalidLidGrooveWidth", "")     -- Added by Claude 10/25/2026
   dialog:AddTextField("InvalidLidGripWidth", "")       -- Added by Claude 10/26/2026
+  dialog:AddTextField("InvalidLidHoleSize", "")        -- Added by Claude 10/26/2026
+  dialog:AddTextField("InvalidLidHoleDistance", "")    -- Added by Claude 10/26/2026
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -1102,7 +1172,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
   dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
   dialog:AddCheckBox("LidFrontGrooveFlip", options.lidFrontGrooveFlip)       -- Dovetail only: Front lid groove on the flip sheet -- by Claude 10/26/2026
-  dialog:AddCheckBox("LidGripEnabled", options.lidGripEnabled)
+  dialog:AddDropDownList("LidGripType", options.lidGripType)                 -- "None" / "Finger Hole" / "Grab Handle" -- by Claude 10/26/2026
+  dialog:AddDropDownList("LidHoleShape", options.lidHoleShape)               -- "Round" / "Rounded Square"
+  dialog:AddDoubleField("LidHoleSizeField", options.lidHoleSize)
+  dialog:AddDoubleField("LidHoleDistanceField", options.lidHoleDistance)
+  dialog:AddDoubleField("LidHoleRadiusField", options.lidHoleRadius)
   dialog:AddDoubleField("LidGripOverhangField", options.lidGripOverhang)
   dialog:AddDoubleField("LidGripWidthField", options.lidGripWidth)
   dialog:AddDropDownList("LidGripShape", options.lidGripShape)               -- "Square" / "Rounded" / "Arc"
@@ -1392,7 +1466,12 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.lidGrooveOffsetRef = dialog:GetDropDownListValue("LidGrooveOffsetRef")
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
   options.lidFrontGrooveFlip = dialog:GetCheckBox("LidFrontGrooveFlip")   -- by Claude 10/26/2026
-  options.lidGripEnabled = dialog:GetCheckBox("LidGripEnabled")
+  options.lidGripType = NormalizeLidGripType(dialog:GetDropDownListValue("LidGripType"))   -- by Claude 10/26/2026
+  options.lidHoleShape = dialog:GetDropDownListValue("LidHoleShape")
+  if options.lidHoleShape ~= "Rounded Square" then options.lidHoleShape = "Round" end
+  options.lidHoleSize = dialog:GetDoubleField("LidHoleSizeField")
+  options.lidHoleDistance = dialog:GetDoubleField("LidHoleDistanceField")
+  options.lidHoleRadius = dialog:GetDoubleField("LidHoleRadiusField")
   options.lidGripOverhang = dialog:GetDoubleField("LidGripOverhangField")
   options.lidGripWidth = dialog:GetDoubleField("LidGripWidthField")
   options.lidGripShape = dialog:GetDropDownListValue("LidGripShape")
@@ -1520,7 +1599,11 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
   registry:SetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
   registry:SetBool("LidFrontGrooveFlip", options.lidFrontGrooveFlip)
-  registry:SetBool("LidGripEnabled", options.lidGripEnabled)
+  registry:SetString("LidGripType", options.lidGripType)                -- by Claude 10/26/2026
+  registry:SetString("LidHoleShape", options.lidHoleShape)
+  registry:SetDouble("LidHoleSize", options.lidHoleSize)
+  registry:SetDouble("LidHoleDistance", options.lidHoleDistance)
+  registry:SetDouble("LidHoleRadius", options.lidHoleRadius)
   registry:SetDouble("LidGripOverhang", options.lidGripOverhang)
   registry:SetDouble("LidGripWidth", options.lidGripWidth)
   registry:SetString("LidGripShape", options.lidGripShape)
@@ -1611,7 +1694,20 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.lidGrooveOffsetRef = registry:GetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
   options.lidFrontGrooveFlip = registry:GetBool("LidFrontGrooveFlip", options.lidFrontGrooveFlip)
-  options.lidGripEnabled = registry:GetBool("LidGripEnabled", options.lidGripEnabled)
+  -- Grip type (replaces the "Grip tab" checkbox): a save from before only has
+  -- LidGripEnabled - unticked there means None.                -- by Claude 10/26/2026
+  local savedGripType = registry:GetString("LidGripType", "")
+  if savedGripType == "" and not registry:GetBool("LidGripEnabled", true) then
+    savedGripType = "None"
+  end
+  if savedGripType ~= "" then
+    options.lidGripType = NormalizeLidGripType(savedGripType)
+  end
+  options.lidHoleShape = registry:GetString("LidHoleShape", options.lidHoleShape)
+  if options.lidHoleShape ~= "Rounded Square" then options.lidHoleShape = "Round" end
+  options.lidHoleSize = registry:GetDouble("LidHoleSize", options.lidHoleSize)
+  options.lidHoleDistance = registry:GetDouble("LidHoleDistance", options.lidHoleDistance)
+  options.lidHoleRadius = registry:GetDouble("LidHoleRadius", options.lidHoleRadius)
   options.lidGripOverhang = registry:GetDouble("LidGripOverhang", options.lidGripOverhang)
   options.lidGripWidth = registry:GetDouble("LidGripWidth", options.lidGripWidth)
   options.lidGripShape = registry:GetString("LidGripShape", options.lidGripShape)
@@ -1677,6 +1773,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
   ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
   ValidateLidGripWidth(dialog, G_dialogOptions, false)       -- by Claude 10/26/2026
+  ValidateLidFingerHole(dialog, G_dialogOptions, false)      -- by Claude 10/26/2026
 
   return true
 end
