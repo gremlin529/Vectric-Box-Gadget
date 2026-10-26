@@ -548,7 +548,12 @@ function MakeGroovedLid(options, facesToMake, name)
   AddMiddleOfLastSpanToList(contour, tablist)
   contour:LineTo(Point2D(x1, y1))
   AddMiddleOfLastSpanToList(contour, tablist)
-  AddLidGripTab(contour, 0.5*(x0 + x1), y1, grip_width, options.lidGripOverhang, options.lidGripRadius, options.lidGripShape)
+  -- "Grip tab" unticked in the dialog = no tab, the lid ends flush with End 2
+  local grip_overhang = options.lidGripOverhang
+  if (options.lidGripEnabled == false) then
+    grip_overhang = 0
+  end
+  AddLidGripTab(contour, 0.5*(x0 + x1), y1, grip_width, grip_overhang, options.lidGripRadius, options.lidGripShape)
   LineToIfNeeded(contour, Point2D(x0, y1))
   contour:LineTo(blc)
   AddMiddleOfLastSpanToList(contour, tablist)

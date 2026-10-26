@@ -140,6 +140,7 @@ function main(script_path)
   options.lidGrooveOffset = options.lidGrooveOffsetInput + options.lidGrooveWidth
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
+  options.lidGripEnabled = true             --- Grooved lid only: make a grip tab behind End 2 (off = the lid ends flush with End 2)
   options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out behind End 2 (0 = no grip tab)
   options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
   options.lidGripShape = "Rounded"          --- Grooved lid only: "Square", "Rounded" or "Arc"

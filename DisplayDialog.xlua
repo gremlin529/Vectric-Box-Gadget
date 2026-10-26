@@ -927,13 +927,14 @@ local function ValidateGroovedLidOptions(dialog, options)
   if (options.lidGrooveOffset + bottom_reserved) >= options.height - 0.0001 then
     return fail(string.format("The lid groove offset is too large for the box height %.2f (End 2 would have no height left below the lid).", options.height))
   end
-  if not IsNonNeg(options.lidGripOverhang) then
+  -- grip values only matter with "Grip tab" ticked
+  if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripOverhang) then
     return fail("Grip overhang must be 0 or greater.")
   end
-  if not IsNonNeg(options.lidGripWidth) then
+  if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripWidth) then
     return fail("Grip width must be 0 or greater.")
   end
-  if options.lidGripOverhang > 0.0001 then
+  if options.lidGripEnabled ~= false and options.lidGripOverhang > 0.0001 then
     if options.lidGripWidth <= 0.0001 then
       return fail("Grip width must be greater than 0 when there is a grip overhang.")
     end
@@ -1072,6 +1073,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("LidGrooveDepthField", options.lidGrooveDepth)
   dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
   dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
+  dialog:AddCheckBox("LidGripEnabled", options.lidGripEnabled)
   dialog:AddDoubleField("LidGripOverhangField", options.lidGripOverhang)
   dialog:AddDoubleField("LidGripWidthField", options.lidGripWidth)
   dialog:AddDropDownList("LidGripShape", options.lidGripShape)               -- "Square" / "Rounded" / "Arc"
@@ -1360,6 +1362,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.lidGrooveOffsetInput = dialog:GetDoubleField("LidGrooveOffsetField")
   options.lidGrooveOffsetRef = dialog:GetDropDownListValue("LidGrooveOffsetRef")
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidGripEnabled = dialog:GetCheckBox("LidGripEnabled")
   options.lidGripOverhang = dialog:GetDoubleField("LidGripOverhangField")
   options.lidGripWidth = dialog:GetDoubleField("LidGripWidthField")
   options.lidGripShape = dialog:GetDropDownListValue("LidGripShape")
@@ -1486,6 +1489,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetDouble("LidGrooveDepth", options.lidGrooveDepth)
   registry:SetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
   registry:SetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
+  registry:SetBool("LidGripEnabled", options.lidGripEnabled)
   registry:SetDouble("LidGripOverhang", options.lidGripOverhang)
   registry:SetDouble("LidGripWidth", options.lidGripWidth)
   registry:SetString("LidGripShape", options.lidGripShape)
@@ -1575,6 +1579,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.lidGrooveOffsetInput = registry:GetDouble("LidGrooveOffsetInput", options.lidGrooveOffsetInput)
   options.lidGrooveOffsetRef = registry:GetString("LidGrooveOffsetRef", options.lidGrooveOffsetRef)
   if options.lidGrooveOffsetRef ~= "Lid" then options.lidGrooveOffsetRef = "Groove" end
+  options.lidGripEnabled = registry:GetBool("LidGripEnabled", options.lidGripEnabled)
   options.lidGripOverhang = registry:GetDouble("LidGripOverhang", options.lidGripOverhang)
   options.lidGripWidth = registry:GetDouble("LidGripWidth", options.lidGripWidth)
   options.lidGripShape = registry:GetString("LidGripShape", options.lidGripShape)

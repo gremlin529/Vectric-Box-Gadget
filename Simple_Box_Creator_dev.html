@@ -361,6 +361,11 @@
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
             <div class="sub-panel">
               <div class="sub-panel-title">Grip Tab</div>
+              <div class="checkbox-row" title="When checked, a grip tab sticks out behind End 2 to pull the lid out. Unchecked, the lid ends flush with End 2.">
+                <input type="checkbox" class="LuaButton" id="LidGripEnabled" onclick="onLidGripEnabledChanged(); onGeometryFieldChanged();" />
+                <label for="LidGripEnabled">Grip tab behind End 2</label>
+              </div>
+              <div id="showHideLidGripFields">
               <div class="field-row" title="How far the grip tab sticks out behind End 2 (0 = no grip tab, the lid ends flush with End 2).">
                 <label for="LidGripOverhangField">Grip overhang</label>
                 <input type="number" step="any" id="LidGripOverhangField" placeholder="Overhang" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
@@ -369,13 +374,14 @@
                 <label for="LidGripWidthField">Grip width</label>
                 <input type="number" step="any" id="LidGripWidthField" placeholder="Grip width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
+              </div>
             </div>
           </td>
-          <td style="vertical-align: middle; padding: 10px 20px 0 20px;">
+          <td id="showHideLidGripSketch" style="vertical-align: middle; padding: 10px 20px 0 20px;">
             <img id="LidGripSketchImage" src="Images/LidGripSketch_Rounded.png" alt="Sketch: Grip tab, Grip overhang, Grip width, Corner radius" />
           </td>
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
-            <div class="sub-panel">
+            <div class="sub-panel" id="showHideLidGripShape">
               <div class="sub-panel-title">Grip Shape</div>
               <div class="field-row" title="Shape of the grip tab. Square: plain rectangle. Rounded: rectangle with rounded outer corners. Arc: one circular arc from root to root through the tip (a half circle on straight flanks if the overhang is more than half the grip width).">
                 <label for="LidGripShape">Shape</label>
@@ -743,6 +749,18 @@
     if (radiusRow) { radiusRow.style.display = (shape === "Rounded") ? "block" : "none"; }
   }
 
+  // "Grip tab" checkbox: the grip fields, sketch and shape only show when it is ticked.
+  // Only the contents are hidden, not the table cells, so the columns stay where they are.  -- by Claude 10/26/2026
+  function onLidGripEnabledChanged() {
+    var cb = document.getElementById("LidGripEnabled");
+    var on = !cb || cb.checked;
+    var ids = ["showHideLidGripFields", "LidGripSketchImage", "showHideLidGripShape"];
+    for (var i = 0; i < ids.length; i++) {
+      var el = document.getElementById(ids[i]);
+      if (el) { el.style.display = on ? "" : "none"; }
+    }
+  }
+
   function onBottomTypeChanged(el) {
     var select = document.getElementById("BottomTypeSelect");
     var selectedIndex = select ? select.selectedIndex : 0;
@@ -961,6 +979,7 @@
     updateLidRabbetInfo();
     onLidGrooveOffsetRefChanged();
     onLidGripShapeChanged();
+    onLidGripEnabledChanged();
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }
