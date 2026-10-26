@@ -505,13 +505,24 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
     sheet_names[sheet_num] = SheetNameForIndex(base_sheet_name, sheet_num)
   end
 
+  -- Bottom and lid both cut from the same thinner stock: one shared sheet
+  -- "Bottom + Lid Panel <thickness>" instead of two.          -- by Claude 10/26/2026
+  local bottom_sheet_format = "Bottom Panel %g"
+  if IsSharedPanelSheet(options) and #bottom_faces > 0 and #lid_faces > 0 then
+    for i = 1, #lid_faces do
+      bottom_faces[#bottom_faces + 1] = lid_faces[i]
+    end
+    lid_faces = {}
+    bottom_sheet_format = "Bottom + Lid Panel %g"
+  end
+
   if #bottom_faces > 0 then
     if #faces == 0 then
       required_sheets = 0  -- only the bottom is being made: it gets the only sheet
     end
     bottom_faces = ArrangeContours(bottom_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
     local bottom_sheet_num = required_sheets + 1
-    local bottom_sheet_name = string.format("Bottom Panel %g", options.bottomThickness)
+    local bottom_sheet_name = string.format(bottom_sheet_format, options.bottomThickness)
     if not SheetEnsureExists(job, base_sheet_id, bottom_sheet_name, 1) then
       return nil
     end
@@ -614,6 +625,13 @@ function MakeFrontGrooveFlipFace(front)
   return f
 end
 
+-- Grooved bottom and Grooved lid both thinner than the material and equally thick:
+-- they share one sheet, one pair of layers and one cutout toolpath.  -- by Claude 10/26/2026
+function IsSharedPanelSheet(options)
+  return IsSeparateBottom(options) and IsSeparateLid(options)
+    and math.abs(options.bottomThickness - options.lidThickness) < 0.0001
+end
+
 -- Grooved (sliding) lid thinner than the material: same as the bottom.  -- by Claude 10/25/2026
 function IsSeparateLid(options)
   return (options.lidType == FaceJointType.Grooved)
@@ -645,6 +663,17 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
   -- Same thickness as the material -> everything stays on the normal layers as before.  -- by Claude 10/9/2026
   local separateBottom = IsSeparateBottom(options)
   local separateLid = IsSeparateLid(options)   -- by Claude 10/25/2026
+  -- Shared bottom + lid sheet: the lid joins the bottom's group (same depth), on
+  -- combined layer and toolpath names.                         -- by Claude 10/26/2026
+  local sharedPanels = IsSharedPanelSheet(options) and computedFacesToMake.bottom and computedFacesToMake.lid
+  local panelLayerName = G_bottomLayerName
+  local panelCutoutLayerName = G_bottomCutoutLayerName
+  local panelCutoutName = string.format("Cut Out Bottom (%g)", options.bottomThickness or 0)
+  if sharedPanels then
+    panelLayerName = "Bottom + Lid Panel"
+    panelCutoutLayerName = "CutOut Bottom + Lid"
+    panelCutoutName = string.format("Cut Out Bottom + Lid (%g)", options.bottomThickness)
+  end
 
   for sheet_num = 1, required_sheets do
     local sheet_name = (sheet_names and sheet_names[sheet_num]) or SheetNameForIndex(base_sheet_name, sheet_num)
@@ -673,6 +702,8 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         if faces[i].is_flip_helper then
           flip_faces[#flip_faces + 1] = faces[i]
         elseif separateBottom and faces[i].facetype == FaceType.Bottom then
+          bottom_faces[#bottom_faces + 1] = faces[i]
+        elseif sharedPanels and faces[i].facetype == FaceType.Lid then
           bottom_faces[#bottom_faces + 1] = faces[i]
         elseif separateLid and faces[i].facetype == FaceType.Lid then
           lid_faces[#lid_faces + 1] = faces[i]
@@ -733,7 +764,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       end
 
       local cutout_objects = AddProfileAndCutoutVectors(main_faces, G_boxLayerName, G_cutoutLayerName)
-      local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, G_bottomLayerName, G_bottomCutoutLayerName)
+      local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, panelLayerName, panelCutoutLayerName)
       local lid_cutout_objects = AddProfileAndCutoutVectors(lid_faces, G_lidLayerName, G_lidCutoutLayerName)
 
       -- End 1 flip helper: outline only as a placement reference, no cutout
@@ -821,9 +852,9 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
             job,
             options.bottomThickness,
             options.sideOrAllTabWidth,
-            G_bottomCutoutLayerName,
+            panelCutoutLayerName,
             bottom_cutout_objects,
-            string.format("Cut Out Bottom (%g)", options.bottomThickness))
+            panelCutoutName)
         end
 
         -- Thinner lid panel: separate cutout, only as deep as the lid is thick -- by Claude 10/25/2026
