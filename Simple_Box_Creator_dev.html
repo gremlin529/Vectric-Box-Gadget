@@ -143,7 +143,7 @@
       <div class="type-panel">
         <div class="type-panel-header">Lid Type</div>
         <div class="type-dropdown-content">
-          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" title="&#10;Grooved: a sliding lid - a groove is cut into Side 1, Side 2 and End 1 near the top edge and End 2 is shortened to the underside of the lid, so the lid slides in from the back. A grip tab can stick out behind End 2.">
+          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" title="&#10;Grooved: a sliding lid - a groove is cut into Left, Right and Front near the top edge and the Back is shortened to the underside of the lid, so the lid slides in from the back. A grip tab can stick out past the Back.">
             <option value="Inset">Inset</option>
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
@@ -162,7 +162,7 @@
       <div class="type-panel">
         <div class="type-panel-header">Bottom Type</div>
         <div class="type-dropdown-content">
-          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" title="&#10;Grooved: a dado groove is cut into Side 1, Side 2 and End 1 near the bottom edge so a flat bottom panel can be slid in from the open End 2 before it is glued on." style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
+          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" title="&#10;Grooved: a dado groove is cut into Left, Right and Front near the bottom edge so a flat bottom panel can be slid in from the open Back before it is glued on." style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
             <option value="Inset">Inset</option>
             <option value="Fingers">Fingers</option>
             <option value="Flat">Flat</option>
@@ -199,11 +199,11 @@
           <td style="width: 245px; vertical-align: middle;">
             <div class="sub-panel">
               <div class="sub-panel-title">Backside</div>
-              <div class="field-row" title="Angle of Back (End 2)'s own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
+              <div class="field-row" title="Angle of Back's own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
                 <label for="End2ChamferAngleField">Chamfer Angle</label>
                 <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Height of Back (End 2). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+              <div class="field-row" style="margin-bottom: 0;" title="Height of Back. Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
                 <label for="End2HeightField">Height</label>
                 <input type="number" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -215,11 +215,11 @@
           <td style="width: 245px; vertical-align: middle;">
             <div class="sub-panel">
               <div class="sub-panel-title">Frontside</div>
-              <div class="field-row" title="Angle of Front (End 1)'s own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
+              <div class="field-row" title="Angle of Front's own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
                 <label for="End1ChamferAngleField">Chamfer Angle</label>
                 <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Height of Front (End 1). Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
+              <div class="field-row" style="margin-bottom: 0;" title="Height of Front. Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
                 <label for="End1HeightField">Height</label>
                 <input type="number" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -236,7 +236,7 @@
   <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
   <div class="card" id="showHideGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Side 1, Side 2 &amp; End 1 (with Dovetail joints, End 1's groove has to be cut from its other side - tick "Reverse End 1 (Front) for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). End 2 is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
 
       <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
            field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
@@ -248,7 +248,7 @@
           <td style="width: 245px; vertical-align: middle;">
             <div class="sub-panel">
               <div class="sub-panel-title">Bottom Panel</div>
-              <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Side 1, Side 2 and End 1 edges down to the groove width, so it still seats in the groove; End 2's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
+              <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Left, Right and Front edges down to the groove width, so it still seats in the groove; Back's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
                 <label for="BottomThicknessField">Bottom Thickness</label>
                 <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
@@ -256,7 +256,7 @@
                 <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
                 <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Side 1, Side 2, End 1), for an easier slide fit.">
+              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
                 <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
                 <input type="number" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
               </div>
@@ -272,7 +272,7 @@
                 <label for="BottomGrooveWidthField">Groove width</label>
                 <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" title="How deep the groove is plowed into Side 1, Side 2 and End 1 (must be less than the material thickness)">
+              <div class="field-row" title="How deep the groove is plowed into Left, Right and Front (must be less than the material thickness)">
                 <label for="BottomGrooveDepthField">Groove depth</label>
                 <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -288,9 +288,9 @@
                   <option value="Bottom">Bottom</option>
                 </select>
               </div>
-              <div class="checkbox-row" id="showHideFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: End 1's groove has to go into the face that lies on the spoilboard when End 1 is cut. When checked, an extra sheet 'End 1 Groove (flipped)' is created: turn the cut End 1 over (left/right), stand it upright with its bottom edge against the left (X0) stop and push it into the sheet's lower left corner (against the Y0 stop) and run the groove toolpath there. The outline on that sheet is for reference only.">
+              <div class="checkbox-row" id="showHideFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: Front's groove has to go into the face that lies on the spoilboard when Front is cut. When checked, an extra sheet 'Front Groove (flipped)' is created: turn the cut Front over (left/right), stand it upright with its bottom edge against the left (X0) stop and push it into the sheet's lower left corner (against the Y0 stop) and run the groove toolpath there. The outline on that sheet is for reference only.">
                 <input type="checkbox" class="LuaButton" id="BottomFrontGrooveFlip" />
-                <label for="BottomFrontGrooveFlip">Reverse End 1 (Front) for groove on own sheet</label>
+                <label for="BottomFrontGrooveFlip">Reverse Front for groove on own sheet</label>
               </div>
             </div>
           </td>
@@ -308,14 +308,14 @@
   <div class="section-header" id="showHideLidGrooveSectionHeader" style="display: none;">Grooved Lid Options</div>
   <div class="card" id="showHideLidGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Side 1, Side 2 &amp; End 1 near the top edge (with Dovetail joints, End 1's lid groove has to be cut from its other side - tick "Reverse End 1 (Front) for lid groove on own sheet" to get it on the flip sheet, otherwise End 1 gets no lid groove and the lid stops at its inside face). End 2 is shortened to the underside of the lid, so the lid slides in from the back over End 2. Behind End 2 only the grip tab sticks out - the rest of the overhang is cut flush left and right.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Left, Right &amp; Front near the top edge (with Dovetail joints, Front's lid groove has to be cut from its other side - tick "Reverse Front for lid groove on own sheet" to get it on the flip sheet, otherwise Front gets no lid groove and the lid stops at its inside face). The Back is shortened to the underside of the lid, so the lid slides in over it from behind. Only the grip tab overhangs the Back - the rest of the overhang is cut flush left and right.</div>
 
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
         <tr>
           <td style="width: 245px; vertical-align: middle;">
             <div class="sub-panel">
               <div class="sub-panel-title">Lid Panel</div>
-              <div class="field-row" title="Thickness of the lid - defaults to the material thickness. If it is thinner than the material, the lid is cut from separate stock: it is placed on its own sheet (Lid Panel + thickness) and its own layers (Lid Panel / CutOut Lid), with its own cutout toolpath at the lid thickness. If the bottom is a Grooved panel of exactly the same thickness, bottom and lid share one sheet (Bottom + Lid Panel + thickness) and one cutout toolpath. If it is thicker than the lid groove width, a rabbet is milled on the lid's TOP face along its Side 1, Side 2 and End 1 edges down to the groove width, so the lid's underside runs on the groove floor and its top can sit flush with the walls.">
+              <div class="field-row" title="Thickness of the lid - defaults to the material thickness. If it is thinner than the material, the lid is cut from separate stock: it is placed on its own sheet (Lid Panel + thickness) and its own layers (Lid Panel / CutOut Lid), with its own cutout toolpath at the lid thickness. If the bottom is a Grooved panel of exactly the same thickness, bottom and lid share one sheet (Bottom + Lid Panel + thickness) and one cutout toolpath. If it is thicker than the lid groove width, a rabbet is milled on the lid's TOP face along its Left, Right and Front edges down to the groove width, so the lid's underside runs on the groove floor and its top can sit flush with the walls.">
                 <label for="LidThicknessField">Lid Thickness</label>
                 <input type="number" step="any" id="LidThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
@@ -323,7 +323,7 @@
                 <label for="LidRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
                 <input type="number" step="any" id="LidRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the lid reaches into each of the 3 grooves (Side 1, Side 2, End 1), for an easier slide fit.">
+              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the lid reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
                 <label for="LidGrooveClearanceField" style="color: #1155A2;">Lid Clearance</label>
                 <input type="number" step="any" id="LidGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -339,7 +339,7 @@
                 <label for="LidGrooveWidthField">Groove width</label>
                 <input type="number" step="any" id="LidGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" title="How deep the lid groove is cut into Side 1, Side 2 and End 1 (must be less than the material thickness)">
+              <div class="field-row" title="How deep the lid groove is cut into Left, Right and Front (must be less than the material thickness)">
                 <label for="LidGrooveDepthField">Groove depth</label>
                 <input type="number" step="any" id="LidGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -354,10 +354,10 @@
                   <option value="Lid">Lid</option>
                 </select>
               </div>
-              <!-- Dovetail only: End 1's lid groove on the flip sheet, like the bottom groove -- by Claude 10/26/2026 -->
-              <div class="checkbox-row" id="showHideLidFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: End 1's lid groove has to go into the face that lies on the spoilboard when End 1 is cut. When checked, it is cut on the extra sheet 'End 1 Groove (flipped)' (together with the bottom groove, if that is flipped too): turn the cut End 1 over (left/right), stand it upright with its bottom edge against the left (X0) stop, push it into the sheet's lower left corner (against the Y0 stop) and run the lid groove toolpath there. The lid then reaches into that groove. Unchecked, End 1 gets no lid groove and the lid stops at its inside face.">
+              <!-- Dovetail only: Front's lid groove on the flip sheet, like the bottom groove -- by Claude 10/26/2026 -->
+              <div class="checkbox-row" id="showHideLidFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: Front's lid groove has to go into the face that lies on the spoilboard when Front is cut. When checked, it is cut on the extra sheet 'Front Groove (flipped)' (together with the bottom groove, if that is flipped too): turn the cut Front over (left/right), stand it upright with its bottom edge against the left (X0) stop, push it into the sheet's lower left corner (against the Y0 stop) and run the lid groove toolpath there. The lid then reaches into that groove. Unchecked, Front gets no lid groove and the lid stops at its inside face.">
                 <input type="checkbox" class="LuaButton" id="LidFrontGrooveFlip" onclick="onGeometryFieldChanged()" />
-                <label for="LidFrontGrooveFlip">Reverse End 1 (Front) for lid groove on own sheet</label>
+                <label for="LidFrontGrooveFlip">Reverse Front for lid groove on own sheet</label>
               </div>
             </div>
           </td>
@@ -366,12 +366,12 @@
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
             <div class="sub-panel">
               <div class="sub-panel-title">Grip Tab</div>
-              <div class="checkbox-row" title="When checked, a grip tab sticks out behind End 2 to pull the lid out. Unchecked, the lid ends flush with End 2.">
+              <div class="checkbox-row" title="When checked, a grip tab sticks out past the Back to pull the lid out. Unchecked, the lid ends flush with the Back.">
                 <input type="checkbox" class="LuaButton" id="LidGripEnabled" onclick="onLidGripEnabledChanged(); onGeometryFieldChanged();" />
-                <label for="LidGripEnabled">Grip tab behind End 2</label>
+                <label for="LidGripEnabled">Grip tab overhangs the Back</label>
               </div>
               <div id="showHideLidGripFields">
-              <div class="field-row" title="How far the grip tab sticks out behind End 2 (0 = no grip tab, the lid ends flush with End 2).">
+              <div class="field-row" title="How far the grip tab sticks out past the Back (0 = no grip tab, the lid ends flush with the Back).">
                 <label for="LidGripOverhangField">Grip overhang</label>
                 <input type="number" step="any" id="LidGripOverhangField" placeholder="Overhang" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -508,6 +508,7 @@
     <input type="text" id="InvalidBottomJointWidth" value=""/>
     <input type="text" id="InvalidBottomGrooveWidth" value=""/>
     <input type="text" id="InvalidLidGrooveWidth" value=""/>
+    <input type="text" id="InvalidLidGripWidth" value=""/>
   </fieldset>
 
 
@@ -614,7 +615,7 @@
     setSectionVisible("showHideLidGrooveSectionHeader", "showHideLidGrooveOptions", selectedIndex === LID_INDEX_GROOVED);
     if (lidCheckItem) {
       if (selectedIndex === LID_INDEX_GROOVED) {
-        lidCheckItem.title = "Uncheck to skip cutting the lid while still cutting the lid groove into Side 1, Side 2 & End 1 (and still shortening End 2) - e.g. to slide in a lid of your own material.";
+        lidCheckItem.title = "Uncheck to skip cutting the lid while still cutting the lid groove into Left, Right & Front (and still shortening the Back) - e.g. to slide in a lid of your own material.";
       } else {
         lidCheckItem.title = "Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type";
       }
@@ -624,7 +625,7 @@
     onGeometryFieldChanged();
   }
 
-  // Side Overhang (End 1/End 2 height + chamfer) only makes sense with Lid Type =
+  // Side Overhang (Front/Back height + chamfer) only makes sense with Lid Type =
   // Open Chamfer (ValidateOpenChamferOptions on the Lua side rejects it otherwise)
   // - rather than let the user set it up and only find out on OK, lock Front/Back
   // height to the box height and greyed out (no overhang possible) for any other
@@ -789,12 +790,12 @@
     setSectionVisible("showHideGrooveSectionHeader", "showHideGrooveOptions", selectedIndex === 4);
 
     // For a Grooved bottom, unchecking "Bottom" still cuts the slide-in groove into
-    // Side 1, Side 2 & End 1 (and still shortens End 2) - it only skips cutting the
+    // Left, Right & Front (and still shortens the Back) - it only skips cutting the
     // bottom panel itself, e.g. when you want to slide in your own material (glass,
     // a different thickness, ...) instead of the one the gadget would cut. -- by Claude 9/18/2026
     if (bottomCheckItem) {
       if (selectedIndex === 4) {
-        bottomCheckItem.title = "Uncheck to skip cutting the bottom panel while still cutting the slide-in groove into Side 1, Side 2 & End 1 (and still shortening End 2) - useful if you want to slide in your own bottom material instead of the one this gadget would cut.";
+        bottomCheckItem.title = "Uncheck to skip cutting the bottom panel while still cutting the slide-in groove into Left, Right & Front (and still shortening the Back) - useful if you want to slide in your own bottom material instead of the one this gadget would cut.";
       } else {
         bottomCheckItem.title = "Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type";
       }
@@ -830,7 +831,8 @@
     "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
     "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
     "InvalidBottomGrooveWidth": "BottomGrooveWidthField",
-    "InvalidLidGrooveWidth":    "LidGrooveWidthField"
+    "InvalidLidGrooveWidth":    "LidGrooveWidthField",
+    "InvalidLidGripWidth":      "LidGripWidthField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -932,7 +934,7 @@
     var dovetailAngleRow = document.getElementById("showHideDovetailAngle");
     if (dovetailAngleRow) { dovetailAngleRow.style.display = isBoxJoint ? "none" : "block"; }
 
-    // End 1 groove on its own (flip) sheet - dovetails only
+    // Front groove on its own (flip) sheet - dovetails only
     var flipRow = document.getElementById("showHideFrontGrooveFlip");
     if (flipRow) { flipRow.style.display = isBoxJoint ? "none" : "block"; }
     var lidFlipRow = document.getElementById("showHideLidFrontGrooveFlip");

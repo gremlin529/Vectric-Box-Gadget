@@ -489,7 +489,7 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   if (options.bottomType == FaceJointType.Grooved) then
     bottom_thickness_end2 = options.bottomGrooveOffset or 0
   end
-  -- Grooved (sliding) lid: End 2 ends at the lid's underside -- by Claude 10/25/2026
+  -- Grooved (sliding) lid: The Back ends at the lid's underside -- by Claude 10/25/2026
   local top_reserved_end2 = top_reserved_for_corner
   if (options.lidType == FaceJointType.Grooved) then
     top_reserved_end2 = options.lidGrooveOffset or 0
@@ -766,7 +766,7 @@ local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog)
     -- already reports against the allowance field.
     if (effectiveDia > 0) and (effectiveDia > groove_width + 0.0001) then
       message = string.format(
-        "The selected tool is too large to cut the bottom groove.\n\nThe groove in Side 1, Side 2 and End 1 is a closed slot only as wide as the groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
+        "The selected tool is too large to cut the bottom groove.\n\nThe groove in Left, Right and Front is a closed slot only as wide as the groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
         groove_width, effectiveDia, effectiveDia)
     end
   end
@@ -830,7 +830,7 @@ end
 |  options.lidGrooveOffset is "from the top edge down to the groove's LOWER
 |  edge", which is where the lid's underside runs (a lid thicker than the
 |  groove has its rabbet on the top face, so its underside stays on the
-|  groove floor). End 2 is shortened to exactly that height.
+|  groove floor). The Back is shortened to exactly that height.
 |                                                                 -- by Claude 10/25/2026
 ]]
 function LidGrooveFarEdgeFromInput(options)
@@ -861,7 +861,7 @@ local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
     end
     if (effectiveDia > 0) and (effectiveDia > groove_width + 0.0001) then
       message = string.format(
-        "The selected tool is too large to cut the lid groove.\n\nThe groove in Side 1, Side 2 and End 1 is a closed slot only as wide as the lid groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the lid groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
+        "The selected tool is too large to cut the lid groove.\n\nThe groove in Left, Right and Front is a closed slot only as wide as the lid groove width (%." .. G_decimalPlaces .. "f), but the tool is %." .. G_decimalPlaces .. "f wide. Increase the lid groove width to at least %." .. G_decimalPlaces .. "f, or pick a smaller tool.",
         groove_width, effectiveDia, effectiveDia)
     end
   end
@@ -875,6 +875,38 @@ local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
   end
 
   dialog:UpdateTextField("InvalidLidGrooveWidth", message)
+  return message == ""
+end
+
+-- Grip width of the Grooved lid's grip tab: must be > 0 when there is a tab, and
+-- must stay clear of the rabbet bands along Left / Right (at most the inside width
+-- minus twice the lid groove depth). Same report_as_dialog convention as the tool
+-- fit checks: false writes the message (or "") into InvalidLidGripWidth, so the
+-- field turns red while typing.                                -- by Claude 10/26/2026
+local function ValidateLidGripWidth(dialog, options, report_as_dialog)
+  local message = ""
+  local has_tab = (options.lidType == FaceJointType.Grooved)
+    and (options.lidGripEnabled ~= false)
+    and IsNonNeg(options.lidGripOverhang) and options.lidGripOverhang > 0.0001
+  if has_tab then
+    local grip_width = options.lidGripWidth
+    local max_grip = (options.width - 2*options.thickness) - 2*(options.lidGrooveDepth or 0)
+    if not IsNonNeg(grip_width) or grip_width <= 0.0001 then
+      message = "Grip width must be greater than 0 when there is a grip overhang."
+    elseif grip_width > max_grip + 0.0001 then
+      message = string.format("Grip width %." .. G_decimalPlaces .. "f is too wide - at most %." .. G_decimalPlaces .. "f (inside width minus twice the lid groove depth).", grip_width, max_grip)
+    end
+  end
+
+  if report_as_dialog then
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidLidGripWidth", message)
   return message == ""
 end
 
@@ -917,7 +949,7 @@ local function ValidateGroovedLidOptions(dialog, options)
   if options.lidGrooveClearance >= options.lidGrooveDepth then
     return fail(string.format("Lid clearance %.2f must be less than the lid groove depth %.2f.", options.lidGrooveClearance, options.lidGrooveDepth))
   end
-  -- End 2 runs from its bottom (top of the bottom groove, or above the bottom's
+  -- The Back runs from its bottom (top of the bottom groove, or above the bottom's
   -- joint) up to the lid's underside - it must still be a real panel, which also
   -- keeps the lid groove clear of the bottom groove.
   local bottom_reserved = ThicknessForFaceType(options.bottomType, options.thickness)
@@ -925,7 +957,7 @@ local function ValidateGroovedLidOptions(dialog, options)
     bottom_reserved = options.bottomGrooveOffset or 0
   end
   if (options.lidGrooveOffset + bottom_reserved) >= options.height - 0.0001 then
-    return fail(string.format("The lid groove offset is too large for the box height %.2f (End 2 would have no height left below the lid).", options.height))
+    return fail(string.format("The lid groove offset is too large for the box height %.2f (the Back would have no height left below the lid).", options.height))
   end
   -- grip values only matter with "Grip tab" ticked
   if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripOverhang) then
@@ -934,15 +966,10 @@ local function ValidateGroovedLidOptions(dialog, options)
   if options.lidGripEnabled ~= false and not IsNonNeg(options.lidGripWidth) then
     return fail("Grip width must be 0 or greater.")
   end
+  if not ValidateLidGripWidth(dialog, options, true) then
+    return false
+  end
   if options.lidGripEnabled ~= false and options.lidGripOverhang > 0.0001 then
-    if options.lidGripWidth <= 0.0001 then
-      return fail("Grip width must be greater than 0 when there is a grip overhang.")
-    end
-    -- the grip tab must stay clear of the rabbet bands along Side 1 / Side 2
-    local max_grip = (options.width - 2*options.thickness) - 2*options.lidGrooveDepth
-    if options.lidGripWidth > max_grip + 0.0001 then
-      return fail(string.format("Grip width %.2f is too wide - at most %.2f (inside width minus twice the lid groove depth).", options.lidGripWidth, max_grip))
-    end
     if options.lidGripShape == "Rounded" and not IsNonNeg(options.lidGripRadius) then
       return fail("Grip corner radius must be 0 or greater.")
     end
@@ -1009,6 +1036,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidEnd2ChamferAngle", "")
   dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
   dialog:AddTextField("InvalidLidGrooveWidth", "")     -- Added by Claude 10/25/2026
+  dialog:AddTextField("InvalidLidGripWidth", "")       -- Added by Claude 10/26/2026
 
   -- Add Tool picker
   -- Add toolpath name field
@@ -1073,7 +1101,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("LidGrooveDepthField", options.lidGrooveDepth)
   dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
   dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
-  dialog:AddCheckBox("LidFrontGrooveFlip", options.lidFrontGrooveFlip)       -- Dovetail only: End 1 lid groove on the flip sheet -- by Claude 10/26/2026
+  dialog:AddCheckBox("LidFrontGrooveFlip", options.lidFrontGrooveFlip)       -- Dovetail only: Front lid groove on the flip sheet -- by Claude 10/26/2026
   dialog:AddCheckBox("LidGripEnabled", options.lidGripEnabled)
   dialog:AddDoubleField("LidGripOverhangField", options.lidGripOverhang)
   dialog:AddDoubleField("LidGripWidthField", options.lidGripWidth)
@@ -1167,10 +1195,10 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       -- lid's own reserved thickness, if any) to be a real panel. -- by Claude 9/21/2026
       local top_reserved = ThicknessForFaceType(options.lidType, options.thickness)
       if (options.lidType == FaceJointType.Grooved) then
-        top_reserved = options.lidGrooveOffset or 0   -- End 2 ends at the lid's underside -- by Claude 10/25/2026
+        top_reserved = options.lidGrooveOffset or 0   -- the Back ends at the lid's underside -- by Claude 10/25/2026
       end
       if (options.bottomGrooveOffset + top_reserved) >= options.height then
-        DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (End 2 would have no height left).", options.height))
+        DisplayMessageBox(string.format("The groove offset is too large for the box height %.2f (the Back would have no height left).", options.height))
         return false
       end
       -- The groove in the walls is a closed slot as wide as the groove width,
@@ -1648,6 +1676,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
   ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
   ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
+  ValidateLidGripWidth(dialog, G_dialogOptions, false)       -- by Claude 10/26/2026
 
   return true
 end

@@ -62,8 +62,8 @@ G_bottomLayerName = "Bottom Panel"              -- Grooved bottom thinner than t
 G_bottomCutoutLayerName = "CutOut Bottom"
 G_lidLayerName = "Lid Panel"                    -- Grooved lid thinner than the material: its own layers + cutout toolpath -- by Claude 10/25/2026
 G_lidCutoutLayerName = "CutOut Lid"
-G_flipOutlineLayerName = "End 1 Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
-G_flipSheetName = "End 1 Groove (flipped)"
+G_flipOutlineLayerName = "Front Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
+G_flipSheetName = "Front Groove (flipped)"
 G_doveTailAngleDegrees = 60
 
 local libraryModule
@@ -129,20 +129,20 @@ function main(script_path)
   options.bottomThickness = 0               --- Grooved bottom only: thickness of the bottom panel. 0 (nothing saved yet) or anything thicker than the material means "use the material thickness" (resolved below, before the dialog opens). A rabbet (Falz) is milled along Side 1/Side 2/End 1's edges only where the panel is thicker than the groove width -- by Claude 10/9/2026 (replaces bottomSameMaterial)
   options.bottomGrooveClearance = 0.01      --- Grooved bottom only: clearance ("Luft") subtracted from how far the panel reaches into each of the 3 grooves, for an easier slide fit -- by Claude 9/21/2026
   options.bottomRabbetDepthCorrection = 0   --- Grooved bottom only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
-  -- Grooved (sliding) lid: the mirror image of the Grooved bottom - grooves near the top edge of Side 1,
-  -- Side 2 and End 1, End 2 shortened to the lid's underside so the lid slides in from the back, with a
-  -- grip tab sticking out behind End 2.                                                        -- by Claude 10/25/2026
+  -- Grooved (sliding) lid: the mirror image of the Grooved bottom - grooves near the top edge of Left,
+  -- Right and Front, the Back shortened to the lid's underside so the lid slides in from the back, with a
+  -- grip tab sticking out past the Back.                                                        -- by Claude 10/25/2026
   options.lidThickness = 0                  --- Grooved lid only: lid thickness. 0 or thicker than the material = material thickness (resolved below)
   options.lidGrooveWidth = options.thickness --- Grooved lid only: width of the lid groove slot
-  options.lidGrooveDepth = 0.125            --- Grooved lid only: how deep the lid groove is cut into Side 1/Side 2/End 1
+  options.lidGrooveDepth = 0.125            --- Grooved lid only: how deep the lid groove is cut into Left/Right/Front
   options.lidGrooveOffsetRef = "Groove"     --- Grooved lid only: the offset in the dialog is measured from the top edge to the top of the groove ("Groove") or to the top face of the lid ("Lid")
   options.lidGrooveOffsetInput = 0.25       --- Grooved lid only: the offset as entered, see lidGrooveOffsetRef. Internally options.lidGrooveOffset = top edge down to the groove's lower edge
   options.lidGrooveOffset = options.lidGrooveOffsetInput + options.lidGrooveWidth
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
-  options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut End 1's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
-  options.lidGripEnabled = true             --- Grooved lid only: make a grip tab behind End 2 (off = the lid ends flush with End 2)
-  options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out behind End 2 (0 = no grip tab)
+  options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut Front's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
+  options.lidGripEnabled = true             --- Grooved lid only: make a grip tab past the Back (off = the lid ends flush with the Back)
+  options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out past the Back (0 = no grip tab)
   options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
   options.lidGripShape = "Rounded"          --- Grooved lid only: "Square", "Rounded" or "Arc"
   options.lidGripRadius = 0.5               --- Grooved lid only: corner radius for the "Rounded" grip tab
@@ -834,7 +834,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         -- grooves above since it's cut to a different depth.  -- by Claude 9/21/2026
         CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
 
-        -- Grooved (sliding) lid: grooves near the top of Side 1/Side 2/End 1 and the
+        -- Grooved (sliding) lid: grooves near the top of Left/Right/Front and the
         -- rabbet on the lid's top face - each its own pass/depth.  -- by Claude 10/25/2026
         CreateLidGroovePocketToolpath(job, options, sheet_faces, options.tool, "Lid Groove")
         CreateLidRabbetToolpath(job, options, sheet_faces, options.tool, "Lid Rabbet")
