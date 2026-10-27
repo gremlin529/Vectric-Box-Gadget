@@ -7,6 +7,20 @@
   <title>Box Creator Gadget</title>
   <link href="stylesheets/layout-css-8.css" rel="stylesheet" type="text/css" />
   <script type="text/javascript" src="scripts/browser-compatibility.js"></script>
+  <style type="text/css">
+    /* Tabs in the Grooved Lid Options section -- by Claude 10/27/2026 */
+    .lid-tabs { border-bottom: 2px solid #2255aa; margin: 4px 0 10px 0; padding-left: 4px; }
+    .lid-tab { display: inline; zoom: 1; padding: 4px 16px 3px 16px; margin-right: 4px; cursor: pointer;
+               font-weight: bold; font-size: 14px; background-color: #dde3ee; color: #1f3b63;
+               border: 1px solid #b8c2d6; border-bottom: none; }
+    .lid-tab-active { background-color: #2255aa; color: #ffffff; border-color: #2255aa; }
+    .lid-tab-warn { color: #cc3333; }
+    .lid-tab-active.lid-tab-warn { color: #ffd0d0; }
+    body.dark-mode .lid-tabs { border-bottom-color: #3a6ab0; }
+    body.dark-mode .lid-tab { background-color: #2a2f3b; color: #b0b8cc; border-color: #383d4a; }
+    body.dark-mode .lid-tab-active { background-color: #3a6ab0; color: #ffffff; border-color: #3a6ab0; }
+    body.dark-mode .lid-tab-warn { color: #ff7b7b; }
+  </style>
 </head>
 <body>
 <div id="page-wrapper">
@@ -310,8 +324,13 @@
     <div class="card-body clearfix">
       <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Sliding lid: grooved into Left, Right &amp; Front near the top edge (with Dovetail joints, Front's lid groove has to be cut from its other side - tick "Reverse Front for lid groove on own sheet" to get it on the flip sheet, otherwise Front gets no lid groove and the lid stops at its inside face). The Back is shortened to the underside of the lid, so the lid slides in over it from behind. To pull it out, pick a Grip: a finger hole near the back end, or a grab handle - a tab that overhangs the Back (the rest of the overhang is cut flush left and right).</div>
 
+      <!-- Tabs: "Lid & Groove" / "Grip" - only one row of the table below is shown at a
+           time, so the section stays short. Plain spans + onclick, IE7-safe. -- by Claude 10/27/2026 -->
+      <div class="lid-tabs">
+        <span class="lid-tab lid-tab-active" id="LidTabGroove" onclick="showLidTab('Groove')" title="Lid panel and lid groove">Lid &amp; Groove</span><span class="lid-tab" id="LidTabGrip" onclick="showLidTab('Grip')" title="How the lid is pulled out: none, finger hole, grab handle, or both">Grip</span>
+      </div>
       <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
-        <tr>
+        <tr id="LidTabRowGroove">
           <td style="width: 245px; vertical-align: middle;">
             <div class="sub-panel">
               <div class="sub-panel-title">Lid Panel</div>
@@ -362,7 +381,7 @@
             </div>
           </td>
         </tr>
-        <tr>
+        <tr id="LidTabRowGrip" style="display: none;">
           <td style="width: 245px; vertical-align: middle; padding-top: 10px;">
             <div class="sub-panel">
               <div class="sub-panel-title">Grip</div>
@@ -853,6 +872,42 @@
     }
   }
 
+  // Tabs in the Grooved Lid Options section: "Groove" (lid panel + lid groove) or
+  // "Grip". A tab whose hidden fields have a problem gets a red label, so a red
+  // field is never out of sight unnoticed.               -- by Claude 10/27/2026
+  var g_lidTab = "Groove";
+  function showLidTab(which) {
+    g_lidTab = (which === "Grip") ? "Grip" : "Groove";
+    var grip = (g_lidTab === "Grip");
+    var rowGroove = document.getElementById("LidTabRowGroove");
+    var rowGrip = document.getElementById("LidTabRowGrip");
+    var info = document.getElementById("LidRabbetInfoText");
+    if (rowGroove) { rowGroove.style.display = grip ? "none" : ""; }
+    if (rowGrip) { rowGrip.style.display = grip ? "" : "none"; }
+    if (info) { info.style.display = grip ? "none" : ""; }
+    updateLidTabLabels();
+  }
+  function rowHasInvalidField(rowId) {
+    var row = document.getElementById(rowId);
+    if (!row) { return false; }
+    var inputs = row.getElementsByTagName("input");
+    for (var i = 0; i < inputs.length; i++) {
+      if ((" " + inputs[i].className + " ").indexOf(" invalid ") >= 0) { return true; }
+    }
+    return false;
+  }
+  function updateLidTabLabels() {
+    var tabs = [["LidTabGroove", "LidTabRowGroove", "Groove"], ["LidTabGrip", "LidTabRowGrip", "Grip"]];
+    for (var i = 0; i < tabs.length; i++) {
+      var tab = document.getElementById(tabs[i][0]);
+      if (!tab) { continue; }
+      var cls = "lid-tab";
+      if (g_lidTab === tabs[i][2]) { cls += " lid-tab-active"; }
+      if (rowHasInvalidField(tabs[i][1])) { cls += " lid-tab-warn"; }
+      if (tab.className !== cls) { tab.className = cls; }
+    }
+  }
+
   function onBottomTypeChanged(el) {
     var select = document.getElementById("BottomTypeSelect");
     var selectedIndex = select ? select.selectedIndex : 0;
@@ -979,6 +1034,7 @@
     }
   }
   setInterval(pollInvalidFieldFlags, 300);
+  setInterval(updateLidTabLabels, 300);   // red tab label when a field on it is invalid -- by Claude 10/27/2026
 
   // ToolNameField is a <span> that Lua's tool picker updates directly when
   // the user picks a tool - not a form field, so there's no onchange to hook,
@@ -1080,6 +1136,7 @@
     onLidGrooveOffsetRefChanged();
     onLidGripShapeChanged();
     onLidGripTypeChanged();
+    showLidTab("Groove");
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }
