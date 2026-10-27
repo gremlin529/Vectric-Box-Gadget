@@ -835,6 +835,7 @@
     var handle = (type === "Grab Handle" || type === "Indented Handle");
     var hole = (type === "Finger Hole" || type === "Indented Handle");
     var both = handle && hole;   // Indented Handle -- by Claude 10/27/2026
+    updateLidTabLabels();
     var show = function (id, on) { var el = document.getElementById(id); if (el) { el.style.display = on ? "" : "none"; } };
     show("showHideLidGripFields", handle);
     show("showHideLidHandleShape", handle);
@@ -905,6 +906,14 @@
       if (g_lidTab === tabs[i][2]) { cls += " lid-tab-active"; }
       if (rowHasInvalidField(tabs[i][1])) { cls += " lid-tab-warn"; }
       if (tab.className !== cls) { tab.className = cls; }
+    }
+    // The Grip tab names the grip that is set, so it is visible from the other tab
+    // too: "Add a Grip" when there is none.                -- by Claude 10/27/2026
+    var gripTab = document.getElementById("LidTabGrip");
+    if (gripTab) {
+      var type = selectedValue("LidGripType", "Grab Handle");
+      var label = (type === "None") ? "Add a Grip" : ("Grip: " + type);
+      if (gripTab.innerHTML !== label) { gripTab.innerHTML = label; }
     }
   }
 
