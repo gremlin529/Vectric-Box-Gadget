@@ -60,8 +60,10 @@ G_labelsLayerName = "Labels"
 G_cutoutLayerName = "CutOut"
 G_bottomLayerName = "Bottom Panel"              -- Grooved bottom thinner than the material: its own layers + cutout toolpath -- by Claude 10/9/2026
 G_bottomCutoutLayerName = "CutOut Bottom"
-G_flipOutlineLayerName = "End 1 Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
-G_flipSheetName = "End 1 Groove (flipped)"
+G_lidLayerName = "Lid Panel"                    -- Grooved lid thinner than the material: its own layers + cutout toolpath -- by Claude 10/25/2026
+G_lidCutoutLayerName = "CutOut Lid"
+G_flipOutlineLayerName = "Front Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
+G_flipSheetName = "Front Groove (flipped)"
 G_doveTailAngleDegrees = 60
 
 local libraryModule
@@ -127,6 +129,30 @@ function main(script_path)
   options.bottomThickness = 0               --- Grooved bottom only: thickness of the bottom panel. 0 (nothing saved yet) or anything thicker than the material means "use the material thickness" (resolved below, before the dialog opens). A rabbet (Falz) is milled along Side 1/Side 2/End 1's edges only where the panel is thicker than the groove width -- by Claude 10/9/2026 (replaces bottomSameMaterial)
   options.bottomGrooveClearance = 0.01      --- Grooved bottom only: clearance ("Luft") subtracted from how far the panel reaches into each of the 3 grooves, for an easier slide fit -- by Claude 9/21/2026
   options.bottomRabbetDepthCorrection = 0   --- Grooved bottom only: fine-tune correction added to the computed rabbet depth (thickness minus groove width) -- by Claude 9/21/2026
+  -- Grooved (sliding) lid: the mirror image of the Grooved bottom - grooves near the top edge of Left,
+  -- Right and Front, the Back shortened to the lid's underside so the lid slides in from the back, with a
+  -- grip tab sticking out past the Back.                                                        -- by Claude 10/25/2026
+  options.lidThickness = 0                  --- Grooved lid only: lid thickness. 0 or thicker than the material = material thickness (resolved below)
+  options.lidGrooveWidth = options.thickness --- Grooved lid only: width of the lid groove slot
+  options.lidGrooveDepth = 0.125            --- Grooved lid only: how deep the lid groove is cut into Left/Right/Front
+  options.lidGrooveOffsetRef = "Groove"     --- Grooved lid only: the offset in the dialog is measured from the top edge to the top of the groove ("Groove") or to the top face of the lid ("Lid")
+  options.lidGrooveOffsetInput = 0.25       --- Grooved lid only: the offset as entered, see lidGrooveOffsetRef. Internally options.lidGrooveOffset = top edge down to the groove's lower edge
+  options.lidGrooveOffset = options.lidGrooveOffsetInput + options.lidGrooveWidth
+  options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
+  options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
+  options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut Front's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
+  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole", "Grab Handle" (grip tab that overhangs the Back) or "Indented Handle" (tab with a hole, may sit in the overhang) -- by Claude 10/26/2026, 10/27/2026
+  options.lidHoleShape = "Round"            --- Grooved lid, Finger Hole: "Round" or "Rectangle"
+  options.lidHoleSize = 1.0                 --- Grooved lid, Finger Hole: diameter of a Round hole / width (across the lid) of a Rectangle
+  options.lidHoleLength = 0.75              --- Grooved lid, Finger Hole: length (along the depth) of a Rectangle hole -- by Claude 10/27/2026
+  options.lidHoleDistance = options.thickness + 0.25  --- Grooved lid, Finger Hole: from the lid's rearmost edge (back edge, or tip of the grip tab) to the near edge of the hole, min 3 mm
+  options.lidHoleRadius = 0.25              --- Grooved lid, Finger Hole: corner radius of a Rectangle hole
+  options.lidHoleThrough = true             --- Grooved lid, Finger Hole: cut right through the lid (false = recess lidHoleDepth deep in the top face) -- by Claude 10/27/2026
+  options.lidHoleDepth = 0.25               --- Grooved lid, Finger Hole: depth of the recess when not cut through
+  options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out past the Back (0 = no grip tab)
+  options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
+  options.lidGripShape = "Rounded"          --- Grooved lid only: "Square", "Rounded" or "Arc"
+  options.lidGripRadius = 0.5               --- Grooved lid only: corner radius for the "Rounded" grip tab
   options.end1Height = options.height       --- "Side Overhang": End 1's own height. Equal to options.height by default (no overhang). Set it lower than
   options.end2Height = options.height       --- the box height and Side 1/Side 2 (always cut "height" tall) will overhang End 1/End 2 by their own difference,
                                              --- independently - so Front and Back can each have their own overhang. Only used when Lid Type = Open Chamfer. -- by Claude 9/20/2026
@@ -206,6 +232,20 @@ function main(script_path)
     options.bottomGrooveClearance = Truncate(options.bottomGrooveClearance * multiplier, 2)
     options.bottomRabbetDepthCorrection = Truncate(options.bottomRabbetDepthCorrection * multiplier, 2)
     options.bottomThickness = Truncate(options.bottomThickness * multiplier, 2)
+    options.lidThickness = Truncate(options.lidThickness * multiplier, 2)                          -- Grooved lid, by Claude 10/25/2026
+    options.lidGrooveWidth = Truncate(options.lidGrooveWidth * multiplier, 2)
+    options.lidGrooveDepth = Truncate(options.lidGrooveDepth * multiplier, 2)
+    options.lidGrooveOffsetInput = Truncate(options.lidGrooveOffsetInput * multiplier, 2)
+    options.lidGrooveClearance = Truncate(options.lidGrooveClearance * multiplier, 2)
+    options.lidRabbetDepthCorrection = Truncate(options.lidRabbetDepthCorrection * multiplier, 2)
+    options.lidGripOverhang = Truncate(options.lidGripOverhang * multiplier, 2)
+    options.lidGripWidth = Truncate(options.lidGripWidth * multiplier, 2)
+    options.lidGripRadius = Truncate(options.lidGripRadius * multiplier, 2)
+    options.lidHoleSize = Truncate(options.lidHoleSize * multiplier, 2)          -- by Claude 10/26/2026
+    options.lidHoleLength = Truncate(options.lidHoleLength * multiplier, 2)      -- by Claude 10/27/2026
+    options.lidHoleDepth = Truncate(options.lidHoleDepth * multiplier, 2)
+    options.lidHoleDistance = Truncate(options.lidHoleDistance * multiplier, 2)
+    options.lidHoleRadius = Truncate(options.lidHoleRadius * multiplier, 2)
     options.end1Height = Truncate(options.end1Height * multiplier, 2)
     options.end2Height = Truncate(options.end2Height * multiplier, 2)
     -- end1ChamferAngle/end2ChamferAngle are in degrees, not a length, so they
@@ -225,6 +265,13 @@ function main(script_path)
       or options.bottomThickness == nil or options.bottomThickness <= 0
       or options.bottomThickness > options.thickness + 0.0001) then
     options.bottomThickness = options.thickness
+  end
+
+  -- Lid Thickness: same rule for a Grooved (sliding) lid.  -- by Claude 10/25/2026
+  if (options.lidType ~= FaceJointType.Grooved
+      or options.lidThickness == nil or options.lidThickness <= 0
+      or options.lidThickness > options.thickness + 0.0001) then
+    options.lidThickness = options.thickness
   end
 
   local tool = Tool("0.25 Inch End Mill", Tool.END_MILL)
@@ -428,18 +475,23 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
   -- while End 1 is still in its original (unarranged) position.  -- by Claude 10/9/2026
   local flip_face = nil
   for i = 1, #faces do
-    if faces[i].flip_groove_contours ~= nil then
+    if faces[i].flip_groove_contours ~= nil or faces[i].flip_lid_groove_contours ~= nil then  -- lid groove too, by Claude 10/26/2026
       flip_face = MakeFrontGrooveFlipFace(faces[i])
       break
     end
   end
 
   local bottom_faces = {}
-  if IsSeparateBottom(options) then
+  local lid_faces = {}   -- Grooved lid thinner than the material -> "Lid Panel <thickness>" sheet -- by Claude 10/25/2026
+  local separateBottom = IsSeparateBottom(options)
+  local separateLid = IsSeparateLid(options)
+  if separateBottom or separateLid then
     local main_faces = {}
     for i = 1, #faces do
-      if faces[i].facetype == FaceType.Bottom then
+      if separateBottom and faces[i].facetype == FaceType.Bottom then
         bottom_faces[#bottom_faces + 1] = faces[i]
+      elseif separateLid and faces[i].facetype == FaceType.Lid then
+        lid_faces[#lid_faces + 1] = faces[i]
       else
         main_faces[#main_faces + 1] = faces[i]
       end
@@ -466,13 +518,24 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
     sheet_names[sheet_num] = SheetNameForIndex(base_sheet_name, sheet_num)
   end
 
+  -- Bottom and lid both cut from the same thinner stock: one shared sheet
+  -- "Bottom + Lid Panel <thickness>" instead of two.          -- by Claude 10/26/2026
+  local bottom_sheet_format = "Bottom Panel %g"
+  if IsSharedPanelSheet(options) and #bottom_faces > 0 and #lid_faces > 0 then
+    for i = 1, #lid_faces do
+      bottom_faces[#bottom_faces + 1] = lid_faces[i]
+    end
+    lid_faces = {}
+    bottom_sheet_format = "Bottom + Lid Panel %g"
+  end
+
   if #bottom_faces > 0 then
     if #faces == 0 then
       required_sheets = 0  -- only the bottom is being made: it gets the only sheet
     end
     bottom_faces = ArrangeContours(bottom_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
     local bottom_sheet_num = required_sheets + 1
-    local bottom_sheet_name = string.format("Bottom Panel %g", options.bottomThickness)
+    local bottom_sheet_name = string.format(bottom_sheet_format, options.bottomThickness)
     if not SheetEnsureExists(job, base_sheet_id, bottom_sheet_name, 1) then
       return nil
     end
@@ -482,6 +545,24 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
       faces[#faces + 1] = bottom_faces[i]
     end
     required_sheets = bottom_sheet_num
+  end
+
+  if #lid_faces > 0 then
+    if #faces == 0 then
+      required_sheets = 0  -- only the lid is being made: it gets the only sheet
+    end
+    lid_faces = ArrangeContours(lid_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
+    local lid_sheet_num = required_sheets + 1
+    local lid_sheet_name = string.format("Lid Panel %g", options.lidThickness)
+    if not SheetEnsureExists(job, base_sheet_id, lid_sheet_name, 1) then
+      return nil
+    end
+    sheet_names[lid_sheet_num] = lid_sheet_name
+    for i = 1, #lid_faces do
+      lid_faces[i].sheet_number = lid_sheet_num
+      faces[#faces + 1] = lid_faces[i]
+    end
+    required_sheets = lid_sheet_num
   end
 
   if flip_face ~= nil then
@@ -530,31 +611,55 @@ function MakeFrontGrooveFlipFace(front)
   outline:LineTo(Point2D(0, part_w))
   outline:LineTo(Point2D(0, 0))
 
-  local grooves = ContourGroup(true)
-  local pos = front.flip_groove_contours:GetHeadPosition()
-  while pos ~= nil do
-    local c
-    c, pos = front.flip_groove_contours:GetNext(pos)
-    local b = c.BoundingBox2D
-    -- mirror x about the part's own centre line, then move its lower left to (0,0)
-    local ax, ay = Upright(fx1 - b.MaxX, b.MinY - fy0)
-    local bx, by = Upright(fx1 - b.MinX, b.MaxY - fy0)
-    local gx0 = math.min(ax, bx)
-    local gx1 = math.max(ax, bx)
-    local gy0 = math.min(ay, by)
-    local gy1 = math.max(ay, by)
-    local g = Contour(0.0)
-    g:AppendPoint(Point2D(gx0, gy0))
-    g:LineTo(Point2D(gx1, gy0))
-    g:LineTo(Point2D(gx1, gy1))
-    g:LineTo(Point2D(gx0, gy1))
-    g:LineTo(Point2D(gx0, gy0))
-    grooves:AddTail(g)
+  -- Bottom groove and (Grooved lid) lid groove are mirrored the same way, but kept
+  -- in separate groups: they are cut in separate passes at their own depths.
+  --                                                             -- by Claude 10/26/2026
+  local function MirrorGrooves(source)
+    if source == nil then
+      return nil
+    end
+    local grooves = ContourGroup(true)
+    local pos = source:GetHeadPosition()
+    while pos ~= nil do
+      local c
+      c, pos = source:GetNext(pos)
+      local b = c.BoundingBox2D
+      -- mirror x about the part's own centre line, then move its lower left to (0,0)
+      local ax, ay = Upright(fx1 - b.MaxX, b.MinY - fy0)
+      local bx, by = Upright(fx1 - b.MinX, b.MaxY - fy0)
+      local gx0 = math.min(ax, bx)
+      local gx1 = math.max(ax, bx)
+      local gy0 = math.min(ay, by)
+      local gy1 = math.max(ay, by)
+      local g = Contour(0.0)
+      g:AppendPoint(Point2D(gx0, gy0))
+      g:LineTo(Point2D(gx1, gy0))
+      g:LineTo(Point2D(gx1, gy1))
+      g:LineTo(Point2D(gx0, gy1))
+      g:LineTo(Point2D(gx0, gy0))
+      grooves:AddTail(g)
+    end
+    return grooves
   end
 
-  local f = Face(outline, nil, {}, {}, "End1GrooveFlip", FaceType.End, FaceJointType.Grooved, {}, nil, grooves)
+  local f = Face(outline, nil, {}, {}, "End1GrooveFlip", FaceType.End, FaceJointType.Grooved, {}, nil, MirrorGrooves(front.flip_groove_contours))
+  f.lid_groove_contours = MirrorGrooves(front.flip_lid_groove_contours)
   f.is_flip_helper = true
   return f
+end
+
+-- Grooved bottom and Grooved lid both thinner than the material and equally thick:
+-- they share one sheet, one pair of layers and one cutout toolpath.  -- by Claude 10/26/2026
+function IsSharedPanelSheet(options)
+  return IsSeparateBottom(options) and IsSeparateLid(options)
+    and math.abs(options.bottomThickness - options.lidThickness) < 0.0001
+end
+
+-- Grooved (sliding) lid thinner than the material: same as the bottom.  -- by Claude 10/25/2026
+function IsSeparateLid(options)
+  return (options.lidType == FaceJointType.Grooved)
+    and (options.lidThickness ~= nil)
+    and (options.lidThickness < options.thickness - 0.0001)
 end
 
 -- Grooved bottom thinner than the material: cut from separate stock, so it gets its own
@@ -580,6 +685,18 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
   -- (and LayoutFacesOnSheets already put it on its own sheet).
   -- Same thickness as the material -> everything stays on the normal layers as before.  -- by Claude 10/9/2026
   local separateBottom = IsSeparateBottom(options)
+  local separateLid = IsSeparateLid(options)   -- by Claude 10/25/2026
+  -- Shared bottom + lid sheet: the lid joins the bottom's group (same depth), on
+  -- combined layer and toolpath names.                         -- by Claude 10/26/2026
+  local sharedPanels = IsSharedPanelSheet(options) and computedFacesToMake.bottom and computedFacesToMake.lid
+  local panelLayerName = G_bottomLayerName
+  local panelCutoutLayerName = G_bottomCutoutLayerName
+  local panelCutoutName = string.format("Cut Out Bottom (%g)", options.bottomThickness or 0)
+  if sharedPanels then
+    panelLayerName = "Bottom + Lid Panel"
+    panelCutoutLayerName = "CutOut Bottom + Lid"
+    panelCutoutName = string.format("Cut Out Bottom + Lid (%g)", options.bottomThickness)
+  end
 
   for sheet_num = 1, required_sheets do
     local sheet_name = (sheet_names and sheet_names[sheet_num]) or SheetNameForIndex(base_sheet_name, sheet_num)
@@ -595,6 +712,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
     local sheet_faces = {}
     local main_faces = {}    -- everything cut from the full material thickness
     local bottom_faces = {}  -- a Grooved bottom thinner than the material (own layers + own cutout depth)
+    local lid_faces = {}     -- a Grooved lid thinner than the material (own layers + own cutout depth)
     local real_faces = {}    -- everything except the End 1 flip helper (labels, fluting)
     local flip_faces = {}    -- End 1 flip helper: outline for reference + groove only
     for i = 1, #faces do
@@ -608,6 +726,10 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
           flip_faces[#flip_faces + 1] = faces[i]
         elseif separateBottom and faces[i].facetype == FaceType.Bottom then
           bottom_faces[#bottom_faces + 1] = faces[i]
+        elseif sharedPanels and faces[i].facetype == FaceType.Lid then
+          bottom_faces[#bottom_faces + 1] = faces[i]
+        elseif separateLid and faces[i].facetype == FaceType.Lid then
+          lid_faces[#lid_faces + 1] = faces[i]
         else
           main_faces[#main_faces + 1] = faces[i]
         end
@@ -628,8 +750,34 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         local cdcontours = GetAllProfileCadContours(group_faces)
         local cutout_cadcontours
         if options.create_dogbones or options.dovetailJoint then
-          local dogboned_contours = CreateDogboneProfile(vdcontours, offset_radius)
-          cutout_cadcontours = CreateTabbedCadContours(dogboned_contours, cdcontours)
+          -- A Grooved (sliding) lid has no joints to dogbone, and the dogbone offset
+          -- only handles straight spans - it turned the grip tab's arcs into chords
+          -- and notched the tab's inner corners. Offset the lid normally instead,
+          -- everything else exactly as before.                -- by Claude 10/26/2026
+          local dogbone_faces, plain_faces = {}, {}
+          for i = 1, #group_faces do
+            if group_faces[i].facetype == FaceType.Lid and group_faces[i].jointtype == FaceJointType.Grooved then
+              plain_faces[#plain_faces + 1] = group_faces[i]
+            else
+              dogbone_faces[#dogbone_faces + 1] = group_faces[i]
+            end
+          end
+          local offset_contours = ContourGroup(true)
+          local function AppendAll(group)
+            local pos = group:GetHeadPosition()
+            while pos ~= nil do
+              local c
+              c, pos = group:GetNext(pos)
+              offset_contours:AddTail(c:Clone())
+            end
+          end
+          if #dogbone_faces > 0 then
+            AppendAll(CreateDogboneProfile(GetAllProfileContours(dogbone_faces), offset_radius))
+          end
+          if #plain_faces > 0 then
+            AppendAll(GetAllProfileContours(plain_faces):Offset(offset_radius, 0, 1, true))
+          end
+          cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
         else
           local offset_contours = vdcontours:Offset(offset_radius, 0, 1, true)
           cutout_cadcontours = CreateTabbedCadContours(offset_contours, cdcontours)
@@ -639,7 +787,8 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       end
 
       local cutout_objects = AddProfileAndCutoutVectors(main_faces, G_boxLayerName, G_cutoutLayerName)
-      local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, G_bottomLayerName, G_bottomCutoutLayerName)
+      local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, panelLayerName, panelCutoutLayerName)
+      local lid_cutout_objects = AddProfileAndCutoutVectors(lid_faces, G_lidLayerName, G_lidCutoutLayerName)
 
       -- End 1 flip helper: outline only as a placement reference, no cutout
       if #flip_faces > 0 then
@@ -697,6 +846,12 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         -- grooves above since it's cut to a different depth.  -- by Claude 9/21/2026
         CreateBottomRabbetToolpath(job, options, sheet_faces, options.tool, "Bottom Rabbet")
 
+        -- Grooved (sliding) lid: grooves near the top of Left/Right/Front and the
+        -- rabbet on the lid's top face - each its own pass/depth.  -- by Claude 10/25/2026
+        CreateLidGroovePocketToolpath(job, options, sheet_faces, options.tool, "Lid Groove")
+        CreateLidRabbetToolpath(job, options, sheet_faces, options.tool, "Lid Rabbet")
+        CreateLidFingerHoleToolpath(job, options, sheet_faces, options.tool, "Lid Finger Hole")  -- by Claude 10/26/2026
+
         if options.dovetailJoint and fluting_objects ~= nil then
           if SelectExactObjects(job, fluting_objects) then
             CreateFlutingToolpath(
@@ -721,9 +876,21 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
             job,
             options.bottomThickness,
             options.sideOrAllTabWidth,
-            G_bottomCutoutLayerName,
+            panelCutoutLayerName,
             bottom_cutout_objects,
-            string.format("Cut Out Bottom (%g)", options.bottomThickness))
+            panelCutoutName)
+        end
+
+        -- Thinner lid panel: separate cutout, only as deep as the lid is thick -- by Claude 10/25/2026
+        if lid_cutout_objects ~= nil then
+          CreateCutoutToolpath(
+            options.tool,
+            job,
+            options.lidThickness,
+            options.sideOrAllTabWidth,
+            G_lidCutoutLayerName,
+            lid_cutout_objects,
+            string.format("Cut Out Lid (%g)", options.lidThickness))
         end
       end -- not options.no_toolpath
 
