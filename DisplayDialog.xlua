@@ -942,6 +942,7 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
     local dist = options.lidHoleDistance
     local max_size = (options.width - 2*options.thickness) - 2*(options.lidGrooveDepth or 0)
     local min_dist = options.InMM and 3 or (3/25.4)   -- at least 3 mm of lid behind / beside the hole
+    local min_floor = options.InMM and 2 or (2/25.4)  -- at least 2 mm of lid under a recess
     -- "Indented Handle": the distance is measured from the tip of the grip tab
     local tab_ov = 0
     if LidGripHasTab(options) and IsNonNeg(options.lidGripOverhang) and IsNonNeg(options.lidGripWidth)
@@ -990,8 +991,9 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
       local lid_t = options.lidThickness or options.thickness
       if not IsNonNeg(d) or d <= 0.0001 then
         depth_message = "Hole depth must be greater than 0."
-      elseif d >= lid_t - 0.0001 then
-        depth_message = string.format("Hole depth " .. fmt .. " must be less than the lid thickness " .. fmt .. " - tick 'Cut through' to cut right through.", d, lid_t)
+      elseif d > lid_t - min_floor + 0.0001 then
+        -- at least 2 mm of lid has to stay under the recess  -- by Claude 10/27/2026
+        depth_message = string.format("Hole depth " .. fmt .. " is too deep - at most " .. fmt .. ", so at least 2 mm of the lid (thickness " .. fmt .. ") stays under the recess. Tick 'Cut through' to cut right through.", d, math.max(0, lid_t - min_floor), lid_t)
       end
     end
 
