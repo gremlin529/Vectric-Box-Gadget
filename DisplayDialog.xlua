@@ -833,13 +833,16 @@ end
 |  groove floor). The Back is shortened to exactly that height.
 |                                                                 -- by Claude 10/25/2026
 ]]
--- Grip of the Grooved lid: "None", "Finger Hole", "Grab Handle" or "Handle + Hole"
+-- Grip of the Grooved lid: "None", "Finger Hole", "Grab Handle" or "Indented Handle"
 -- (the dropdown's visible texts, read back as they are). Anything else falls back
 -- to Grab Handle.                                              -- updated by Claude 10/27/2026
 --                                                              -- by Claude 10/26/2026
 function NormalizeLidGripType(value)
-  if value == "None" or value == "Finger Hole" or value == "Handle + Hole" then
+  if value == "None" or value == "Finger Hole" or value == "Indented Handle" then
     return value
+  end
+  if value == "Handle + Hole" then   -- earlier name of Indented Handle -- by Claude 10/27/2026
+    return "Indented Handle"
   end
   return "Grab Handle"
 end
@@ -939,7 +942,7 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
     local dist = options.lidHoleDistance
     local max_size = (options.width - 2*options.thickness) - 2*(options.lidGrooveDepth or 0)
     local min_dist = options.InMM and 3 or (3/25.4)   -- at least 3 mm of lid behind / beside the hole
-    -- "Handle + Hole": the distance is measured from the tip of the grip tab
+    -- "Indented Handle": the distance is measured from the tip of the grip tab
     local tab_ov = 0
     if LidGripHasTab(options) and IsNonNeg(options.lidGripOverhang) and IsNonNeg(options.lidGripWidth)
         and options.lidGripOverhang > 0.0001 and options.lidGripWidth > 0.0001 then
@@ -1238,7 +1241,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddDoubleField("LidGrooveOffsetField", options.lidGrooveOffsetInput)
   dialog:AddDropDownList("LidGrooveOffsetRef", options.lidGrooveOffsetRef)   -- "Groove" / "Lid"
   dialog:AddCheckBox("LidFrontGrooveFlip", options.lidFrontGrooveFlip)       -- Dovetail only: Front lid groove on the flip sheet -- by Claude 10/26/2026
-  dialog:AddDropDownList("LidGripType", options.lidGripType)                 -- "None" / "Finger Hole" / "Grab Handle" / "Handle + Hole" -- by Claude 10/26/2026, 10/27/2026
+  dialog:AddDropDownList("LidGripType", options.lidGripType)                 -- "None" / "Finger Hole" / "Grab Handle" / "Indented Handle" -- by Claude 10/26/2026, 10/27/2026
   dialog:AddDropDownList("LidHoleShape", options.lidHoleShape)               -- "Round" / "Rectangle"
   dialog:AddDoubleField("LidHoleSizeField", options.lidHoleSize)
   dialog:AddDoubleField("LidHoleLengthField", options.lidHoleLength)

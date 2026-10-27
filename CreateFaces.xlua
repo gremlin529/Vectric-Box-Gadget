@@ -481,10 +481,10 @@ end
 ]]
 -- Grip types that make a grip tab / a finger hole (Grip dropdown).  -- by Claude 10/27/2026
 function LidGripHasTab(options)
-  return options.lidGripType == nil or options.lidGripType == "Grab Handle" or options.lidGripType == "Handle + Hole"
+  return options.lidGripType == nil or options.lidGripType == "Grab Handle" or options.lidGripType == "Indented Handle"
 end
 function LidGripHasHole(options)
-  return options.lidGripType == "Finger Hole" or options.lidGripType == "Handle + Hole"
+  return options.lidGripType == "Finger Hole" or options.lidGripType == "Indented Handle"
 end
 
 -- Half width of the grip tab at a line `d` in from its tip (0 = tip, overhang =
@@ -706,7 +706,7 @@ function MakeGroovedLid(options, facesToMake, name)
   -- near edge lidHoleDistance in from the back edge. Rectangle: lidHoleSize wide
   -- (across the lid), lidHoleLength long (along the depth), rounded corners.
   --                                                    -- by Claude 10/26/2026, 10/27/2026
-  -- With "Handle + Hole" the distance is measured from the tip of the grip tab
+  -- With "Indented Handle" the distance is measured from the tip of the grip tab
   -- (the lid's rearmost edge), so the hole can sit in the overhang too.  -- by Claude 10/27/2026
   if (LidGripHasHole(options) and (options.lidHoleSize or 0) > 0.0001) then
     local size = options.lidHoleSize

@@ -386,13 +386,13 @@
             <div class="sub-panel">
               <div class="sub-panel-title">Grip</div>
               <!-- None / Finger Hole / Grab Handle - option texts are read back by Lua, never translate them -- by Claude 10/26/2026 -->
-              <div class="field-row" title="How the lid is pulled out. None: no grip, the lid ends flush with the Back. Finger Hole: a finger hole (or recess) near the lid's back end, centred. Grab Handle: a grip tab that overhangs the Back. Handle + Hole: a grip tab with a finger hole, which may also sit in the overhang.">
-                <label for="LidGripType" style="width: 60px;">Grip</label>
-                <select id="LidGripType" style="width: 135px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
+              <div class="field-row" title="How the lid is pulled out. None: no grip, the lid ends flush with the Back. Finger Hole: a finger hole (or recess) near the lid's back end, centred. Grab Handle: a grip tab that overhangs the Back. Indented Handle: a grip tab with a finger hole, which may also sit in the overhang.">
+                <label for="LidGripType" style="width: 50px;">Grip</label>
+                <select id="LidGripType" style="width: 150px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
                   <option value="None">None</option>
                   <option value="Finger Hole">Finger Hole</option>
                   <option value="Grab Handle">Grab Handle</option>
-                  <option value="Handle + Hole">Handle + Hole</option>
+                  <option value="Indented Handle">Indented Handle</option>
                 </select>
               </div>
               <div id="showHideLidGripFields">
@@ -414,7 +414,7 @@
                 <label for="LidHoleLengthField">Hole length</label>
                 <input type="number" step="any" id="LidHoleLengthField" placeholder="Length" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's rearmost edge to the near edge of the finger hole - the back edge (flush with the outside of the Back), or with Handle + Hole the tip of the grip tab. The hole may go right up to that edge - at least 3 mm of lid has to stay behind it (and, inside the grip tab, on each side of it). The hole must end before the Front's inside face.">
+              <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's rearmost edge to the near edge of the finger hole - the back edge (flush with the outside of the Back), or with Indented Handle the tip of the grip tab. The hole may go right up to that edge - at least 3 mm of lid has to stay behind it (and, inside the grip tab, on each side of it). The hole must end before the Front's inside face.">
                 <label for="LidHoleDistanceField">Distance from edge</label>
                 <input type="number" step="any" id="LidHoleDistanceField" placeholder="Distance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -832,9 +832,9 @@
   }
   function onLidGripTypeChanged() {
     var type = selectedValue("LidGripType", "Grab Handle");
-    var handle = (type === "Grab Handle" || type === "Handle + Hole");
-    var hole = (type === "Finger Hole" || type === "Handle + Hole");
-    var both = handle && hole;   // Handle + Hole -- by Claude 10/27/2026
+    var handle = (type === "Grab Handle" || type === "Indented Handle");
+    var hole = (type === "Finger Hole" || type === "Indented Handle");
+    var both = handle && hole;   // Indented Handle -- by Claude 10/27/2026
     var show = function (id, on) { var el = document.getElementById(id); if (el) { el.style.display = on ? "" : "none"; } };
     show("showHideLidGripFields", handle);
     show("showHideLidHandleShape", handle);

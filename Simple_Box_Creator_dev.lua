@@ -141,7 +141,7 @@ function main(script_path)
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
   options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut Front's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
-  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole", "Grab Handle" (grip tab that overhangs the Back) or "Handle + Hole" (tab with a hole, may sit in the overhang) -- by Claude 10/26/2026, 10/27/2026
+  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole", "Grab Handle" (grip tab that overhangs the Back) or "Indented Handle" (tab with a hole, may sit in the overhang) -- by Claude 10/26/2026, 10/27/2026
   options.lidHoleShape = "Round"            --- Grooved lid, Finger Hole: "Round" or "Rectangle"
   options.lidHoleSize = 1.0                 --- Grooved lid, Finger Hole: diameter of a Round hole / width (across the lid) of a Rectangle
   options.lidHoleLength = 0.75              --- Grooved lid, Finger Hole: length (along the depth) of a Rectangle hole -- by Claude 10/27/2026
