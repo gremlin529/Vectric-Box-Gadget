@@ -367,12 +367,13 @@
             <div class="sub-panel">
               <div class="sub-panel-title">Grip</div>
               <!-- None / Finger Hole / Grab Handle - option texts are read back by Lua, never translate them -- by Claude 10/26/2026 -->
-              <div class="field-row" title="How the lid is pulled out. None: no grip, the lid ends flush with the Back. Finger Hole: a hole through the lid near its back end, centred. Grab Handle: a grip tab that overhangs the Back.">
+              <div class="field-row" title="How the lid is pulled out. None: no grip, the lid ends flush with the Back. Finger Hole: a finger hole (or recess) near the lid's back end, centred. Grab Handle: a grip tab that overhangs the Back. Handle + Hole: a grip tab with a finger hole, which may also sit in the overhang.">
                 <label for="LidGripType" style="width: 60px;">Grip</label>
                 <select id="LidGripType" style="width: 135px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
                   <option value="None">None</option>
                   <option value="Finger Hole">Finger Hole</option>
                   <option value="Grab Handle">Grab Handle</option>
+                  <option value="Handle + Hole">Handle + Hole</option>
                 </select>
               </div>
               <div id="showHideLidGripFields">
@@ -386,13 +387,26 @@
               </div>
               </div>
               <div id="showHideLidHoleFields" style="display: none;">
-              <div class="field-row" title="Diameter of a Round finger hole, or the side length of a Rounded Square one. Must be bigger than the tool and at most the inside width minus twice the lid groove depth.">
-                <label for="LidHoleSizeField">Hole size</label>
+              <div class="field-row" title="Diameter of a Round finger hole, or the width (across the lid) of a Rectangle one. Must be bigger than the tool and at most the inside width minus twice the lid groove depth.">
+                <label for="LidHoleSizeField" id="LidHoleSizeLabel">Hole size</label>
                 <input type="number" step="any" id="LidHoleSizeField" placeholder="Size" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's back edge (flush with the outside of the Back) to the near edge of the finger hole. At least the material thickness, so the hole is clear of the Back underneath.">
+              <div class="field-row" id="showHideLidHoleLength" title="Length of a Rectangle finger hole, along the depth of the box (towards the Front). Must be bigger than the tool.">
+                <label for="LidHoleLengthField">Hole length</label>
+                <input type="number" step="any" id="LidHoleLengthField" placeholder="Length" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's rearmost edge to the near edge of the finger hole - the back edge (flush with the outside of the Back), or with Handle + Hole the tip of the grip tab. The hole may go right up to that edge - at least 3 mm of lid has to stay behind it (and, inside the grip tab, on each side of it). The hole must end before the Front's inside face.">
                 <label for="LidHoleDistanceField">Distance from edge</label>
                 <input type="number" step="any" id="LidHoleDistanceField" placeholder="Distance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <!-- cut through, or a finger recess of a set depth -- by Claude 10/27/2026 -->
+              <div class="checkbox-row" style="margin-top: 6px;" title="When checked, the finger hole is cut right through the lid. Unchecked, it becomes a finger recess in the lid's top face, as deep as 'Hole depth'.">
+                <input type="checkbox" class="LuaButton" id="LidHoleThrough" onclick="onLidGripTypeChanged(); onGeometryFieldChanged();" />
+                <label for="LidHoleThrough">Cut through</label>
+              </div>
+              <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0 and less than the lid thickness.">
+                <label for="LidHoleDepthField">Hole depth</label>
+                <input type="number" step="any" id="LidHoleDepthField" placeholder="Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
             </div>
@@ -406,7 +420,7 @@
               <div id="showHideLidHandleShape">
               <div class="field-row" title="Shape of the grip tab. Square: plain rectangle. Rounded: rectangle with rounded outer corners. Arc: one circular arc from root to root through the tip (a half circle on straight flanks if the overhang is more than half the grip width).">
                 <label for="LidGripShape">Shape</label>
-                <select id="LidGripShape" onchange="onLidGripShapeChanged(); onGeometryFieldChanged();">
+                <select id="LidGripShape" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
                   <option value="Square">Square</option>
                   <option value="Rounded">Rounded</option>
                   <option value="Arc">Arc</option>
@@ -418,15 +432,15 @@
               </div>
               </div>
               <div id="showHideLidHoleShape" style="display: none;">
-              <div class="field-row" title="Shape of the finger hole. Round: a circle. Rounded Square: a square with rounded corners.">
-                <label for="LidHoleShape" style="width: 50px;">Shape</label>
+              <div class="field-row" title="Shape of the finger hole. Round: a circle (Hole size = diameter). Rectangle: Hole width x Hole length, with rounded corners (Corner radius, 0 = as sharp as the tool allows).">
+                <label for="LidHoleShape" style="width: 50px;" id="LidHoleShapeLabel">Shape</label>
                 <select id="LidHoleShape" style="width: 150px;" onchange="onLidGripTypeChanged(); onGeometryFieldChanged();">
                   <option value="Round">Round</option>
-                  <option value="Rounded Square">Rounded Square</option>
+                  <option value="Rectangle">Rectangle</option>
                 </select>
               </div>
-              <div class="field-row" id="showHideLidHoleRadius" style="margin-bottom: 0;" title="Corner radius of a Rounded Square finger hole (at most half the hole size). Corners smaller than the tool radius come out with the tool radius.">
-                <label for="LidHoleRadiusField">Corner radius</label>
+              <div class="field-row" id="showHideLidHoleRadius" style="margin-bottom: 0;" title="Corner radius of a Rectangle finger hole (0 up to half the shorter side). Corners smaller than the tool radius come out with the tool radius.">
+                <label for="LidHoleRadiusField" id="LidHoleRadiusLabel">Corner radius</label>
                 <input type="number" step="any" id="LidHoleRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
@@ -541,6 +555,9 @@
     <input type="text" id="InvalidLidGripWidth" value=""/>
     <input type="text" id="InvalidLidHoleSize" value=""/>
     <input type="text" id="InvalidLidHoleDistance" value=""/>
+    <input type="text" id="InvalidLidHoleLength" value=""/>
+    <input type="text" id="InvalidLidHoleRadius" value=""/>
+    <input type="text" id="InvalidLidHoleDepth" value=""/>
   </fieldset>
 
 
@@ -796,22 +813,41 @@
   }
   function onLidGripTypeChanged() {
     var type = selectedValue("LidGripType", "Grab Handle");
-    var handle = (type === "Grab Handle");
-    var hole = (type === "Finger Hole");
+    var handle = (type === "Grab Handle" || type === "Handle + Hole");
+    var hole = (type === "Finger Hole" || type === "Handle + Hole");
+    var both = handle && hole;   // Handle + Hole -- by Claude 10/27/2026
     var show = function (id, on) { var el = document.getElementById(id); if (el) { el.style.display = on ? "" : "none"; } };
     show("showHideLidGripFields", handle);
     show("showHideLidHandleShape", handle);
     show("showHideLidHoleFields", hole);
     show("showHideLidHoleShape", hole);
+    var holeShapeGroup = document.getElementById("showHideLidHoleShape");
+    if (holeShapeGroup) { holeShapeGroup.style.marginTop = (handle && hole) ? "8px" : "0"; }
+    var holeFields = document.getElementById("showHideLidHoleFields");
+    if (holeFields) { holeFields.style.marginTop = (handle && hole) ? "8px" : "0"; }
     show("showHideLidGripShape", handle || hole);
     var holeShape = selectedValue("LidHoleShape", "Round");
-    show("showHideLidHoleRadius", holeShape === "Rounded Square");
+    var rect = (holeShape === "Rectangle");
+    var through = document.getElementById("LidHoleThrough");
+    show("showHideLidHoleDepth", hole && through && !through.checked);
+    show("showHideLidHoleRadius", rect);
+    show("showHideLidHoleLength", rect);
+    var sizeLabel = document.getElementById("LidHoleSizeLabel");
+    if (sizeLabel) { sizeLabel.innerHTML = rect ? "Hole width" : "Hole size"; }
+    // with both a tab and a hole on the panel, name the hole's own rows clearly
+    var holeShapeLabel = document.getElementById("LidHoleShapeLabel");
+    if (holeShapeLabel) { holeShapeLabel.innerHTML = both ? "Hole" : "Shape"; }
+    var holeRadiusLabel = document.getElementById("LidHoleRadiusLabel");
+    if (holeRadiusLabel) { holeRadiusLabel.innerHTML = both ? "Hole radius" : "Corner radius"; }
     var img = document.getElementById("LidGripSketchImage");
     if (img) {
       if (handle) {
-        onLidGripShapeChanged();
+        onLidGripShapeChanged();   // tab sketch + its corner radius row
+      }
+      if (both) {
+        img.src = "Images/LidGripHoleSketch.png";
       } else if (hole) {
-        img.src = (holeShape === "Rounded Square") ? "Images/LidHoleSketch_RoundedSquare.png" : "Images/LidHoleSketch_Round.png";
+        img.src = rect ? "Images/LidHoleSketch_Rectangle.png" : "Images/LidHoleSketch_Round.png";
       }
       img.style.display = (handle || hole) ? "" : "none";
     }
@@ -884,7 +920,10 @@
     "InvalidLidGrooveWidth":    "LidGrooveWidthField",
     "InvalidLidGripWidth":      "LidGripWidthField",
     "InvalidLidHoleSize":       "LidHoleSizeField",
-    "InvalidLidHoleDistance":   "LidHoleDistanceField"
+    "InvalidLidHoleDistance":   "LidHoleDistanceField",
+    "InvalidLidHoleLength":     "LidHoleLengthField",
+    "InvalidLidHoleRadius":     "LidHoleRadiusField",
+    "InvalidLidHoleDepth":      "LidHoleDepthField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can

@@ -479,6 +479,49 @@ end
 |  Added by Claude 10/25/2026
 |
 ]]
+-- Grip types that make a grip tab / a finger hole (Grip dropdown).  -- by Claude 10/27/2026
+function LidGripHasTab(options)
+  return options.lidGripType == nil or options.lidGripType == "Grab Handle" or options.lidGripType == "Handle + Hole"
+end
+function LidGripHasHole(options)
+  return options.lidGripType == "Finger Hole" or options.lidGripType == "Handle + Hole"
+end
+
+-- Half width of the grip tab at a line `d` in from its tip (0 = tip, overhang =
+-- back edge), with the same limits AddLidGripTab applies. For the S-curve rounding
+-- only the convex part is used, which is never wider than the real outline - so a
+-- finger hole checked against this always fits.               -- by Claude 10/27/2026
+function LidGripHalfWidthAt(grip_width, overhang, radius, shape, d)
+  local hx = 0.5*(grip_width or 0)
+  local ov = overhang or 0
+  if (hx < 0.0001 or ov < 0.0001) then
+    return 0
+  end
+  d = math.max(0, math.min(d, ov))
+  local function corner(r)
+    if (r > 0.0001 and d < r) then
+      return hx - r + math.sqrt(math.max(0, r*r - (r - d)*(r - d)))
+    end
+    return hx
+  end
+  if (shape == "Rounded") then
+    local R = radius or 0
+    if (R >= ov - 0.0001 and hx > ov + 0.0001) then
+      R = math.min(R, (hx*hx + 3*ov*ov) / (4*ov))
+      local w = math.sqrt(math.max(0, 4*R*ov - 3*ov*ov))
+      return math.min(hx, (hx - w) + math.sqrt(math.max(0, R*R - (R - d)*(R - d))))
+    end
+    return corner(math.min(R, hx, ov))
+  elseif (shape == "Arc") then
+    if (ov < hx) then
+      local R = (hx*hx + ov*ov) / (2*ov)
+      return math.sqrt(math.max(0, R*R - (R - d)*(R - d)))
+    end
+    return corner(hx)
+  end
+  return hx
+end
+
 function AddLidGripTab(contour, cx, yb, grip_width, overhang, radius, shape)
   local hx = 0.5*(grip_width or 0)
   local ov = overhang or 0
@@ -604,7 +647,7 @@ function MakeGroovedLid(options, facesToMake, name)
   AddMiddleOfLastSpanToList(contour, tablist)
   -- Grip = None or Finger Hole: no tab, the lid ends flush with the Back  -- by Claude 10/26/2026
   local grip_overhang = options.lidGripOverhang
-  if (options.lidGripType ~= nil and options.lidGripType ~= "Grab Handle") then
+  if not LidGripHasTab(options) then
     grip_overhang = 0
   end
   AddLidGripTab(contour, 0.5*(x0 + x1), y1, grip_width, grip_overhang, options.lidGripRadius, options.lidGripShape)
@@ -659,18 +702,30 @@ function MakeGroovedLid(options, facesToMake, name)
   lid_face.rabbet_contours = rabbet_contours
   lid_face.rabbet_depth = rabbet_depth
 
-  -- Grip = Finger Hole: a Round or Rounded Square hole through the lid, centred,
-  -- its near edge lidHoleDistance in from the back edge.     -- by Claude 10/26/2026
-  if (options.lidGripType == "Finger Hole" and (options.lidHoleSize or 0) > 0.0001) then
+  -- Grip = Finger Hole: a Round or Rectangle hole through the lid, centred, its
+  -- near edge lidHoleDistance in from the back edge. Rectangle: lidHoleSize wide
+  -- (across the lid), lidHoleLength long (along the depth), rounded corners.
+  --                                                    -- by Claude 10/26/2026, 10/27/2026
+  -- With "Handle + Hole" the distance is measured from the tip of the grip tab
+  -- (the lid's rearmost edge), so the hole can sit in the overhang too.  -- by Claude 10/27/2026
+  if (LidGripHasHole(options) and (options.lidHoleSize or 0) > 0.0001) then
     local size = options.lidHoleSize
     local cx = 0.5*(x0 + x1)
-    local top = y1 - (options.lidHoleDistance or 0)   -- near (back) edge of the hole
+    local rear = y1
+    if (grip_overhang or 0) > 0.0001 and grip_width > 0.0001 then
+      rear = y1 + grip_overhang
+    end
+    local top = rear - (options.lidHoleDistance or 0)   -- near (rear) edge of the hole
     local hole = Contour(0.0)
-    if (options.lidHoleShape == "Rounded Square") then
-      local r = math.max(0, math.min(options.lidHoleRadius or 0, 0.5*size))
+    if (options.lidHoleShape == "Rectangle" or options.lidHoleShape == "Rounded Square") then
+      local length = options.lidHoleLength or size
+      if (length <= 0.0001) then
+        length = size
+      end
+      local r = math.max(0, math.min(options.lidHoleRadius or 0, 0.5*size, 0.5*length))
       local hxl = cx - 0.5*size
       local hxr = cx + 0.5*size
-      local hyb = top - size
+      local hyb = top - length
       hole:AppendPoint(Point2D(hxl + r, hyb))
       LineToIfNeeded(hole, Point2D(hxr - r, hyb))
       AppendArc(hole, hxr - r, hyb + r, r, -0.5*math.pi, 0)
@@ -689,7 +744,12 @@ function MakeGroovedLid(options, facesToMake, name)
     end
     lid_face.hole_contours = ContourGroup(true)
     lid_face.hole_contours:AddTail(hole)
-    lid_face.hole_depth = lid_thickness
+    -- cut right through, or a finger recess of lidHoleDepth in the lid's top face
+    if (options.lidHoleThrough == false and (options.lidHoleDepth or 0) > 0.0001) then
+      lid_face.hole_depth = math.min(options.lidHoleDepth, lid_thickness)
+    else
+      lid_face.hole_depth = lid_thickness
+    end
   end
   return lid_face
 end

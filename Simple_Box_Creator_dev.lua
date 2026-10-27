@@ -141,11 +141,14 @@ function main(script_path)
   options.lidGrooveClearance = 0.01         --- Grooved lid only: clearance subtracted from how far the lid reaches into each groove
   options.lidRabbetDepthCorrection = 0      --- Grooved lid only: correction added to the rabbet depth (lid thickness minus groove width)
   options.lidFrontGrooveFlip = false        --- Grooved lid + Dovetail joints only: cut Front's lid groove from the other side, on the flip sheet (like bottomFrontGrooveFlip) -- by Claude 10/26/2026
-  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole" or "Grab Handle" (grip tab that overhangs the Back) -- by Claude 10/26/2026
-  options.lidHoleShape = "Round"            --- Grooved lid, Finger Hole: "Round" or "Rounded Square"
-  options.lidHoleSize = 1.0                 --- Grooved lid, Finger Hole: diameter / side length of the hole
-  options.lidHoleDistance = options.thickness + 0.25  --- Grooved lid, Finger Hole: from the lid's back edge to the near edge of the hole
-  options.lidHoleRadius = 0.25              --- Grooved lid, Finger Hole: corner radius of a Rounded Square hole
+  options.lidGripType = "Grab Handle"       --- Grooved lid only: "None", "Finger Hole", "Grab Handle" (grip tab that overhangs the Back) or "Handle + Hole" (tab with a hole, may sit in the overhang) -- by Claude 10/26/2026, 10/27/2026
+  options.lidHoleShape = "Round"            --- Grooved lid, Finger Hole: "Round" or "Rectangle"
+  options.lidHoleSize = 1.0                 --- Grooved lid, Finger Hole: diameter of a Round hole / width (across the lid) of a Rectangle
+  options.lidHoleLength = 0.75              --- Grooved lid, Finger Hole: length (along the depth) of a Rectangle hole -- by Claude 10/27/2026
+  options.lidHoleDistance = options.thickness + 0.25  --- Grooved lid, Finger Hole: from the lid's rearmost edge (back edge, or tip of the grip tab) to the near edge of the hole, min 3 mm
+  options.lidHoleRadius = 0.25              --- Grooved lid, Finger Hole: corner radius of a Rectangle hole
+  options.lidHoleThrough = true             --- Grooved lid, Finger Hole: cut right through the lid (false = recess lidHoleDepth deep in the top face) -- by Claude 10/27/2026
+  options.lidHoleDepth = 0.25               --- Grooved lid, Finger Hole: depth of the recess when not cut through
   options.lidGripOverhang = 0.75            --- Grooved lid only: how far the grip tab sticks out past the Back (0 = no grip tab)
   options.lidGripWidth = 3                  --- Grooved lid only: width of the grip tab
   options.lidGripShape = "Rounded"          --- Grooved lid only: "Square", "Rounded" or "Arc"
@@ -239,6 +242,8 @@ function main(script_path)
     options.lidGripWidth = Truncate(options.lidGripWidth * multiplier, 2)
     options.lidGripRadius = Truncate(options.lidGripRadius * multiplier, 2)
     options.lidHoleSize = Truncate(options.lidHoleSize * multiplier, 2)          -- by Claude 10/26/2026
+    options.lidHoleLength = Truncate(options.lidHoleLength * multiplier, 2)      -- by Claude 10/27/2026
+    options.lidHoleDepth = Truncate(options.lidHoleDepth * multiplier, 2)
     options.lidHoleDistance = Truncate(options.lidHoleDistance * multiplier, 2)
     options.lidHoleRadius = Truncate(options.lidHoleRadius * multiplier, 2)
     options.end1Height = Truncate(options.end1Height * multiplier, 2)
