@@ -423,7 +423,7 @@
                 <input type="checkbox" class="LuaButton" id="LidHoleThrough" onclick="onLidGripTypeChanged(); onGeometryFieldChanged();" />
                 <label for="LidHoleThrough">Cut through</label>
               </div>
-              <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0 and less than the lid thickness.">
+              <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0, and at least 2 mm of the lid has to stay under the recess.">
                 <label for="LidHoleDepthField">Hole depth</label>
                 <input type="number" step="any" id="LidHoleDepthField" placeholder="Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
