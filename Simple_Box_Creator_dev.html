@@ -15,6 +15,9 @@
                border: 1px solid #b8c2d6; border-bottom: none; }
     .lid-tab-active { background-color: #2255aa; color: #ffffff; border-color: #2255aa; }
     .lid-tab-warn { color: #cc3333; }
+    /* Warning (allowed but questionable value): orange, not red -- by Claude 10/28/2026 */
+    .field-row input.warning { border: 2px solid #e08a00; background-color: #fff3df; }
+    body.dark-mode .field-row input.warning { border-color: #e0a040; background-color: #3a2e1a; }
     .lid-tab-active.lid-tab-warn { color: #ffd0d0; }
     body.dark-mode .lid-tabs { border-bottom-color: #3a6ab0; }
     body.dark-mode .lid-tab { background-color: #2a2f3b; color: #b0b8cc; border-color: #383d4a; }
@@ -574,6 +577,8 @@
     <input type="text" id="InvalidLidGripWidth" value=""/>
     <input type="text" id="InvalidBottomGrooveDepth" value=""/>
     <input type="text" id="InvalidLidGrooveDepth" value=""/>
+    <input type="text" id="WarnBottomGrooveOffset" value=""/>
+    <input type="text" id="WarnLidGrooveOffset" value=""/>
     <input type="text" id="InvalidLidHoleSize" value=""/>
     <input type="text" id="InvalidLidHoleDistance" value=""/>
     <input type="text" id="InvalidLidHoleLength" value=""/>
@@ -1001,25 +1006,47 @@
   // field that ever gains one keeps it.
   var g_originalTitles = {};
 
-  // Marks/unmarks the field paired with messageFieldId based on that hidden
-  // field's current text: empty means valid, anything else is the error
-  // message to show as the field's own tooltip.
-  function updateInvalidFieldFlag(messageFieldId) {
-    var fieldId = g_invalidFieldMap[messageFieldId];
+  // Hidden "WarnXxx" text fields: Lua writes a warning (or "") for a value that is
+  // allowed but questionable - the field is marked orange with the warning as its
+  // tooltip, but nothing is blocked. An error (InvalidXxx) always wins over a
+  // warning.                                                 -- by Claude 10/28/2026
+  var g_warningFieldMap = {
+    "WarnBottomGrooveOffset": "BottomGrooveOffsetField",
+    "WarnLidGrooveOffset":    "LidGrooveOffsetField"
+  };
+
+  // The error / warning message currently set for a field, "" if none.
+  function messageForField(map, fieldId) {
+    for (var id in map) {
+      if (map[id] === fieldId) {
+        var el = document.getElementById(id);
+        if (el && el.value) { return el.value; }
+      }
+    }
+    return "";
+  }
+
+  // Marks the field red (error), orange (warning) or plain, with the message as its
+  // tooltip, and restores its own tooltip when it is fine again.
+  function refreshFieldFlag(fieldId) {
     var field = fieldId && document.getElementById(fieldId);
-    var messageField = document.getElementById(messageFieldId);
-    if (!field || !messageField) { return; }
+    if (!field) { return; }
 
     if (!(fieldId in g_originalTitles)) {
       g_originalTitles[fieldId] = field.getAttribute("title");
     }
 
-    var message = messageField.value;
-    var className = field.className.replace(" invalid", "").replace("invalid", "");
+    var error = messageForField(g_invalidFieldMap, fieldId);
+    var warning = error ? "" : messageForField(g_warningFieldMap, fieldId);
+    var className = field.className.replace(" invalid", "").replace("invalid", "")
+                                   .replace(" warning", "").replace("warning", "");
 
-    if (message) {
+    if (error) {
       field.className = className + " invalid";
-      field.title = message;
+      field.title = error;
+    } else if (warning) {
+      field.className = className + " warning";
+      field.title = warning;
     } else {
       field.className = className;
       var originalTitle = g_originalTitles[fieldId];
@@ -1031,18 +1058,26 @@
     }
   }
 
+  // Kept for the existing callers: refresh the field paired with an InvalidXxx id.
+  function updateInvalidFieldFlag(messageFieldId) {
+    refreshFieldFlag(g_invalidFieldMap[messageFieldId]);
+  }
+
   // Lua writes an error message (or "") into these hidden text fields
   // directly through the dialog bridge, which doesn't fire onchange
   // (programmatic changes never do). IE7 has no MutationObserver either, so
-  // poll for the messages instead.
+  // poll for the messages instead (warnings too).
   var g_lastInvalidMessage = {};
   function pollInvalidFieldFlags() {
-    for (var messageFieldId in g_invalidFieldMap) {
-      var messageField = document.getElementById(messageFieldId);
-      var message = messageField ? messageField.value : "";
-      if (message !== g_lastInvalidMessage[messageFieldId]) {
-        g_lastInvalidMessage[messageFieldId] = message;
-        updateInvalidFieldFlag(messageFieldId);
+    var maps = [g_invalidFieldMap, g_warningFieldMap];
+    for (var m = 0; m < maps.length; m++) {
+      for (var messageFieldId in maps[m]) {
+        var messageField = document.getElementById(messageFieldId);
+        var message = messageField ? messageField.value : "";
+        if (message !== g_lastInvalidMessage[messageFieldId]) {
+          g_lastInvalidMessage[messageFieldId] = message;
+          refreshFieldFlag(maps[m][messageFieldId]);
+        }
       }
     }
   }

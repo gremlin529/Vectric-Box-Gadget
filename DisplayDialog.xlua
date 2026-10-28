@@ -931,6 +931,35 @@ local function ValidateGrooveDepths(dialog, options, report_as_dialog)
   return bottom_message == "" and lid_message == ""
 end
 
+-- Thin wall strip outside a groove: below the bottom groove (to the walls' bottom
+-- edge) or above the lid groove (to the top edge). 3 mm or less is allowed but
+-- fragile, so it is only a WARNING - the Groove offset field turns orange, and OK
+-- shows the warning once but still goes ahead.                 -- by Claude 10/28/2026
+local function GrooveStripWarnings(options)
+  local min_strip = options.InMM and 3 or (3/25.4)
+  local fmt = "%." .. G_decimalPlaces .. "f"
+  local bottom_warning, lid_warning = "", ""
+  if (options.bottomType == FaceJointType.Grooved) then
+    local strip = (options.bottomGrooveOffset or 0) - (options.bottomGrooveWidth or 0)
+    if strip >= -0.0001 and strip <= min_strip + 0.0001 then
+      bottom_warning = string.format("Warning: only " .. fmt .. " of the wall stays below the bottom groove (3 mm or less) - that strip may break off. Allowed, but consider a bigger groove offset.", math.max(0, strip))
+    end
+  end
+  if (options.lidType == FaceJointType.Grooved) then
+    local strip = (options.lidGrooveOffset or 0) - (options.lidGrooveWidth or 0)
+    if strip >= -0.0001 and strip <= min_strip + 0.0001 then
+      lid_warning = string.format("Warning: only " .. fmt .. " of the wall stays above the lid groove (3 mm or less) - that strip may break off. Allowed, but consider a bigger groove offset.", math.max(0, strip))
+    end
+  end
+  return bottom_warning, lid_warning
+end
+
+local function UpdateGrooveStripWarnings(dialog, options)
+  local bottom_warning, lid_warning = GrooveStripWarnings(options)
+  dialog:UpdateTextField("WarnBottomGrooveOffset", bottom_warning)
+  dialog:UpdateTextField("WarnLidGrooveOffset", lid_warning)
+end
+
 -- Grip width of the Grooved lid's grip tab: must be > 0 when there is a tab, and
 -- must stay clear of the rabbet bands along Left / Right (at most the inside width
 -- minus twice the lid groove depth). Same report_as_dialog convention as the tool
@@ -1210,6 +1239,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidLidGripWidth", "")       -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidBottomGrooveDepth", "")  -- Added by Claude 10/28/2026
   dialog:AddTextField("InvalidLidGrooveDepth", "")     -- Added by Claude 10/28/2026
+  dialog:AddTextField("WarnBottomGrooveOffset", "")    -- warnings (orange, not blocking) -- by Claude 10/28/2026
+  dialog:AddTextField("WarnLidGrooveOffset", "")
   dialog:AddTextField("InvalidLidHoleSize", "")        -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleDistance", "")    -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleLength", "")      -- Added by Claude 10/27/2026
@@ -1442,6 +1473,16 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     if not ValidateOpenChamferOptions(dialog, options, true) then
       return false
+    end
+
+    -- Thin strip beside a groove: warn, but go ahead.            -- by Claude 10/28/2026
+    local bottom_warning, lid_warning = GrooveStripWarnings(options)
+    if bottom_warning ~= "" or lid_warning ~= "" then
+      local text = bottom_warning
+      if lid_warning ~= "" then
+        text = (text ~= "") and (text .. "\n\n" .. lid_warning) or lid_warning
+      end
+      DisplayMessageBox(text .. "\n\nThe box is created anyway.")
     end
 
     return true
@@ -1890,6 +1931,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
   ValidateLidGripWidth(dialog, G_dialogOptions, false)       -- by Claude 10/26/2026
   ValidateGrooveDepths(dialog, G_dialogOptions, false)       -- by Claude 10/28/2026
+  UpdateGrooveStripWarnings(dialog, G_dialogOptions)         -- by Claude 10/28/2026
   ValidateLidFingerHole(dialog, G_dialogOptions, false)      -- by Claude 10/26/2026
 
   return true
