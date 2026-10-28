@@ -41,7 +41,7 @@ $mainHTMLFile = $config.MainHTMLFile
 # Optionally leave the version number out of the released file names.
 # Config field "AppendVersionToFileNames": true (default, or absent) stamps the
 # version into the lua/htm file names and the .vgadget; false releases them as
-# <ModuleToCreate>.lua / <ModuleToCreate>.htm / <ModuleToCreate>.vgadget.
+# <ModuleToCreate>.lua / <ModuleToCreate>.html / <ModuleToCreate>.vgadget.
 $appendVersionToFileNames = $true
 if ($null -ne $config.AppendVersionToFileNames) {
     if ($config.AppendVersionToFileNames -is [bool]) {
@@ -158,15 +158,15 @@ function UpdateVersionInLuaFile {
         Write-Warning "No matching G_subVersion line found in '$filePath'. Subversion not updated."
     }
 
-    # The dialog HTML file name is built from G_version (e.g. "Vektor_PDF_" .. G_version .. ".htm").
+    # The dialog HTML file name is built from G_version (e.g. "Simple_Box_Creator" .. G_version .. ".html").
     # When the released files carry no version, that reference has to lose it as well.
     if ($removeVersionFromHtmlName) {
-        $htmlNamePattern = '"([^"]*)_"\s*\.\.\s*G_version\s*\.\.\s*"\.htm"'
+        $htmlNamePattern = '"([^"]*)_"\s*\.\.\s*G_version\s*\.\.\s*"\.html"'
         if ($content -match $htmlNamePattern) {
-            $content = $content -replace $htmlNamePattern, '"${1}.htm"'
+            $content = $content -replace $htmlNamePattern, '"${1}.html"'
             Write-Host "HTML dialog file reference in '$filePath' changed to the unversioned name."
         } else {
-            Write-Warning "No versioned HTML file name expression found in '$filePath'. Check that it opens the unversioned .htm file."
+            Write-Warning "No versioned HTML file name expression found in '$filePath'. Check that it opens the unversioned .html file."
         }
     }
 
@@ -236,13 +236,13 @@ try {
     }
 
     $htmlFile = Join-Path $versionDir $mainHTMLFile    
-    $htmlFileVersioned = Join-Path $versionDir ($releaseName + ".htm")
+    $htmlFileVersioned = Join-Path $versionDir ($releaseName + ".html")
     if (Test-Path $htmlFile) {
         if (Test-Path $htmlFileVersioned) {  
             Remove-Item $htmlFileVersioned -Force
         }
-        Write-Host "Renaming '$htmlFile' to '$releaseName.htm'..."
-        Rename-Item -Path $htmlFile -NewName ($releaseName + ".htm") -Force
+        Write-Host "Renaming '$htmlFile' to '$releaseName.html'..."
+        Rename-Item -Path $htmlFile -NewName ($releaseName + ".html") -Force
     }
     else {
         Write-Warning "File not found: $htmlFile (skipping rename)"
