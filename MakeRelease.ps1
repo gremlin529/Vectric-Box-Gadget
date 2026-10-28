@@ -38,10 +38,18 @@ $moduleToCreate = $config.ModuleToCreate
 $mainLuaFile = $config.MainLuaFile
 $mainHTMLFile = $config.MainHTMLFile
 
+# Vectric gadgets are built with either a .html or a .htm dialog file - whichever
+# MainHTMLFile uses, the released/renamed copy keeps that same extension rather
+# than assuming .html.
+$htmlExtension = [System.IO.Path]::GetExtension($mainHTMLFile)
+if ([string]::IsNullOrEmpty($htmlExtension)) {
+    Write-Warning "MainHTMLFile '$mainHTMLFile' has no file extension - the released dialog file will have none either."
+}
+
 # Optionally leave the version number out of the released file names.
 # Config field "AppendVersionToFileNames": true (default, or absent) stamps the
-# version into the lua/htm file names and the .vgadget; false releases them as
-# <ModuleToCreate>.lua / <ModuleToCreate>.html / <ModuleToCreate>.vgadget.
+# version into the lua/html file names and the .vgadget; false releases them as
+# <ModuleToCreate>.lua / <ModuleToCreate>$htmlExtension / <ModuleToCreate>.vgadget.
 $appendVersionToFileNames = $true
 if ($null -ne $config.AppendVersionToFileNames) {
     if ($config.AppendVersionToFileNames -is [bool]) {
@@ -132,7 +140,8 @@ function UpdateVersionInLuaFile {
         [string]$filePath,
         [string]$version,
         [string]$subversion,
-        [bool]$removeVersionFromHtmlName = $false
+        [bool]$removeVersionFromHtmlName = $false,
+        [string]$htmlExtension = ".html"
     )
 
     # Read file content
@@ -158,15 +167,17 @@ function UpdateVersionInLuaFile {
         Write-Warning "No matching G_subVersion line found in '$filePath'. Subversion not updated."
     }
 
-    # The dialog HTML file name is built from G_version (e.g. "Simple_Box_Creator" .. G_version .. ".html").
+    # The dialog HTML file name is built from G_version (e.g. "Simple_Box_Creator" .. G_version .. ".html",
+    # or "...htm" for a gadget whose MainHTMLFile uses that extension instead).
     # When the released files carry no version, that reference has to lose it as well.
     if ($removeVersionFromHtmlName) {
-        $htmlNamePattern = '"([^"]*)_"\s*\.\.\s*G_version\s*\.\.\s*"\.html"'
+        $escapedExtension = [regex]::Escape($htmlExtension)
+        $htmlNamePattern = '"([^"]*)_"\s*\.\.\s*G_version\s*\.\.\s*"' + $escapedExtension + '"'
         if ($content -match $htmlNamePattern) {
-            $content = $content -replace $htmlNamePattern, '"${1}.html"'
+            $content = $content -replace $htmlNamePattern, ('"${1}' + $htmlExtension + '"')
             Write-Host "HTML dialog file reference in '$filePath' changed to the unversioned name."
         } else {
-            Write-Warning "No versioned HTML file name expression found in '$filePath'. Check that it opens the unversioned .html file."
+            Write-Warning "No versioned HTML file name expression found in '$filePath'. Check that it opens the unversioned $htmlExtension file."
         }
     }
 
@@ -210,7 +221,7 @@ try {
     $luaFileInRelease = Join-Path $versionDir $mainLuaFile
     Write-Host "Updating version in '$luaFileInRelease' file in release directory to '$version'..."
     if (Test-Path $luaFileInRelease) {  
-        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion -removeVersionFromHtmlName (-not $appendVersionToFileNames)
+        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion -removeVersionFromHtmlName (-not $appendVersionToFileNames) -htmlExtension $htmlExtension
     }
     else {
         Write-Warning "Lua file not found in release directory: $luaFileInRelease (skipping version update)"
@@ -235,14 +246,14 @@ try {
         Write-Warning "File not found: $luaFile (skipping rename)"
     }
 
-    $htmlFile = Join-Path $versionDir $mainHTMLFile    
-    $htmlFileVersioned = Join-Path $versionDir ($releaseName + ".html")
+    $htmlFile = Join-Path $versionDir $mainHTMLFile
+    $htmlFileVersioned = Join-Path $versionDir ($releaseName + $htmlExtension)
     if (Test-Path $htmlFile) {
-        if (Test-Path $htmlFileVersioned) {  
+        if (Test-Path $htmlFileVersioned) {
             Remove-Item $htmlFileVersioned -Force
         }
-        Write-Host "Renaming '$htmlFile' to '$releaseName.html'..."
-        Rename-Item -Path $htmlFile -NewName ($releaseName + ".html") -Force
+        Write-Host "Renaming '$htmlFile' to '$releaseName$htmlExtension'..."
+        Rename-Item -Path $htmlFile -NewName ($releaseName + $htmlExtension) -Force
     }
     else {
         Write-Warning "File not found: $htmlFile (skipping rename)"
