@@ -892,6 +892,45 @@ local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
   return message == ""
 end
 
+-- Groove depth of the Grooved bottom and the Grooved lid: more than 0, and at least
+-- half of the wall has to stay behind the groove (depth <= 1/2 of the material
+-- thickness). Checked live: each problem goes to the Invalid field of its
+-- own Groove depth input.                                     -- by Claude 10/28/2026
+local function GrooveDepthMessage(depth, thickness, name)
+  local fmt = "%." .. G_decimalPlaces .. "f"
+  if not IsNonNeg(depth) or depth <= 0.0001 then
+    return name .. " must be greater than 0."
+  end
+  local max_depth = 0.5 * thickness
+  if depth > max_depth + 0.0001 then
+    return string.format(name .. " " .. fmt .. " is too deep - at most " .. fmt .. " (half the material thickness " .. fmt .. "), so at least half of the wall stays behind the groove.", depth, max_depth, thickness)
+  end
+  return ""
+end
+
+local function ValidateGrooveDepths(dialog, options, report_as_dialog)
+  local bottom_message, lid_message = "", ""
+  if (options.bottomType == FaceJointType.Grooved) then
+    bottom_message = GrooveDepthMessage(options.bottomGrooveDepth, options.thickness, "Groove depth")
+  end
+  if (options.lidType == FaceJointType.Grooved) then
+    lid_message = GrooveDepthMessage(options.lidGrooveDepth, options.thickness, "Lid groove depth")
+  end
+
+  if report_as_dialog then
+    local message = (bottom_message ~= "") and bottom_message or lid_message
+    if message ~= "" then
+      DisplayMessageBox(message)
+      return false
+    end
+    return true
+  end
+
+  dialog:UpdateTextField("InvalidBottomGrooveDepth", bottom_message)
+  dialog:UpdateTextField("InvalidLidGrooveDepth", lid_message)
+  return bottom_message == "" and lid_message == ""
+end
+
 -- Grip width of the Grooved lid's grip tab: must be > 0 when there is a tab, and
 -- must stay clear of the rabbet bands along Left / Right (at most the inside width
 -- minus twice the lid groove depth). Same report_as_dialog convention as the tool
@@ -942,7 +981,6 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
     local dist = options.lidHoleDistance
     local max_size = (options.width - 2*options.thickness) - 2*(options.lidGrooveDepth or 0)
     local min_dist = options.InMM and 3 or (3/25.4)   -- at least 3 mm of lid behind / beside the hole
-    local min_floor = options.InMM and 2 or (2/25.4)  -- at least 2 mm of lid under a recess
     -- "Indented Handle": the distance is measured from the tip of the grip tab
     local tab_ov = 0
     if LidGripHasTab(options) and IsNonNeg(options.lidGripOverhang) and IsNonNeg(options.lidGripWidth)
@@ -991,9 +1029,9 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
       local lid_t = options.lidThickness or options.thickness
       if not IsNonNeg(d) or d <= 0.0001 then
         depth_message = "Hole depth must be greater than 0."
-      elseif d > lid_t - min_floor + 0.0001 then
-        -- at least 2 mm of lid has to stay under the recess  -- by Claude 10/27/2026
-        depth_message = string.format("Hole depth " .. fmt .. " is too deep - at most " .. fmt .. ", so at least 2 mm of the lid (thickness " .. fmt .. ") stays under the recess. Tick 'Cut through' to cut right through.", d, math.max(0, lid_t - min_floor), lid_t)
+      elseif d > 0.5*lid_t + 0.0001 then
+        -- a recess at most half the lid thickness deep (like the grooves)  -- by Claude 10/28/2026
+        depth_message = string.format("Hole depth " .. fmt .. " is too deep - at most " .. fmt .. " (half the lid thickness " .. fmt .. "), so at least half of the lid stays under the recess. Tick 'Cut through' to cut right through.", d, 0.5*lid_t, lid_t)
       end
     end
 
@@ -1052,11 +1090,8 @@ local function ValidateGroovedLidOptions(dialog, options)
     DisplayMessageBox(msg)
     return false
   end
-  if not IsNonNeg(options.lidGrooveDepth) or options.lidGrooveDepth <= 0 then
-    return fail("Lid groove depth must be greater than 0.")
-  end
-  if options.lidGrooveDepth >= options.thickness then
-    return fail(string.format("Lid groove depth %.2f must be less than the material thickness %.2f.", options.lidGrooveDepth, options.thickness))
+  if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and <= 1/2 thickness -- by Claude 10/28/2026
+    return false
   end
   if not IsNonNeg(options.lidGrooveWidth) or options.lidGrooveWidth <= 0 then
     return fail("Lid groove width must be greater than 0.")
@@ -1173,6 +1208,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
   dialog:AddTextField("InvalidLidGrooveWidth", "")     -- Added by Claude 10/25/2026
   dialog:AddTextField("InvalidLidGripWidth", "")       -- Added by Claude 10/26/2026
+  dialog:AddTextField("InvalidBottomGrooveDepth", "")  -- Added by Claude 10/28/2026
+  dialog:AddTextField("InvalidLidGrooveDepth", "")     -- Added by Claude 10/28/2026
   dialog:AddTextField("InvalidLidHoleSize", "")        -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleDistance", "")    -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleLength", "")      -- Added by Claude 10/27/2026
@@ -1283,12 +1320,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- Grooved (slide-in) bottom: validate the groove offset/depth/width -- by Claude 9/18/2026
     if (options.bottomType == FaceJointType.Grooved) then
-      if not IsNonNeg(options.bottomGrooveDepth) or options.bottomGrooveDepth <= 0 then
-        DisplayMessageBox("Groove depth must be greater than 0.")
-        return false
-      end
-      if options.bottomGrooveDepth >= options.thickness then
-        DisplayMessageBox(string.format("Groove depth %.2f must be less than the material thickness %.2f.", options.bottomGrooveDepth, options.thickness))
+      if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and <= 1/2 thickness -- by Claude 10/28/2026
         return false
       end
       if not IsNonNeg(options.bottomGrooveOffsetInput) then
@@ -1857,6 +1889,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
   ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
   ValidateLidGripWidth(dialog, G_dialogOptions, false)       -- by Claude 10/26/2026
+  ValidateGrooveDepths(dialog, G_dialogOptions, false)       -- by Claude 10/28/2026
   ValidateLidFingerHole(dialog, G_dialogOptions, false)      -- by Claude 10/26/2026
 
   return true
