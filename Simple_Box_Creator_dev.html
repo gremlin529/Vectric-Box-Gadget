@@ -245,75 +245,6 @@
     </div>
   </div>
 
-  <!-- ── Grooved Bottom Options ───────────────────────────────────
-       Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
-  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
-  <div class="card" id="showHideGrooveOptions" style="display: none;">
-    <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
-
-      <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
-           field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
-           absolute positions (those did not survive IE's Zoom Level and lost their labels), so it
-           scales like the rest of the dialog. Panels are 245px wide like the geometry columns.
-                                                                         -- by Claude 10/9/2026 -->
-      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
-        <tr>
-          <td style="width: 245px; vertical-align: middle;">
-            <div class="sub-panel">
-              <div class="sub-panel-title">Bottom Panel</div>
-              <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Left, Right and Front edges down to the groove width, so it still seats in the groove; Back's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
-                <label for="BottomThicknessField">Bottom Thickness</label>
-                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
-              </div>
-              <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (bottom thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the bottom is thicker than the groove width (i.e. a rabbet is milled).">
-                <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
-                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
-              </div>
-              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
-                <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
-                <input type="number" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
-              </div>
-            </div>
-          </td>
-          <td style="vertical-align: middle; padding: 0 20px;">
-            <img id="GrooveSketchImage" src="Images/GroovedOverhangSketch_174.png" alt="Sketch: Side, Chamfer Angle, Height, Groove offset, Groove width, Groove depth, rabbet correction, Bottom Clearance" />
-          </td>
-          <td style="width: 245px; vertical-align: middle;">
-            <div class="sub-panel">
-              <div class="sub-panel-title">Groove</div>
-              <div class="field-row" title="Width of the groove slot (vertical height of the dado), independent of material thickness - set this to the actual thickness of the bottom panel you'll slide in, e.g. 4mm for a thin plywood/hardboard bottom. If 'Same material' is checked, set this to whatever width you want the rabbeted edge to seat at (can be smaller than the material thickness).">
-                <label for="BottomGrooveWidthField">Groove width</label>
-                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
-              </div>
-              <div class="field-row" title="How deep the groove is plowed into Left, Right and Front (must be less than the material thickness)">
-                <label for="BottomGrooveDepthField">Groove depth</label>
-                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-              </div>
-              <div class="field-row" title="Distance from the outer bottom edge of the walls up to the bottom of the groove, or up to the underside of the bottom panel - see 'Offset to' below. Must be 0 or more.">
-                <label for="BottomGrooveOffsetField">Groove offset</label>
-                <input type="number" step="any" id="BottomGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
-              </div>
-              <!-- What the groove offset is measured to (#86) -- by Claude 10/15/2026 -->
-              <div class="field-row" style="margin-bottom: 0;" title="What the groove offset is measured to, from the outer bottom edge of the walls. Groove: up to the bottom (floor) of the groove. Bottom: up to the underside of the bottom panel (e.g. the clearance under a drawer) - the groove position is then worked out from the bottom thickness, groove width and rabbet correction.">
-                <label for="BottomGrooveOffsetRef">Offset to</label>
-                <select id="BottomGrooveOffsetRef" onchange="onGrooveOffsetRefChanged(); onGeometryFieldChanged();">
-                  <option value="Groove">Groove</option>
-                  <option value="Bottom">Bottom</option>
-                </select>
-              </div>
-              <div class="checkbox-row" id="showHideFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: Front's groove has to go into the face that lies on the spoilboard when Front is cut. When checked, an extra sheet 'Front Groove (flipped)' is created: turn the cut Front over (left/right), stand it upright with its bottom edge against the left (X0) stop and push it into the sheet's lower left corner (against the Y0 stop) and run the groove toolpath there. The outline on that sheet is for reference only.">
-                <input type="checkbox" class="LuaButton" id="BottomFrontGrooveFlip" />
-                <label for="BottomFrontGrooveFlip">Reverse Front for groove on own sheet</label>
-              </div>
-            </div>
-          </td>
-        </tr>
-      </table>
-      <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center; margin-top: 6px;" id="BottomRabbetInfoText"></div>
-    </div>
-  </div>
-
   <!-- ── Grooved Lid Options ──────────────────────────────────────
        Only shown when Lid Type = Grooved (sliding lid). Same layout as the Grooved
        Bottom Options: lid panel fields | Detail B (LidGroovedSketch_174.png, 174x182) |
@@ -468,6 +399,75 @@
         </tr>
       </table>
       <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center; margin-top: 6px;" id="LidRabbetInfoText"></div>
+    </div>
+  </div>
+
+  <!-- ── Grooved Bottom Options ───────────────────────────────────
+       Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
+  <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
+  <div class="card" id="showHideGrooveOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+
+      <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
+           field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
+           absolute positions (those did not survive IE's Zoom Level and lost their labels), so it
+           scales like the rest of the dialog. Panels are 245px wide like the geometry columns.
+                                                                         -- by Claude 10/9/2026 -->
+      <table cellpadding="0" cellspacing="0" border="0" style="margin: 0 auto; border-collapse: collapse;">
+        <tr>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Bottom Panel</div>
+              <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Left, Right and Front edges down to the groove width, so it still seats in the groove; Back's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
+                <label for="BottomThicknessField">Bottom Thickness</label>
+                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (bottom thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the bottom is thicker than the groove width (i.e. a rabbet is milled).">
+                <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
+                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
+                <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
+                <input type="number" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+              </div>
+            </div>
+          </td>
+          <td style="vertical-align: middle; padding: 0 20px;">
+            <img id="GrooveSketchImage" src="Images/GroovedOverhangSketch_174.png" alt="Sketch: Side, Chamfer Angle, Height, Groove offset, Groove width, Groove depth, rabbet correction, Bottom Clearance" />
+          </td>
+          <td style="width: 245px; vertical-align: middle;">
+            <div class="sub-panel">
+              <div class="sub-panel-title">Groove</div>
+              <div class="field-row" title="Width of the groove slot (vertical height of the dado), independent of material thickness - set this to the actual thickness of the bottom panel you'll slide in, e.g. 4mm for a thin plywood/hardboard bottom. If 'Same material' is checked, set this to whatever width you want the rabbeted edge to seat at (can be smaller than the material thickness).">
+                <label for="BottomGrooveWidthField">Groove width</label>
+                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+              </div>
+              <div class="field-row" title="How deep the groove is plowed into Left, Right and Front (must be less than the material thickness)">
+                <label for="BottomGrooveDepthField">Groove depth</label>
+                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <div class="field-row" title="Distance from the outer bottom edge of the walls up to the bottom of the groove, or up to the underside of the bottom panel - see 'Offset to' below. Must be 0 or more.">
+                <label for="BottomGrooveOffsetField">Groove offset</label>
+                <input type="number" step="any" id="BottomGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              </div>
+              <!-- What the groove offset is measured to (#86) -- by Claude 10/15/2026 -->
+              <div class="field-row" style="margin-bottom: 0;" title="What the groove offset is measured to, from the outer bottom edge of the walls. Groove: up to the bottom (floor) of the groove. Bottom: up to the underside of the bottom panel (e.g. the clearance under a drawer) - the groove position is then worked out from the bottom thickness, groove width and rabbet correction.">
+                <label for="BottomGrooveOffsetRef">Offset to</label>
+                <select id="BottomGrooveOffsetRef" onchange="onGrooveOffsetRefChanged(); onGeometryFieldChanged();">
+                  <option value="Groove">Groove</option>
+                  <option value="Bottom">Bottom</option>
+                </select>
+              </div>
+              <div class="checkbox-row" id="showHideFrontGrooveFlip" style="display: none; margin-top: 6px;" title="Dovetail joints only: Front's groove has to go into the face that lies on the spoilboard when Front is cut. When checked, an extra sheet 'Front Groove (flipped)' is created: turn the cut Front over (left/right), stand it upright with its bottom edge against the left (X0) stop and push it into the sheet's lower left corner (against the Y0 stop) and run the groove toolpath there. The outline on that sheet is for reference only.">
+                <input type="checkbox" class="LuaButton" id="BottomFrontGrooveFlip" />
+                <label for="BottomFrontGrooveFlip">Reverse Front for groove on own sheet</label>
+              </div>
+            </div>
+          </td>
+        </tr>
+      </table>
+      <div style="font-size: 11px; opacity: 0.8; min-height: 14px; text-align: center; margin-top: 6px;" id="BottomRabbetInfoText"></div>
     </div>
   </div>
 
