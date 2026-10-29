@@ -896,14 +896,25 @@ end
 -- half of the wall has to stay behind the groove (depth <= 1/2 of the material
 -- thickness). Checked live: each problem goes to the Invalid field of its
 -- own Groove depth input.                                     -- by Claude 10/28/2026
+-- Hard errors only: a groove depth of 0 or less, or one that would go right
+-- through the wall. Deeper than half the thickness is allowed but only gets a
+-- warning (GrooveDepthWarning).                                -- by Claude 10/29/2026
 local function GrooveDepthMessage(depth, thickness, name)
   local fmt = "%." .. G_decimalPlaces .. "f"
   if not IsNonNeg(depth) or depth <= 0.0001 then
     return name .. " must be greater than 0."
   end
+  if depth >= thickness - 0.0001 then
+    return string.format(name .. " " .. fmt .. " must be less than the material thickness " .. fmt .. ".", depth, thickness)
+  end
+  return ""
+end
+
+local function GrooveDepthWarning(depth, thickness, name)
+  local fmt = "%." .. G_decimalPlaces .. "f"
   local max_depth = 0.5 * thickness
-  if depth > max_depth + 0.0001 then
-    return string.format(name .. " " .. fmt .. " is too deep - at most " .. fmt .. " (half the material thickness " .. fmt .. "), so at least half of the wall stays behind the groove.", depth, max_depth, thickness)
+  if IsNonNeg(depth) and depth > max_depth + 0.0001 and depth < thickness - 0.0001 then
+    return string.format("Warning: " .. name .. " " .. fmt .. " is more than half the material thickness (" .. fmt .. ") - only " .. fmt .. " of the wall stays behind the groove. Allowed, but the wall gets weak there.", depth, max_depth, thickness - depth)
   end
   return ""
 end
@@ -954,10 +965,41 @@ local function GrooveStripWarnings(options)
   return bottom_warning, lid_warning
 end
 
+-- Finger recess (not cut through) deeper than half the lid thickness: warning only.
+--                                                              -- by Claude 10/29/2026
+local function LidRecessDepthWarning(options)
+  if (options.lidType ~= FaceJointType.Grooved) or not LidGripHasHole(options) or options.lidHoleThrough ~= false then
+    return ""
+  end
+  local d = options.lidHoleDepth
+  local lid_t = options.lidThickness or options.thickness
+  local fmt = "%." .. G_decimalPlaces .. "f"
+  if IsNonNeg(d) and d > 0.5*lid_t + 0.0001 and d < lid_t - 0.0001 then
+    return string.format("Warning: Hole depth " .. fmt .. " is more than half the lid thickness (" .. fmt .. ") - only " .. fmt .. " of the lid stays under the recess. Allowed, but the lid gets weak there.", d, 0.5*lid_t, lid_t - d)
+  end
+  return ""
+end
+
+-- Groove deeper than half the material thickness: warning only.  -- by Claude 10/29/2026
+local function GrooveDepthWarnings(options)
+  local bottom_warning, lid_warning = "", ""
+  if (options.bottomType == FaceJointType.Grooved) then
+    bottom_warning = GrooveDepthWarning(options.bottomGrooveDepth, options.thickness, "Groove depth")
+  end
+  if (options.lidType == FaceJointType.Grooved) then
+    lid_warning = GrooveDepthWarning(options.lidGrooveDepth, options.thickness, "Lid groove depth")
+  end
+  return bottom_warning, lid_warning
+end
+
 local function UpdateGrooveStripWarnings(dialog, options)
   local bottom_warning, lid_warning = GrooveStripWarnings(options)
   dialog:UpdateTextField("WarnBottomGrooveOffset", bottom_warning)
   dialog:UpdateTextField("WarnLidGrooveOffset", lid_warning)
+  local bottom_depth_warning, lid_depth_warning = GrooveDepthWarnings(options)
+  dialog:UpdateTextField("WarnBottomGrooveDepth", bottom_depth_warning)
+  dialog:UpdateTextField("WarnLidGrooveDepth", lid_depth_warning)
+  dialog:UpdateTextField("WarnLidHoleDepth", LidRecessDepthWarning(options))
 end
 
 -- Grip width of the Grooved lid's grip tab: must be > 0 when there is a tab, and
@@ -1058,9 +1100,10 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
       local lid_t = options.lidThickness or options.thickness
       if not IsNonNeg(d) or d <= 0.0001 then
         depth_message = "Hole depth must be greater than 0."
-      elseif d > 0.5*lid_t + 0.0001 then
-        -- a recess at most half the lid thickness deep (like the grooves)  -- by Claude 10/28/2026
-        depth_message = string.format("Hole depth " .. fmt .. " is too deep - at most " .. fmt .. " (half the lid thickness " .. fmt .. "), so at least half of the lid stays under the recess. Tick 'Cut through' to cut right through.", d, 0.5*lid_t, lid_t)
+      elseif d >= lid_t - 0.0001 then
+        -- as deep as the lid: that is a hole, not a recess. Deeper than half the
+        -- lid is only a warning (LidRecessDepthWarning).     -- by Claude 10/29/2026
+        depth_message = string.format("Hole depth " .. fmt .. " must be less than the lid thickness " .. fmt .. " - tick 'Cut through' to cut right through.", d, lid_t)
       end
     end
 
@@ -1119,7 +1162,7 @@ local function ValidateGroovedLidOptions(dialog, options)
     DisplayMessageBox(msg)
     return false
   end
-  if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and <= 1/2 thickness -- by Claude 10/28/2026
+  if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and < thickness (deeper than half: warning only) -- by Claude 10/29/2026
     return false
   end
   if not IsNonNeg(options.lidGrooveWidth) or options.lidGrooveWidth <= 0 then
@@ -1241,6 +1284,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidLidGrooveDepth", "")     -- Added by Claude 10/28/2026
   dialog:AddTextField("WarnBottomGrooveOffset", "")    -- warnings (orange, not blocking) -- by Claude 10/28/2026
   dialog:AddTextField("WarnLidGrooveOffset", "")
+  dialog:AddTextField("WarnBottomGrooveDepth", "")     -- by Claude 10/29/2026
+  dialog:AddTextField("WarnLidGrooveDepth", "")
+  dialog:AddTextField("WarnLidHoleDepth", "")
   dialog:AddTextField("InvalidLidHoleSize", "")        -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleDistance", "")    -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidLidHoleLength", "")      -- Added by Claude 10/27/2026
@@ -1351,7 +1397,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
 
     -- Grooved (slide-in) bottom: validate the groove offset/depth/width -- by Claude 9/18/2026
     if (options.bottomType == FaceJointType.Grooved) then
-      if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and <= 1/2 thickness -- by Claude 10/28/2026
+      if not ValidateGrooveDepths(dialog, options, true) then   -- > 0 and < thickness (deeper than half: warning only) -- by Claude 10/29/2026
         return false
       end
       if not IsNonNeg(options.bottomGrooveOffsetInput) then
@@ -1475,14 +1521,18 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
-    -- Thin strip beside a groove: warn, but go ahead.            -- by Claude 10/28/2026
-    local bottom_warning, lid_warning = GrooveStripWarnings(options)
-    if bottom_warning ~= "" or lid_warning ~= "" then
-      local text = bottom_warning
-      if lid_warning ~= "" then
-        text = (text ~= "") and (text .. "\n\n" .. lid_warning) or lid_warning
+    -- Thin strip beside a groove / groove deeper than half the wall: warn, but
+    -- go ahead.                                       -- by Claude 10/28/2026, 10/29/2026
+    local warnings = {}
+    local w1, w2 = GrooveStripWarnings(options)
+    local w3, w4 = GrooveDepthWarnings(options)
+    for _, w in ipairs({ w1, w2, w3, w4, LidRecessDepthWarning(options) }) do
+      if w ~= "" then
+        warnings[#warnings + 1] = w
       end
-      DisplayMessageBox(text .. "\n\nThe box is created anyway.")
+    end
+    if #warnings > 0 then
+      DisplayMessageBox(table.concat(warnings, "\n\n") .. "\n\nThe box is created anyway.")
     end
 
     return true

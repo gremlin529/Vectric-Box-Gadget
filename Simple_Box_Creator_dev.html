@@ -292,7 +292,7 @@
                 <label for="LidGrooveWidthField">Groove width</label>
                 <input type="number" step="any" id="LidGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" title="How deep the lid groove is cut into Left, Right and Front - at most half the material thickness, so at least half of the wall stays behind the groove.">
+              <div class="field-row" title="How deep the lid groove is cut into Left, Right and Front - less than the material thickness. More than half the thickness is allowed, but gives an orange warning (the wall gets weak behind the groove).">
                 <label for="LidGrooveDepthField">Groove depth</label>
                 <input type="number" step="any" id="LidGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -357,7 +357,7 @@
                 <input type="checkbox" class="LuaButton" id="LidHoleThrough" onclick="onLidGripTypeChanged(); onGeometryFieldChanged();" />
                 <label for="LidHoleThrough">Cut through</label>
               </div>
-              <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0, and at most half the lid thickness, so at least half of the lid stays under the recess.">
+              <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0, and less than the lid thickness. More than half the lid thickness is allowed, but gives an orange warning (the lid gets weak under the recess).">
                 <label for="LidHoleDepthField">Hole depth</label>
                 <input type="number" step="any" id="LidHoleDepthField" placeholder="Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -446,7 +446,7 @@
                 <label for="BottomGrooveWidthField">Groove width</label>
                 <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
-              <div class="field-row" title="How deep the groove is plowed into Left, Right and Front - at most half the material thickness, so at least half of the wall stays behind the groove.">
+              <div class="field-row" title="How deep the groove is plowed into Left, Right and Front - less than the material thickness. More than half the thickness is allowed, but gives an orange warning (the wall gets weak behind the groove).">
                 <label for="BottomGrooveDepthField">Groove depth</label>
                 <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
               </div>
@@ -579,6 +579,9 @@
     <input type="text" id="InvalidLidGrooveDepth" value=""/>
     <input type="text" id="WarnBottomGrooveOffset" value=""/>
     <input type="text" id="WarnLidGrooveOffset" value=""/>
+    <input type="text" id="WarnBottomGrooveDepth" value=""/>
+    <input type="text" id="WarnLidGrooveDepth" value=""/>
+    <input type="text" id="WarnLidHoleDepth" value=""/>
     <input type="text" id="InvalidLidHoleSize" value=""/>
     <input type="text" id="InvalidLidHoleDistance" value=""/>
     <input type="text" id="InvalidLidHoleLength" value=""/>
@@ -1012,7 +1015,10 @@
   // warning.                                                 -- by Claude 10/28/2026
   var g_warningFieldMap = {
     "WarnBottomGrooveOffset": "BottomGrooveOffsetField",
-    "WarnLidGrooveOffset":    "LidGrooveOffsetField"
+    "WarnLidGrooveOffset":    "LidGrooveOffsetField",
+    "WarnBottomGrooveDepth":  "BottomGrooveDepthField",
+    "WarnLidGrooveDepth":     "LidGrooveDepthField",
+    "WarnLidHoleDepth":       "LidHoleDepthField"
   };
 
   // The error / warning message currently set for a field, "" if none.
