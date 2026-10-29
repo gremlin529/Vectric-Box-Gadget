@@ -1,90 +1,129 @@
 ## Changelog
 
-Aenderungen an diesem Gadget-Fork ("Vectric-Box-Gadget_claude"), damit auch nach einer neuen Chat-Sitzung nachvollziehbar bleibt, was wann und warum geaendert wurde.
+Changes made to the Simple Box Creator gadget on the `users/hardiagithub/...` branches, newest first. Commit hashes are given where available.
+
+### 2026-10-29
+
+- **Groove deeper than half the material thickness is a warning, not an error** (`56b317f`)
+  `GrooveDepthMessage` in `DisplayDialog.xlua` now only reports real errors: a depth of 0 or less, or a groove as deep as the wall. Deeper than half the thickness, `GrooveDepthWarning` shows an orange warning with the wall that stays behind the groove; OK shows it once and still goes ahead. Applies to the bottom and the lid groove (`WarnBottomGrooveDepth` / `WarnLidGrooveDepth`).
+
+- **Lid finger recess: depth limit is a warning, not an error** (`56b317f`)
+  A finger recess (Finger Hole, not cut through) may be any depth short of the lid thickness (as deep as the lid is an error pointing to "Cut through"). Deeper than half the lid thickness, `LidRecessDepthWarning` shows an orange warning (`WarnLidHoleDepth`). Replaces the check from 10/27 (`af44d74`).
+
+### 2026-10-28
+
+- **Warning for a thin wall strip beside a groove** (`6f258fb`)
+  When 3 mm or less stays below the bottom groove (to the walls' bottom edge) or above the lid groove (to the top edge), the Groove offset field turns orange. Allowed but fragile, so OK shows the warning once and still goes ahead (`GrooveStripWarnings`).
+
+- **Groove depth at most half the material thickness, live validation** (`79f46ca`)
+  First version of the depth limit as a hard error; relaxed to a warning on 10/29.
+
+- **Dialog: Grooved Lid Options above Grooved Bottom Options** (`0e37f99`)
+
+### 2026-10-27
+
+- **Lid grip: Rectangle finger hole, through or set depth, "Indented Handle"** (`fbc9de7`, `6faa9e7`)
+  Finger hole is Round or Rectangle (width across, length along the depth, corner radius), cut through or as a recess of `lidHoleDepth` in the lid's top face. Distance from the rearmost edge at least 3 mm; the hole must end before the Front's inside face and stay clear of the rabbet bands. New grip type "Indented Handle" (grip tab plus hole; the distance is then measured from the tip of the tab, and at least 3 mm of tab must stay on each side, checked against the tab shape). All hole fields are validated live. Saved "Rounded Square" becomes a square Rectangle, saved "Handle + Hole" becomes "Indented Handle".
+
+- **Grooved Lid Options in two tabs, "Lid & Groove" and "Grip"** (`7210fa8`, `1b8e617`)
+  The Grip tab label shows the selected grip ("Add a Grip" when none, otherwise "Grip: Finger Hole" etc.), so it is visible without switching tabs. A tab label turns red when a field on it is invalid while it is hidden.
+
+- **Finger recess must leave at least 2 mm of lid** (`af44d74`)
+  Replaced by a warning on 10/29.
+
+- **Release script (gremlin529)** (`168e208`, `4d290cc`)
+  `MakeRelease.ps1` used HTM instead of HTML; now checks and preserves the extension.
+
+### 2026-10-26
+
+- **Grip dropdown: None / Finger Hole / Grab Handle** (`78c90a7`)
+  Replaces the grip tab checkbox (gremlin's suggestion). None and Finger Hole: no overhang, the lid ends flush with the Back. Finger Hole is pocketed (own toolpath "Lid Finger Hole"), so no loose slug is left. A saved "grip tab unticked" comes up as None.
+
+- **Front/Back/Left/Right everywhere in the dialog** (`175d592`)
+  Labels, tooltips, messages, comments and grip sketches use Front/Back/Left/Right instead of End 1/End 2/Side 1/Side 2, including the Grooved Bottom and Open Chamfer sections. Variable and function names in the code are unchanged. Checkbox renamed to "Grip tab overhangs the Back". Grip width is validated live (`ValidateLidGripWidth`, `InvalidLidGripWidth`): > 0 and at most the inside width minus twice the lid groove depth.
+  **Renamed:** the flip sheet "End 1 Groove (flipped)" is now **"Front Groove (flipped)"**, its layer "End 1 Flip Outline" is now **"Front Flip Outline"**. Existing jobs with the old name get an additional sheet on the next run.
+
+- **Grip tab: S-curve rounding, no dogbone offset on the lid** (`e2f70e7`)
+  With a corner radius >= the overhang, each corner runs out into the back edge in an S-curve (convex arc blended into the edge by a concave fillet); the tab stays exactly `grip_width` wide at the back edge. The dogbone/dovetail offset only handles straight spans and turned the grip arcs into chords, so the Grooved lid is now offset normally. Only the Grooved lid is affected; all other parts are unchanged.
+
+- **Shared sheet for an equally thin bottom and lid** (`fee91e7`)
+  Grooved bottom and Grooved lid both thinner than the material and equally thick share one sheet "Bottom + Lid Panel <thickness>", one pair of layers and one cutout toolpath. The rabbets stay separate toolpaths. Different thicknesses, or only one of the two parts ticked under Faces To Machine, keep separate sheets.
+
+- **Dovetails: Front lid groove on the flip sheet** (`ae3fdd8`)
+  With "Reverse Front for lid groove on own sheet" the lid groove is cut on the same mirrored helper part as the bottom groove (own group, own depth), so the Front only has to be turned over once. The lid then also reaches into the Front groove (U-shaped rabbet). Unticked, the Front gets no lid groove and the lid stops at its inside face.
+
+- **Grip tab can be switched off** (`87cc9f3`)
+  Superseded the same day by the Grip dropdown.
+
+### 2026-10-25
+
+- **New lid type "Grooved": sliding lid with grip tab** (`1a00a46`)
+  The mirror image of the Grooved bottom: grooves near the top of Left, Right and Front; the Back is shortened to the lid's underside so the lid slides in from the back. The lid reaches into the three grooves (with clearance) and ends flush with the Back; only a centred grip tab (Square, Rounded or Arc) sticks out, the rest of the overhang is cut flush. A lid thicker than the groove gets the rabbet on its top face, so the underside runs on the groove floor and the top can sit flush with the walls. Groove offset measured from the top to the groove ("Groove") or to the lid's top face ("Lid", 0 = flush). A lid thinner than the material goes on its own sheet "Lid Panel <thickness>". Own toolpaths "Lid Groove" and "Lid Rabbet". The finger pitch stays the same on every corner. All existing lid/bottom types produce the same geometry as before.
+
+### 2026-10-15
+
+- **Groove offset measured to the groove bottom or to the underside of the bottom panel (#86)** (`07f9037`)
+  New "Offset to" choice: "Groove" (to the groove bottom) or "Bottom" (to the underside of the bottom panel, e.g. the clearance under a drawer). Older saves are converted so the groove stays where it was.
+
+### 2026-10-09
+
+- **Dovetails + Grooved bottom: Front groove on its own flip sheet** (`331dab7`)
+  Optional mirrored helper part on a sheet of its own (upright at X0/Y0), so the Front can be turned over and the groove cut into its inside face. "Bottom same material" replaced by a free "Bottom Thickness" (default = material thickness); a rabbet only where the panel is thicker than the groove; a thinner bottom goes on its own sheet "Bottom Panel <thickness>". The rabbet is one U-shaped band instead of three overlapping rectangles (VCarve dropped the Front band).
+
+- **Rabbet band reaches one tool diameter past the panel edge** (`894b2fd`)
+  Any bit fits however narrow the groove depth; the inner edge stays exactly at the groove depth. The tool-fit check moved from groove depth to groove width (the groove in the wall is a closed slot).
+
+- **Shared rabbet function, groove depth vs. bit check (gremlin529)** (`6acc09b`)
+
+- **Sketch: Bottom Clearance in blue, no German terms in tooltips** (`066fa39`)
+
+- **Open Chamfer options: Back/Front sub-panels** (`3ba6787`)
+
+### 2026-10-07 / 2026-10-08
+
+- **Open Chamfer and Grooved Bottom: input fields placed at the sketches** (`4f997a4`, `110d878`)
+  Table layout instead of absolute positions, so the sketch zooms with the dialog.
+
+- **gremlin529:** comment translation via GitHub Action, README updated for the new gadget name, Open Chamfer registry fix (`0ee03e7`).
 
 ### 2026-10-06
 
-- **UI: Neue Skizze fuer "Bottom Type: Grooved Options"**
-  `Images/GroovedOverhangSketch.png` ersetzt: statt der bisherigen abstrakten Skizze jetzt ein Laengsschnitt durch die Lade (mit Bruchlinien in der Mitte, nach einer Vorlage des Nutzers). Links Back, rechts Front, jeweils niedriger als die Box mit eigener Fase an der Seitenwand (vorne groesserer Rueckstand als hinten), bemasst mit Height, Height Back, Height Front und Chamfer Angle. Der Boden laeuft unter dem verkuerzten Back durch bis zur Aussenkante und greift vorne mit der Feder in die Nut. Rechts ein vergroessertes "Detail A" der Nut an der Front mit Groove offset, Groove width, Groove depth, Bottom Clearance (rot) und Rabbet correction (blau). HTML unveraendert, nur das Bild wurde getauscht.
+- **gremlin529: Open Chamfer as its own lid type** (`f75d16c`, `887ae96`, `de636a9`, `5033241`)
+  Chamfer options split from Lid Type = None; only validated when actually used.
 
-- **Fix: Fasen-Pruefung ("Englischer Zug") vergleicht jetzt mit der inneren Tiefe statt der inneren Breite**
-  Seit gremlins Width/Depth-Fix (Branch `users/gremlin/DepthWidth`, PR #71) laufen Left/Right (Side 1/Side 2) ueber die Tiefe der Box (`MakeSideFace` nutzt `options.depth`). Die Validierung im Dialog (`DisplayDialog.xlua`, Pruefung ob Front- und Back-Fase zusammen auf das Seitenteil passen) verglich aber noch mit `inner_width`. Folge: bei einer Lade, die tiefer als breit ist, wurden passende Fasen faelschlich abgelehnt; im umgekehrten Fall konnten zu breite Fasen durchrutschen. Jetzt wird mit `inner_depth` (Tiefe minus beide Wandstaerken) verglichen, die Fehlermeldung nennt entsprechend die Innenlaenge des Seitenteils.
+- **New sketch for the Grooved Bottom options** (`8153999`)
+  Section through the drawer with "Detail A" of the groove at the Front.
+
+- **Fix: chamfer check compares against the inner depth, not the inner width** (`9e33938`)
+  Since the Width/Depth fix (PR #71) Left/Right run along the box depth; the check still used `inner_width`, wrongly rejecting chamfers on boxes deeper than wide.
 
 ### 2026-09-22
 
-- **Fix: Nut in Side 1/Side 2 an der End-1-Ecke (vorne) um halbe Materialstaerke verkuerzt**
-  Die Nut fuer den Schiebeboden in Side 1/Side 2 lief bisher ueber die gesamte Wandlaenge bis in beide Ecken hinein. An der End-1-Ecke (vorne) ist das nicht noetig, da der Boden dort nur einsitzt statt hindurchzugleiten (das Einschieben passiert an End 2, hinten). Auf Wunsch wird die Nut jetzt an der Vorderseite (End 1) um eine halbe Materialstaerke zurueckgesetzt; an der Hinterseite (End 2) bleibt sie unveraendert voll durchgehend. Fix in `CreateFaces.xlua` (`MakeSideFace`, Nutkontur `groove_x0`/`groove_x1`): welches Ende "vorne" (End 1) ist, haengt von `is_side1` ab (Side 1: linke Seite = End 1 -> `groove_x0` wird um `0.5*thickness` nach innen verschoben; Side 2: rechte Seite = End 1 -> `groove_x1` wird um `0.5*thickness` nach innen verschoben), analog zur bestehenden `makeTabsForLeftFace`/`makeTabsForRightFace`-Zuordnung.
+- **Fix: Left/Right bottom groove stops half a material thickness short of the Front corner**
+  The panel only seats at the Front, it slides in at the Back, which stays open.
 
 ### 2026-09-21
 
-- **Feature: "Bottom aus gleichem Material" bei Grooved-Boden**
-  Neue Checkbox "Same material (rabbet 3 sides)" fuer Bottom Type = Grooved: der Bodenpanel wird aus der vollen (gleichen) Materialstaerke wie die Waende gefertigt statt aus einem duenneren Einlege-Boden. Dazu wird an den 3 genuteten Kanten (Side 1, Side 2, End 1) ein Falz gefraest, der das Panel auf die Nutbreite herunterbringt; End 2 bleibt auf voller Dicke, da der Boden dort eingeschoben wird. Zwei neue Feinjustage-Felder: "Groove clearance" ("Luft", verkuerzt wie weit das Panel in die 3 Nuten hineinreicht, fuer leichteren Schiebesitz) und "Rabbet correction" (Korrektur der Falztiefe). Umsetzung in `CreateFaces.xlua` (`MakeBottomFaceContour`: `rabbet_contours`/`rabbet_depth` je Face, neue Funktion `CreateBottomRabbetToolpath`), `Simple_Box_Creator_dev.lua` (neue Optionen `bottomSameMaterial`, `bottomGrooveClearance`, `bottomRabbetDepthCorrection`, neuer Toolpath-Aufruf), `DisplayDialog.xlua` (Dialogfelder, Validierung, Registry-Persistenz) und `Simple_Box_Creator_dev.html` (eigener vollbreiter Abschnitt "Bottom Type: Grooved Options", analog zu "Side Top Overhang").
-
-- **Fix: Bodenpanel-Groesse bei Grooved-Boden (Breite/Tiefe und Anlage an End 2)**
-  Die Bodenpanel-Abmessung auf der End1/End2-Achse hat eine volle Materialstaerke gefehlt: da End 2s eigenes Wandmaterial unterhalb der Nut weggeschnitten ist (Einschubseite), liegt dort nichts an, woran das Panel innen anstossen koennte - es laeuft tatsaechlich bis zur Aussenkante von End 2 durch und liegt dort voll auf. Fix in `CreateFaces.xlua` (`MakeBottomFaceContour`: `panel_width` um eine zusaetzliche `thickness` erweitert). Die Formel auf der Side1/Side2-Achse ("Laden Breite") war bereits korrekt (2x Nuttiefe, 2x Clearance) und wurde nicht veraendert. Nutzer-getestet und bestaetigt ("bodengroesse passt").
-
-- **Fix: "Groove offset" misst jetzt bis zur Oberkante statt zur Unterkante der Nut**
-  `bottomGrooveOffset` bezog sich bisher auf die Unterkante der Nut; auf Wunsch bezieht er sich jetzt auf die Oberkante (entspricht der Skizze im Dialog). Betroffen: die Nutgeometrie in Side 1/Side 2 (`MakeSideFace`) und End 1 (`MakeEndFace`) wird jetzt aus der Oberkante rueckwaerts (minus Nutbreite) berechnet; die Berechnung, wieviel Material End 2 unten verliert (`EndGrooveShortfall`, `bottom_thickness`), braucht kein `+ Nutbreite` mehr, da der Offset das jetzt schon direkt ist; der Standardwert wurde von 0.25 auf `0.25 + Nutbreite` angehoben, damit die Nut nicht unter die Unterkante der Wand rutscht; neue Validierung in `DisplayDialog.xlua` prueft, dass Offset >= Nutbreite ist. Umsetzung in `CreateFaces.xlua`, `Simple_Box_Creator_dev.lua`, `DisplayDialog.xlua`.
-
-- **Fix: Falzbreite am Bodenpanel wurde faelschlich um die Groove clearance verkuerzt**
-  Die Falzfraesung an allen 3 Seiten (End 1, Side 1, Side 2) nutzte bisher dieselbe (um die Clearance/"Luft" verkuerzte) Reichweite wie die Aussenkontur des Panels. Dadurch blieb am Nutgrund ein schmaler Streifen in voller Dicke stehen statt gefalzt zu sein. Fix in `CreateFaces.xlua` (`MakeBottomFaceContour`): die Falzbaender (`r1`/`r2`/`r3`) nutzen jetzt die volle "Groove depth", die Clearance wirkt weiterhin nur auf die Aussenkontur (wie weit der Boden tatsaechlich in die Nut hineinreicht). Nutzer-getestet und bestaetigt.
-
-- **UI: Skizze fuer Grooved-Boden-Optionen**
-  Der Dialog zeigt jetzt eine kleine technische Skizze (`Images/GrooveSketch.png`) neben der "Same material"-Checkbox, die den Nut/Falz-Querschnitt mit Masslinien fuer "Groove offset", "Groove clearance" und "Rabbet correction" zeigt (deutsche Beschriftung fett/schwarz, englische Feldnamen grau darunter, passend zur handgezeichneten Vorlage des Nutzers). Eine urspruengliche Fassung mit eingebettetem SVG wurde verworfen, da der Dialog (alter IE7-Browser) kein SVG rendert - stattdessen ein per PIL erzeugtes PNG. "Rabbet correction" wurde nachtraeglich korrigiert: die Massline zeigt jetzt nur noch den kleinen Feinkorrektur-Betrag (Abstand zwischen tatsaechlicher Feder-Unterkante und der gestrichelten Referenzlinie fuer die exakte Passung), nicht mehr die komplette Falztiefe.
-
-- **Fix: Kerbe in Side 1/Side 2 an der Ecke zum Hinterstueck (End 2) bei Grooved-Boden**
-  An der Ecke, wo Side 1/Side 2 auf das (bei Grooved-Boden verkuerzte) Hinterstueck End 2 trifft, wurde der Bereich von der Unterkante bis zur Nut-Oberkante bisher als gerade Linie ohne Erreichen der wahren Aussenkante gezogen ("plain margin", siehe `EndGrooveShortfall`) - das erzeugte eine tatsaechliche Kerbe/Aussparung in der Seitenwand selbst, sichtbar als Fehlstelle nach dem Zusammenbau (das Hinterstueck selbst war bereits korrekt). Fix in `CreateFaces.xlua` (`MakeSideFace`, beide `right_shortfall`/`left_shortfall`-Bloecke): die Seitenwand reicht in diesem Bereich jetzt fuer die gesamte Hoehe bis zur wahren Aussenkante hinaus (unverzahntes Vollmaterial, da dort nichts zum Verzahnen vorhanden ist), statt zurueckversetzt zu bleiben. Die Zinkenteilung darueber bleibt unveraendert. Nutzer-getestet an einer gebauten Lade und bestaetigt (an den Box-Zinken; Kerbe war dort vorher sichtbar).
+- **Grooved bottom from the same material** with a rabbet on 3 sides, plus "Groove clearance" and "Rabbet correction" fields.
+- **Fix: bottom panel size** along the Front/Back axis (one material thickness was missing; the panel runs out to the Back's outer face).
+- **Groove offset measured to the top edge of the groove** (as in the sketch); default and validation adjusted.
+- **Fix: rabbet band was shortened by the groove clearance**, leaving a full-thickness strip at the groove floor.
+- **Sketch for the Grooved bottom options** (PNG, as the IE7 dialog does not render SVG).
+- **Fix: notch in Left/Right at the Back corner** with a Grooved bottom; the wall now runs out to the true outer edge there.
 
 ### 2026-09-20
 
-- **Feature: Unabhaengige End-Hoehe fuer Front und Back bei "Englischer Zug"**
-  Bisher hatte der seitliche Ueberstand ("Englischer Zug", Lid Type = None) nur eine gemeinsame End-Hoehe fuer beide Stirnseiten. Jetzt lassen sich End Height Front (End 1) und End Height Back (End 2) unabhaengig voneinander einstellen. Umsetzung in `CreateFaces.xlua` (`MakeSideFace`: `corner_height_left`/`corner_height_right`, `num_flaps_side_left`/`_right`, `tab_space_side_left`/`_right`), `Simple_Box_Creator_dev.lua` (Optionen `end1Height`/`end2Height`) und `DisplayDialog.xlua`/HTML (getrennte Felder "End height (Front)"/"End height (Back)").
-
-- **Feature: Chamfer als Winkel statt als Breite**
-  Die Fase des Ueberstands ("Englischer Zug") wird jetzt ueber einen Winkel (Grad von der Senkrechten, 1-89 Grad) definiert statt ueber eine feste Breite, und ebenfalls getrennt fuer Front/Back (`end1ChamferAngle`/`end2ChamferAngle`, Standard je 45 Grad = alte symmetrische Fase). Die Fasenbreite wird daraus berechnet (Ueberstand * tan(Winkel)). Umsetzung in `CreateFaces.xlua`, `Simple_Box_Creator_dev.lua`, `DisplayDialog.xlua` (Validierung: 0 < Winkel < 90, plus Pruefung dass beide Fasen zusammen nicht breiter als die Innenbreite sind) und HTML (Felder "Chamfer angle (Front)"/"(Back)").
-
-- **Fix: Zinkenversatz von 2,7 mm bei Grooved-Boden + kurzer Nachbarhoehe (`Dovetails.xlua`, `ComputeFingerTrim`)**
-  Die Schleife zum Weglassen eines Fingers griff nur, wenn der fehlende Rest (Shortfall) mindestens `tab_space + min_width` betrug. Lag der Shortfall knapp darunter (z.B. 14 mm bei tab_space=11,25/min_width=15), wurde der Rest stillschweigend verworfen und die Zinkenteilung um genau diesen Betrag verschoben. Fix: Schleifenbedingung korrigiert, sodass auch teilweise Shortfalls korrekt im letzten Feld (edge_gap) beruecksichtigt werden.
-
-- **Fix: Zinkenversatz um eine volle Teilung (26,3 mm) nach dem ersten Fix (`CreateFaces.xlua`, `MakeSideFace`)**
-  Nach dem Fix oben kam ein zweiter, bis dahin verdeckter Fehler zum Vorschein: der Trimm-Rand fuer die an die Nut angrenzende Ecke wurde am falschen Ende der Zinkenreihe platziert (am oberen statt am unteren/nutseitigen Ende). Dadurch verschob sich die gesamte Zinkenteilung um eine volle Rastereinheit, sobald tatsaechlich ein Finger weggelassen wurde. Fix: Trimm-Rand (Shortfall + edge_gap) wird jetzt zuerst gezeichnet, direkt an der Nutseite, wie bei End 2 selbst. Nutzer-getestet und bestaetigt.
-
-- **UI: Chamfer-Winkel-Feld neben End-Hoehe-Feld**
-  Im HTML-Dialog stehen "Chamfer angle (Front)"/"(Back)" jetzt jeweils in derselben Zeile neben "End height (Front)"/"(Back)" statt darunter (`Simple_Box_Creator_dev.html`, `.clearfix`-Wrapper mit zwei nebeneinander schwebenden `.field-row`-Boxen).
-
-- **UI: Farbschema auf Gruen umgestellt**
-  Das komplette Farbschema (`stylesheets/layout-css-8.css`, hell und dunkel) wurde von Blau auf Gruen umgestellt - Akzentfarben (Section-Header, Tool-Picker, Sub-Panel-Titel, Type-Panel-Header) ebenso wie die dezenten Hintergrund-/Grautoene. Der Akzentgruenton wurde danach auf Wunsch eine Nuance dunkler gesetzt (`#22AA55` -> `#1C8F47`).
+- **Independent end height for Front and Back** for the side top overhang.
+- **Chamfer defined by an angle** instead of a width, separately for Front and Back.
+- **Fix: finger offset with a Grooved bottom** (`ComputeFingerTrim` dropped partial shortfalls; trim margin drawn at the wrong end).
+- **UI: chamfer angle next to the end height field.**
 
 ### 2026-09-19
 
-- **Fix: Zinkengroesse an der Grooved-Ecke (Side/End) bei "Englischer Zug"**
-  Bei kombinierter Nutzung von Bottom Type = Grooved (Schiebeboden) und Side Top Overhang ("Englischer Zug") stimmte die Zinkenteilung an der Ecke zu End 2 nicht. Ursache: die Zinkenteilung wurde aus der tatsaechlichen (durch die Nut verkuerzten) Hoehe berechnet statt aus einer einheitlichen Referenzhoehe. Fix in `CreateFaces.xlua` (`MakeSideFace`, `MakeEndFace`) und `Dovetails.xlua` (`ComputeFingerTrim`, `*TrimEnd`-Varianten): die Zinkenteilung wird jetzt immer aus der Referenzhoehe berechnet, der fehlende Rest (Shortfall) wird als eigenes, randseitiges Blindstueck neben der Nut abgeschnitten.
+- **Fix: finger size at the Grooved corner** with the side top overhang (pitch from a common reference height).
+- **Fix: language-independent sheet lookup** (by sheet ID instead of the name "Sheet 1", which differs on localized VCarve).
+- **Dovetails: no Front groove** (it collided with the dovetails); with Box joints the Front groove stops half a thickness short of each edge.
 
-- **Fix: Sprachunabhaengige Sheet-Erkennung**
-  Das Gadget suchte bisher nach dem hart codierten englischen Sheet-Namen "Sheet 1"/"Sheet N", was auf einer deutschen VCarve-Installation ("Seite 1") nicht gefunden wurde. Fix in `SheetArrangement.xlua`: Sheets werden jetzt ausschliesslich ueber ihre ID (`job.SheetManager:GetSheetIds()` / `ActiveSheetId`) gesucht/erstellt/aktiviert, unabhaengig von der angezeigten (lokalisierten) Bezeichnung.
+### 2026-09-18
 
-- **Fix: Keine Nut bei End 1, wenn Joint Type = Dovetail**
-  Bei Bottom Type = Grooved wurde bisher immer eine Nut in End 1 gefraest (als fester Anschlag fuer den Schiebeboden). Bei Dovetail-Zinken kollidiert diese Nut mit den schraegen Schwalbenschwanz-Zinken an dieser Kante. Fix in `CreateFaces.xlua` (`MakeEndFace`): die Nut wird bei End 1 nur noch gefraest, wenn Joint Type = Box ist; bei Dovetail entfaellt sie komplett.
-
-- **Verfeinerung: Gestoppte Nut bei End 1 (nur Joint Type = Box)**
-  Die Nut in End 1 lief bisher komplett von Kante zu Kante durch die Zinkenbereiche. Auf Wunsch endet sie jetzt links und rechts jeweils eine halbe Materialstaerke vor der Kante, sodass an den Ecken ein durchgehender Materialsteg stehen bleibt statt die Nut bis in die Zinkenluecke zu ziehen.
-
-### Vor dem 19.09.2026 (rueckwirkend rekonstruiert)
-
-Diese Aenderungen liegen vor dem Beginn dieser Changelog-Datei und wurden damals nicht dokumentiert. Der urspruengliche Chatverlauf aus dieser Zeit liegt nicht mehr vor; die folgenden Punkte wurden daher nachtraeglich durch einen Code-Vergleich zwischen dem oeffentlichen Original-Repo (github.com/gremlin529/Vectric-Box-Gadget) und dem aktuellen Stand dieses Ordners rekonstruiert - nicht aus dem tatsaechlichen Gespraech. Datierung und Reihenfolge stuetzen sich vor allem auf "by Claude <Datum>"-Kommentare im Code selbst; wo das nicht eindeutig war, ist es unten als Vorbehalt vermerkt.
-
-- **Feature: Neuer Bottom-Typ "Grooved" (Schiebeboden) - Kerngeometrie**
-  Das Original-Repo kennt fuer den Boden nur die Typen Inset/Fingers/Flat/None; ein Schiebeboden existiert dort nicht. Der Fork fuegt einen fuenften Typ `FaceJointType.Grooved` hinzu: In Side 1, Side 2 und End 1 wird eine einfache Nut (Dado) nahe der Unterkante in die Wand gefraest; End 2 bleibt bewusst ungenutet, damit der Bodenpanel nach dem Verleimen der uebrigen Teile von hinten eingeschoben werden kann. Der Bodenpanel selbst ist bei diesem Typ ein schlichtes Rechteck ohne Finger/Zinken, dessen Groesse sich aus der Nuttiefe ergibt. Umsetzung in `CreateFaces.xlua`: neuer Eintrag `FaceJointType.Grooved`, ein eigener Rueckgabezweig in `MakeBottomFaceContour` fuer den reinen Panel-Umriss, sowie `groove_contours` als neues Feld auf dem `Face`-Objekt, das in `MakeSideFace` (Side 1/Side 2) und `MakeEndFace` (End 1) mit der jeweiligen Nutkontur befuellt wird. Durchgehend mit "by Claude 9/18/2026" markiert. Alle spaeteren Korrekturen daran (Zinkengroesse an der Ecke, sprachunabhaengige Sheets, keine/gestoppte Nut bei Dovetail bzw. bei End 1, Groove-offset-Bezug, "Bottom aus gleichem Material", Bodenpanel-Groesse, Kerbe an der Ecke, Nutverkuerzung an End 1) sind bereits ab dem 19.09.-Eintrag oben dokumentiert.
-
-- **Feature: Grooved-Boden - Dialog-Integration, Registry und eigener Fraes-Toolpath**
-  Ergaenzend zur Nutgeometrie: eine neue Funktion `CreateGroovePocketToolpath` in `CreateFaces.xlua`, die alle `groove_contours` eines Sheets sammelt und als eigenen Fraes-Durchgang abarbeitet; in `Simple_Box_Creator_dev.lua` die neuen Optionen `bottomGrooveOffset`/`bottomGrooveDepth`/`bottomGrooveWidth` samt Defaultwerten und Einheiten-Umrechnung; in `DisplayDialog.xlua` die drei zugehoerigen Zahlenfelder, eine erste Validierung sowie Speichern/Laden in der Registry; und in `Simple_Box_Creator_dev.html` der neue Dropdown-Eintrag "Grooved" fuer Bottom Type samt Ein-/Ausblend-Logik. Ebenfalls durchgehend "by Claude 9/18/2026". Die feinere Ausgestaltung (Same material/Groove clearance/Rabbet correction, die Skizze, der geaenderte Bezugspunkt des Offsets) kam erst ab 20./21.09. dazu und ist dort bereits dokumentiert.
-
-- **Robustheit: Auffangen eines ungueltigen Lid-/Bottom-Type-Dropdownwerts**
-  In `DisplayDialog.xlua` faengt `GetOptionsFromDialog` jetzt einen unbekannten Dropdown-Wert fuer Lid Type/Bottom Type ab und faellt auf einen Default zurueck (Inset bzw. Fingers), statt die Option stillschweigend auf `nil` zu lassen, was spaeter zu einem schwer nachvollziehbaren Laufzeitfehler gefuehrt haette. Mit "by Claude 9/18/2026" markiert, direkt neben den neuen Grooved-Feldern eingefuehrt.
-
-- **Feature, mit Vorbehalt: "Englischer Zug" - erste Fassung des seitlichen Ueberstands mit Fase**
-  Auch dieses Konzept (seitlicher Ueberstand mit Fase) kommt im Original-Repo nirgends vor. Der Changelog-Eintrag vom 20.09. beschreibt seine dortige Aenderung ausdruecklich als Erweiterung einer bereits vorhandenen Funktion ("Bisher hatte der seitliche Ueberstand [...] nur eine gemeinsame End-Hoehe fuer beide Stirnseiten") - es muss also schon vorher eine erste, einfachere Fassung mit EINER gemeinsamen End-Hoehe gegeben haben. Diese urspruengliche Fassung wurde am 20.09. jedoch direkt durch die neue End1Height/End2Height- und Winkel-basierte Version ersetzt und ist im heutigen Code nicht mehr getrennt sichtbar; ob sie noch vor dem 19.09. oder erst am 19.09. selbst entstand, laesst sich aus dem Diff allein nicht sicher sagen (der zugehoerige HTML-Abschnitt traegt bereits ein 9/19-Datum). Deshalb hier nur mit Vorbehalt aufgefuehrt.
-
-### Hinweis zur Nachvollziehbarkeit
-
-Diese Datei wird bei zukuenftigen Aenderungen fortgeschrieben. Der eigentliche Chat-Verlauf bleibt zusaetzlich in der Cowork-Sitzungshistorie erhalten und kann bei Bedarf dort erneut aufgerufen werden; diese Datei dient als kompakte technische Zusammenfassung direkt im Gadget-Ordner. Der Abschnitt "Vor dem 19.09.2026" oben ist eine nachtraegliche Rekonstruktion aus einem Code-Vergleich, kein Original-Protokoll.
+- **New bottom type "Grooved" (sliding bottom):** dado grooves in Left, Right and Front, Back left open so the panel slides in from the back; own groove pocket toolpath, dialog fields, validation and registry save/load. Unknown Lid/Bottom Type values fall back to a default.
