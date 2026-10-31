@@ -1386,6 +1386,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   end
 
   dialog:AddTextField("UnitsLabel", units_string)
+  -- material thickness for the live isometric view in the dialog header (read-only) -- by Claude 10/31/2026
+  dialog:AddTextField("MaterialThicknessInfo", string.format("%.4f", options.thickness or 0))
 
   local validator = function(dialog)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail

@@ -586,6 +586,7 @@
     <input type="text" id="WarnBottomGrooveDepth" value=""/>
     <input type="text" id="WarnLidGrooveDepth" value=""/>
     <input type="text" id="WarnLidHoleDepth" value=""/>
+    <input type="text" id="MaterialThicknessInfo" value=""/>
     <input type="text" id="InvalidLidHoleSize" value=""/>
     <input type="text" id="InvalidLidHoleDistance" value=""/>
     <input type="text" id="InvalidLidHoleLength" value=""/>
@@ -1141,14 +1142,17 @@
   // Redraw only when something it shows has changed.
   function isoUpdate() {
     var w = isoNum("WidthField"), d = isoNum("DepthField"), h = isoNum("HeightField");
+    var t = isoNum("MaterialThicknessInfo");
+    var bsel = document.getElementById("BottomTypeSelect");
+    var noBottom = bsel && bsel.selectedIndex === 3;   // Bottom Type None
     var dark = (document.body.className.indexOf("dark-mode") >= 0);
-    var key = w + "|" + d + "|" + h + "|" + dark;
+    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark;
     if (key === g_iso.key) { return; }
     g_iso.key = key;
-    isoDraw(w, d, h, dark);
+    isoDraw(w, d, h, t, noBottom, dark);
   }
 
-  function isoDraw(w, d, h, dark) {
+  function isoDraw(w, d, h, t, noBottom, dark) {
     var view = document.getElementById("BoxIsoView");
     if (!view) { return; }
     if (!(w > 0 && d > 0 && h > 0)) { view.innerHTML = ""; return; }
@@ -1167,28 +1171,49 @@
     var sc = Math.min((g_iso.W - padL - padR) / (maxX - minX), (g_iso.H - padT - padB) / (maxY - minY));
     var offX = padL + ((g_iso.W - padL - padR) - (maxX - minX) * sc) / 2 - minX * sc;
     var offY = padT + ((g_iso.H - padT - padB) - (maxY - minY) * sc) / 2 - minY * sc;
-    var S = function (p) { return [ Math.round((p[0] * sc + offX) * 10) / 10, Math.round((p[1] * sc + offY) * 10) / 10 ]; };
-    var q = []; for (i = 0; i < corners.length; i++) { q.push(S(corners[i])); }
+    // projected screen point of a box coordinate
+    var Q = function (x, y, z) { var p = P(x, y, z); return [ p[0] * sc + offX, p[1] * sc + offY ]; };
 
     var line = dark ? "#c9d3e6" : "#1f2a3a";
     var top = dark ? "#4a5a75" : "#dfe8f5";
     var front = dark ? "#3a4860" : "#c4d3ea";
     var side = dark ? "#2e3a4e" : "#a9bedd";
+    var inner = dark ? "#252e3d" : "#8ea6cc";
+    var floor = dark ? "#2b3546" : "#b4c6e3";
     var text = dark ? "#e3e8f2" : "#1f3b63";
 
-    // visible faces: front (y = 0), right (x = w), top (z = h)
-    var faces = [
-      [ [q[0], q[1], q[5], q[4]], front ],
-      [ [q[1], q[2], q[6], q[5]], side ],
-      [ [q[4], q[5], q[6], q[7]], top ]
-    ];
+    // Open box with its wall thickness - only when the walls leave an inside
+    // (otherwise, or without a thickness, a solid block). Painter's order: the
+    // inside first, then the rim, then the outside faces, which hide whatever
+    // lies behind the walls.                              -- by Claude 10/31/2026
+    var faces = [];
+    var open = (t > 0) && (2 * t < w) && (2 * t < d) && (t < h);
+    if (open) {
+      var zb = noBottom ? 0 : Math.min(t, h);       // inside floor
+      // inside floor, inside of the Left wall (x = t), inside of the Back wall (y = d - t)
+      faces.push([ [Q(t,t,zb), Q(w-t,t,zb), Q(w-t,d-t,zb), Q(t,d-t,zb)], floor ]);
+      faces.push([ [Q(t,t,zb), Q(t,d-t,zb), Q(t,d-t,h), Q(t,t,h)], inner ]);
+      faces.push([ [Q(t,d-t,zb), Q(w-t,d-t,zb), Q(w-t,d-t,h), Q(t,d-t,h)], inner ]);
+      // the rim on top: front, right, back and left strips
+      faces.push([ [Q(0,0,h), Q(w,0,h), Q(w-t,t,h), Q(t,t,h)], top ]);
+      faces.push([ [Q(w,0,h), Q(w,d,h), Q(w-t,d-t,h), Q(w-t,t,h)], top ]);
+      faces.push([ [Q(w,d,h), Q(0,d,h), Q(t,d-t,h), Q(w-t,d-t,h)], top ]);
+      faces.push([ [Q(0,d,h), Q(0,0,h), Q(t,t,h), Q(t,d-t,h)], top ]);
+    } else {
+      faces.push([ [Q(0,0,h), Q(w,0,h), Q(w,d,h), Q(0,d,h)], top ]);
+    }
+    // outside: front (y = 0) and right (x = w)
+    faces.push([ [Q(0,0,0), Q(w,0,0), Q(w,0,h), Q(0,0,h)], front ]);
+    faces.push([ [Q(w,0,0), Q(w,d,0), Q(w,d,h), Q(w,0,h)], side ]);
+
+    var q0 = Q(0,0,0), q1 = Q(w,0,0), q2 = Q(w,d,0), q4 = Q(0,0,h);
     var labels = [
       // width: under the front bottom edge
-      [ isoFmt(w), (q[0][0] + q[1][0]) / 2 - 18, (q[0][1] + q[1][1]) / 2 + 4 ],
+      [ isoFmt(w), (q0[0] + q1[0]) / 2 - 18, (q0[1] + q1[1]) / 2 + 4 ],
       // depth: under the right bottom edge
-      [ isoFmt(d), (q[1][0] + q[2][0]) / 2 + 2, (q[1][1] + q[2][1]) / 2 + 4 ],
+      [ isoFmt(d), (q1[0] + q2[0]) / 2 + 2, (q1[1] + q2[1]) / 2 + 4 ],
       // height: left of the front left edge
-      [ isoFmt(h), q[0][0] - 4, (q[0][1] + q[4][1]) / 2 - 7, "right" ]
+      [ isoFmt(h), q0[0] - 4, (q0[1] + q4[1]) / 2 - 7, "right" ]
     ];
 
     var html = "";
@@ -1203,7 +1228,7 @@
         path += " x e";
         html += '<v:shape coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" path="' + path +
                 '" filled="true" fillcolor="' + faces[i][1] + '" stroked="true" strokecolor="' + line +
-                '" strokeweight="1.2px" style="position:absolute; left:0; top:0; width:' + g_iso.W + 'px; height:' + g_iso.H + 'px;"></v:shape>';
+                '" strokeweight="1px" style="position:absolute; left:0; top:0; width:' + g_iso.W + 'px; height:' + g_iso.H + 'px;"></v:shape>';
       }
     } else {
       html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
@@ -1220,7 +1245,7 @@
     if (g_iso.mode === "canvas") {
       var cv = document.getElementById("BoxIsoCanvas");
       var cx = cv.getContext("2d");
-      cx.lineWidth = 1.2; cx.strokeStyle = line; cx.lineJoin = "round";
+      cx.lineWidth = 1; cx.strokeStyle = line; cx.lineJoin = "round";
       for (i = 0; i < faces.length; i++) {
         var fp = faces[i][0];
         cx.beginPath(); cx.moveTo(fp[0][0], fp[0][1]);
@@ -1229,6 +1254,7 @@
       }
     }
   }
+
 
 
   // ToolNameField is a <span> that Lua's tool picker updates directly when
