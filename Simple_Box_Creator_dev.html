@@ -1149,7 +1149,7 @@
     var noBottom = bsel && bsel.selectedIndex === 3;   // Bottom Type None
     var dark = (document.body.className.indexOf("dark-mode") >= 0);
     var lid = isoLidSettings();
-    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key;
+    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField");
     if (key === g_iso.key) { return; }
     g_iso.key = key;
     isoDraw(w, d, h, t, noBottom, dark, lid);
@@ -1279,22 +1279,57 @@
           F(hp, holeCol);
         }
       }
-      // the rim on top: front, right, (back), left strips
-      F([[0,0,h],[w,0,h],[w-t,t,h],[t,t,h]], top);
+      // the rim on top, one strip per wall. The finger pattern ends with a gap at
+      // the top, so at the corners the top finger belongs to Front / Back: they
+      // run the full width there, Left / Right sit between them.  -- by Claude 10/31/2026
       if (slide) {
-        F([[w-t,0,h],[w,0,h],[w,d,h],[w-t,d,h]], top);    // Right wall's top
-        F([[0,0,h],[t,0,h],[t,d,h],[0,d,h]], top);        // Left wall's top
+        // Back is lower, so Left / Right run through to the back at the top
+        F([[w-t,t,h],[w,t,h],[w,d,h],[w-t,d,h]], top);    // Right wall's top
+        F([[0,t,h],[t,t,h],[t,d,h],[0,d,h]], top);        // Left wall's top
       } else {
-        F([[w,0,h],[w,d,h],[w-t,d-t,h],[w-t,t,h]], top);
-        F([[w,d,h],[0,d,h],[t,d-t,h],[w-t,d-t,h]], top);
-        F([[0,d,h],[0,0,h],[t,t,h],[t,d-t,h]], top);
+        F([[w-t,t,h],[w,t,h],[w,d-t,h],[w-t,d-t,h]], top);
+        F([[0,t,h],[t,t,h],[t,d-t,h],[0,d-t,h]], top);
+        F([[0,d-t,h],[w,d-t,h],[w,d,h],[0,d,h]], top);
       }
+      F([[0,0,h],[w,0,h],[w,t,h],[0,t,h]], top);
     } else {
       F([[0,0,h],[w,0,h],[w,d,h],[0,d,h]], top);
     }
     // outside: front (y = 0) and right (x = w)
     F([[0,0,0],[w,0,0],[w,0,h],[0,0,h]], front);
     F([[w,0,0],[w,d,0],[w,d,h],[w,0,h]], side);
+
+    // Corner joints: the finger pattern up the corners (gap, [finger, gap] x n,
+    // pitch from the side joint width like the gadget's own). Where a finger of
+    // Left / Right comes through, its end grain shows on the Front face; where
+    // Front / Back fill the gap, theirs shows on the Right face.  -- by Claude 10/31/2026
+    if (open) {
+      var jw = isoNum("SideTabWidthField");
+      if (!(jw > 0)) { jw = 2 * t; }
+      var nf = Math.floor((0.5 * h) / jw);
+      if (nf > 40) { nf = 40; }
+      var gapH = (h - nf * jw) / (nf + 1), zc = 0, seg, k2;
+      var segs = [];   // [z0, z1, isFinger]
+      for (k2 = 0; k2 <= nf; k2++) {
+        segs.push([zc, zc + gapH, false]); zc += gapH;
+        if (k2 < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
+      }
+      for (k2 = 0; k2 < segs.length; k2++) {
+        seg = segs[k2];
+        if (seg[2]) {
+          // fingers of Left (x 0..t) and Right (x w-t..w), seen on the Front face
+          F([[0,0,seg[0]],[t,0,seg[0]],[t,0,seg[1]],[0,0,seg[1]]], side);
+          F([[w-t,0,seg[0]],[w,0,seg[0]],[w,0,seg[1]],[w-t,0,seg[1]]], side);
+        } else {
+          // Front (y 0..t) and Back (y d-t..d) filling the gaps, seen on the Right face
+          F([[w,0,seg[0]],[w,t,seg[0]],[w,t,seg[1]],[w,0,seg[1]]], front);
+          var zTop = Math.min(seg[1], backTop);
+          if (zTop > seg[0]) {
+            F([[w,d-t,seg[0]],[w,d,seg[0]],[w,d,zTop],[w,d-t,zTop]], front);
+          }
+        }
+      }
+    }
 
     // A lid lifted off the box: Flat / Fingers a plain plate, Inset a plate with
     // the plug that drops into the box under it.
