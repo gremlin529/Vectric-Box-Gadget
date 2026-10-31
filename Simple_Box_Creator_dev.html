@@ -1181,6 +1181,11 @@
       L.holeL = isoNum("LidHoleLengthField");
       var hd = document.getElementById("LidHoleDistanceField");
       L.holeD = hd ? (parseFloat(hd.value) || 0) : 0;
+      var rc = document.getElementById("LidRabbetCorrectionField");
+      L.corr = rc ? (parseFloat(rc.value) || 0) : 0;
+      // with dovetails Front only gets a lid groove when it is flipped
+      var dt = document.getElementById("TabTypeRadio2"), fl = document.getElementById("LidFrontGrooveFlip");
+      L.frontGroove = !(dt && dt.checked) || !!(fl && fl.checked);
     }
     var k = [], n;
     for (n in L) { if (L.hasOwnProperty(n)) { k.push(n + "=" + L[n]); } }
@@ -1246,6 +1251,52 @@
     var v = 0;
     if (all && all.checked) { v = isoNum(which === "lid" ? "TopTabWidthField" : "BottomTabWidthField"); }
     return v > 0 ? v : isoNum("SideTabWidthField");
+  }
+
+  // Grip tab outline in plan, from its right root (cx + hx, yb) round to its left
+  // root, sampled: Square, Rounded (corner radius; a radius >= the overhang gives
+  // the S-curve into the back edge) and Arc - the same shapes AddLidGripTab in
+  // CreateFaces.xlua cuts.                                      -- by Claude 10/31/2026
+  function isoGripOutline(cx, yb, hx, ov, shape, radius) {
+    var pts = [], xr = cx + hx, xl = cx - hx, n, a, N = 8;
+    var arc = function (ccx, ccy, r, a0, a1) {
+      for (var k = 1; k <= N; k++) { var aa = a0 + (a1 - a0) * k / N; pts.push([ccx + r * Math.cos(aa), ccy + r * Math.sin(aa)]); }
+    };
+    pts.push([xr, yb]);
+    if (shape === "Arc" && ov < hx) {
+      var R0 = (hx * hx + ov * ov) / (2 * ov), cy0 = yb + ov - R0, a0 = Math.atan2(yb - cy0, hx);
+      for (n = 1; n < 2 * N; n++) { a = a0 + (Math.PI - 2 * a0) * n / (2 * N); pts.push([cx + R0 * Math.cos(a), cy0 + R0 * Math.sin(a)]); }
+      pts.push([xl, yb]);
+      return pts;
+    }
+    var r = 0;
+    if (shape === "Rounded") {
+      var R = radius || 0;
+      if (R >= ov && hx > ov) {
+        R = Math.min(R, (hx * hx + 3 * ov * ov) / (4 * ov));
+        var rho = R - ov, w2 = Math.sqrt(Math.max(0, 4 * R * ov - 3 * ov * ov));
+        var cyS = yb - rho, fy = yb + rho, aT = Math.atan2(fy - cyS, w2);
+        if (rho > 1e-9) { arc(xr, fy, rho, -Math.PI / 2, aT - Math.PI); }
+        arc(xr - w2, cyS, R, aT, Math.PI / 2);
+        pts.push([xl + w2, yb + ov]);
+        arc(xl + w2, cyS, R, Math.PI / 2, Math.PI - aT);
+        if (rho > 1e-9) { arc(xl, fy, rho, -aT, -Math.PI / 2); }
+        return pts;
+      }
+      r = Math.min(R, hx, ov);
+    } else if (shape === "Arc") {
+      r = hx;
+    }
+    if (r <= 1e-9) {
+      pts.push([xr, yb + ov]); pts.push([xl, yb + ov]); pts.push([xl, yb]);
+      return pts;
+    }
+    pts.push([xr, yb + ov - r]);
+    arc(xr - r, yb + ov - r, r, 0, Math.PI / 2);
+    pts.push([xl + r, yb + ov]);
+    arc(xl + r, yb + ov - r, r, Math.PI / 2, Math.PI);
+    pts.push([xl, yb]);
+    return pts;
   }
 
   function isoDraw(w, d, h, t, noBottom, dark, lid) {
@@ -1365,25 +1416,57 @@
           var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
           var sl = d / 2;   // pulled out halfway, so the groove shows in front of it
           var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
-          F([[lx0,ly0,lidZ0],[lx1,ly0,lidZ0],[lx1,ly0,lz1],[lx0,ly0,lz1]], lidFront);
-          F([[lx1,ly0,lidZ0],[lx1,ly1,lidZ0],[lx1,ly1,lz1],[lx1,ly0,lz1]], lidSide);
+          // The lid's outline in plan (anti-clockwise), with the grip tab exactly as
+          // CreateFaces cuts it (AddLidGripTab), then its edges as side faces - only
+          // those facing the viewer - and the top on them. Curved tab corners get
+          // their own side strips, so the tab keeps its thickness all round.
+          //                                                  -- by Claude 10/31/2026
           var cxm = (lx0 + lx1) / 2;
-          var topPts = [[lx0,ly0,lz1],[lx1,ly0,lz1],[lx1,ly1,lz1]];
+          var outline = [[lx0,ly0],[lx1,ly0],[lx1,ly1]];
           var hasTab = (lid.grip === "Grab Handle" || lid.grip === "Indented Handle") && lid.ov > 0 && lid.gripW > 0;
           if (hasTab) {
-            var hx = Math.min(lid.gripW, lx1 - lx0) / 2, ov = lid.ov, xr = cxm + hx, xl = cxm - hx, n, a;
-            var r = 0;
-            if (lid.gripShape === "Rounded") { r = Math.min(lid.gripR, hx, ov); }
-            if (lid.gripShape === "Arc") { r = Math.min(hx, ov); }
-            // right side of the tab, then its outline (corners rounded with r)
-            F([[xr,ly1,lidZ0],[xr,ly1+ov-r,lidZ0],[xr,ly1+ov-r,lz1],[xr,ly1,lz1]], lidSide);
-            topPts.push([xr, ly1, lz1]);
-            topPts.push([xr, ly1 + ov - r, lz1]);
-            for (n = 1; n <= 6; n++) { a = Math.PI / 2 * n / 6; topPts.push([xr - r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
-            for (n = 0; n <= 6; n++) { a = Math.PI / 2 + Math.PI / 2 * n / 6; topPts.push([xl + r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
-            topPts.push([xl, ly1, lz1]);
+            var tab = isoGripOutline(cxm, ly1, Math.min(lid.gripW, lx1 - lx0) / 2, lid.ov, lid.gripShape, lid.gripR);
+            for (var ti = 0; ti < tab.length; ti++) { outline.push(tab[ti]); }
           }
-          topPts.push([lx0, ly1, lz1]);
+          outline.push([lx0, ly1]);
+          // Rabbet on the lid's top face (lid thicker than the groove): a band as
+          // wide as the groove depth along Left, Right (and Front when it has a
+          // groove), cut down to the groove width - like CreateFaces' U band.
+          //                                                  -- by Claude 10/31/2026
+          var rd = 0;
+          if (lidT - (lid.gw > 0 ? lid.gw : t) > 1e-6) { rd = Math.max(0, Math.min(lidT - lid.gw + lid.corr, lidT)); }
+          var gb = (rd > 1e-6) ? g : 0;                  // band width
+          var zr = lz1 - rd;                             // band level
+          var fb = (gb > 0 && lid.frontGroove) ? gb : 0; // front band
+          var sides = [], oi;
+          for (oi = 0; oi < outline.length; oi++) {
+            var pA = outline[oi], pB = outline[(oi + 1) % outline.length];
+            var ex = pB[0] - pA[0], ey = pB[1] - pA[1];
+            var nx = ey, ny = -ex;                       // outward normal (anti-clockwise outline)
+            if (nx - ny <= 1e-9) { continue; }          // faces away from the viewer
+            // the tab lies behind the back edge and keeps the full thickness
+            var onTab = (pA[1] + pB[1]) / 2 > ly1 + 1e-6;
+            var zTopE = onTab ? lz1 : zr;
+            sides.push([ (pA[0] + pB[0]) / 2 - (pA[1] + pB[1]) / 2,
+                         [[pA[0],pA[1],lidZ0],[pB[0],pB[1],lidZ0],[pB[0],pB[1],zTopE],[pA[0],pA[1],zTopE]],
+                         (nx > -ny) ? lidSide : lidFront ]);
+          }
+          // farther side faces first
+          sides.sort(function (u, v) { return u[0] - v[0]; });
+          for (oi = 0; oi < sides.length; oi++) { F(sides[oi][1], sides[oi][2]); }
+          var topPts = [];
+          if (gb > 0) {
+            // the band, then the step up to the raised middle, then the middle
+            F([[lx0,ly0,zr],[lx1,ly0,zr],[lx1,ly1,zr],[lx0,ly1,zr]], lidTop);
+            var mx0 = lx0 + gb, mx1 = lx1 - gb, my0 = ly0 + fb;
+            F([[mx0,my0,zr],[mx1,my0,zr],[mx1,my0,lz1],[mx0,my0,lz1]], lidFront);
+            F([[mx1,my0,zr],[mx1,ly1,zr],[mx1,ly1,lz1],[mx1,my0,lz1]], lidSide);
+            topPts = [[mx0,my0,lz1],[mx1,my0,lz1],[mx1,ly1,lz1]];
+            if (hasTab) { for (oi = 3; oi < outline.length - 1; oi++) { topPts.push([outline[oi][0], outline[oi][1], lz1]); } }
+            topPts.push([mx0, ly1, lz1]);
+          } else {
+            for (oi = 0; oi < outline.length; oi++) { topPts.push([outline[oi][0], outline[oi][1], lz1]); }
+          }
           F(topPts, lidTop);
           // finger hole on the lid's top
           var hasHole = (lid.grip === "Finger Hole" || lid.grip === "Indented Handle") && lid.holeS > 0;
