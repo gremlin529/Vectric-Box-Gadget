@@ -466,7 +466,16 @@ end -- CreateBoxFaces
 ]]
 function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_sheet_id, base_sheet_name)
   local part_gap = math.max(2 * converted_tool_diameter, options.partSpacing)
-  local clampingMargin = math.max(options.clampingMargin or 0.0, 0.75)
+  -- Honour the Clamping Margin the user actually set - only they know what their
+  -- hold-down needs, and the dialog already accepts anything >= 0 (see
+  -- ValidateBoxDimensions/ReadOptionsFromDialog). This used to be floored at 0.75,
+  -- which silently ate 1.5 off the usable height: on a narrow board (e.g. 42 x 6)
+  -- that left only 4.5 of usable height, so every 5-tall side/end face failed to
+  -- fit and got stacked up as an overhang in single-sheet mode - or pushed onto a
+  -- fresh sheet of its own in multi-sheet mode, one sheet per part. The 0.0 floor
+  -- is kept purely so a stray negative can't grow the usable area past the
+  -- material.                                                  -- by Claude 10/30/2026
+  local clampingMargin = math.max(options.clampingMargin or 0.0, 0.0)
   local required_sheets = 1
 
   -- A Grooved bottom thinner than the material is cut from separate stock, so it is

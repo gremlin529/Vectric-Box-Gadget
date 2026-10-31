@@ -1,2 +1,2 @@
 Version=12.6
-SubVersion=beta3
+SubVersion=Beta4
