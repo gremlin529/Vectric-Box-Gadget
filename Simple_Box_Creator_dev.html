@@ -1283,7 +1283,7 @@
     var open = (t > 0) && (2 * t < w) && (2 * t < d) && (t < h);
 
     // Grooved (sliding) lid: Back ends at the lid's underside; the lid is shown
-    // pulled out towards the back by a third of the depth, with its grip.
+    // pulled out towards the back by half the depth, with its grip.
     var slide = (lid.type === "Grooved") && open;
     var lidT = 0, lidZ0 = h, backTop = h;
     if (slide) {
@@ -1353,10 +1353,17 @@
         if (slide) {
           // Back's top (lower than the walls) and the ends of Left / Right above it
           F([[t,d-t,backTop],[w-t,d-t,backTop],[w-t,d,backTop],[t,d,backTop]], top);
-          F([[w-t,d-t,backTop],[w-t,d,backTop],[w-t,d,zT],[w-t,d-t,zT]], inner);
-          // the lid, pulled out by a third of the depth
+          // Left wall's inside face above the lower Back (visible from here), then the
+          // lid groove along it: from just behind Front right out through the back,
+          // as wide as the groove, its lower edge = the lid's underside.  -- by Claude 10/31/2026
+          F([[t,d-t,backTop],[t,d,backTop],[t,d,zT],[t,d-t,zT]], inner);
+          var gwid = Math.min(lid.gw > 0 ? lid.gw : t / 2, zT - lidZ0);
+          if (gwid > 0) {
+            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol);
+          }
+          // the lid, pulled out by half the depth
           var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
-          var sl = d / 3;
+          var sl = d / 2;   // pulled out halfway, so the groove shows in front of it
           var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
           F([[lx0,ly0,lidZ0],[lx1,ly0,lidZ0],[lx1,ly0,lz1],[lx0,ly0,lz1]], lidFront);
           F([[lx1,ly0,lidZ0],[lx1,ly1,lidZ0],[lx1,ly1,lz1],[lx1,ly0,lz1]], lidSide);
