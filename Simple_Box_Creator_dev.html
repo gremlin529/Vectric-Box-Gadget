@@ -1146,33 +1146,48 @@
     var bsel = document.getElementById("BottomTypeSelect");
     var noBottom = bsel && bsel.selectedIndex === 3;   // Bottom Type None
     var dark = (document.body.className.indexOf("dark-mode") >= 0);
-    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark;
+    var lid = isoLidSettings();
+    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key;
     if (key === g_iso.key) { return; }
     g_iso.key = key;
-    isoDraw(w, d, h, t, noBottom, dark);
+    isoDraw(w, d, h, t, noBottom, dark, lid);
   }
 
-  function isoDraw(w, d, h, t, noBottom, dark) {
+  // Lid settings the view shows: Lid Type and, for a Grooved (sliding) lid, its
+  // thickness, groove, offset and grip.                      -- by Claude 10/31/2026
+  function isoLidSettings() {
+    var sel = document.getElementById("LidTypeSelect");
+    var idx = sel ? sel.selectedIndex : 0;
+    var types = ["Inset", "Fingers", "Flat", "None", "OpenChamfer", "Grooved"];
+    var L = { type: types[idx] || "None" };
+    if (L.type === "Grooved") {
+      L.thick = isoNum("LidThicknessField");
+      L.gw = isoNum("LidGrooveWidthField");
+      L.gd = isoNum("LidGrooveDepthField");
+      var off = document.getElementById("LidGrooveOffsetField");
+      L.off = off ? (parseFloat(off.value) || 0) : 0;
+      L.ref = selectedValue("LidGrooveOffsetRef", "Groove");
+      L.grip = selectedValue("LidGripType", "Grab Handle");
+      L.ov = isoNum("LidGripOverhangField");
+      L.gripW = isoNum("LidGripWidthField");
+      L.gripShape = selectedValue("LidGripShape", "Rounded");
+      L.gripR = isoNum("LidGripRadiusField");
+      L.holeShape = selectedValue("LidHoleShape", "Round");
+      L.holeS = isoNum("LidHoleSizeField");
+      L.holeL = isoNum("LidHoleLengthField");
+      var hd = document.getElementById("LidHoleDistanceField");
+      L.holeD = hd ? (parseFloat(hd.value) || 0) : 0;
+    }
+    var k = [], n;
+    for (n in L) { if (L.hasOwnProperty(n)) { k.push(n + "=" + L[n]); } }
+    L.key = k.join(";");
+    return L;
+  }
+
+  function isoDraw(w, d, h, t, noBottom, dark, lid) {
     var view = document.getElementById("BoxIsoView");
     if (!view) { return; }
     if (!(w > 0 && d > 0 && h > 0)) { view.innerHTML = ""; return; }
-
-    // Isometric projection: width runs right-down, depth runs right-up, height up.
-    var c30 = Math.cos(Math.PI / 6), s30 = 0.5;
-    var P = function (x, y, z) { return [ (x + y) * c30, (x - y) * s30 - z ]; };
-    var corners = [P(0,0,0), P(w,0,0), P(w,d,0), P(0,d,0), P(0,0,h), P(w,0,h), P(w,d,h), P(0,d,h)];
-    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i;
-    for (i = 0; i < corners.length; i++) {
-      minX = Math.min(minX, corners[i][0]); maxX = Math.max(maxX, corners[i][0]);
-      minY = Math.min(minY, corners[i][1]); maxY = Math.max(maxY, corners[i][1]);
-    }
-    // room for the labels around the box
-    var padL = 22, padR = 22, padT = 8, padB = 22;
-    var sc = Math.min((g_iso.W - padL - padR) / (maxX - minX), (g_iso.H - padT - padB) / (maxY - minY));
-    var offX = padL + ((g_iso.W - padL - padR) - (maxX - minX) * sc) / 2 - minX * sc;
-    var offY = padT + ((g_iso.H - padT - padB) - (maxY - minY) * sc) / 2 - minY * sc;
-    // projected screen point of a box coordinate
-    var Q = function (x, y, z) { var p = P(x, y, z); return [ p[0] * sc + offX, p[1] * sc + offY ]; };
 
     var line = dark ? "#c9d3e6" : "#1f2a3a";
     var top = dark ? "#4a5a75" : "#dfe8f5";
@@ -1181,30 +1196,138 @@
     var inner = dark ? "#252e3d" : "#8ea6cc";
     var floor = dark ? "#2b3546" : "#b4c6e3";
     var text = dark ? "#e3e8f2" : "#1f3b63";
+    var lidTop = dark ? "#7a6748" : "#f3e2c4";
+    var lidFront = dark ? "#655539" : "#e3c99c";
+    var lidSide = dark ? "#54462f" : "#d2b07a";
+    var holeCol = dark ? "#1d2430" : "#5d6f8c";
+
+    // Faces are collected in box coordinates (x = width, y = depth, z = height)
+    // in painter's order, then projected and scaled to fit the view together.
+    var faces = [];
+    var F = function (pts, col) { faces.push([pts, col]); };
+    // visible faces of a block: top, front (y0) and right (x1)
+    var block = function (x0, x1, y0, y1, z0, z1, cTop, cFront, cSide) {
+      F([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]], cTop);
+      F([[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]], cFront);
+      F([[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]], cSide);
+    };
 
     // Open box with its wall thickness - only when the walls leave an inside
     // (otherwise, or without a thickness, a solid block). Painter's order: the
     // inside first, then the rim, then the outside faces, which hide whatever
     // lies behind the walls.                              -- by Claude 10/31/2026
-    var faces = [];
     var open = (t > 0) && (2 * t < w) && (2 * t < d) && (t < h);
+
+    // Grooved (sliding) lid: Back ends at the lid's underside; the lid is shown
+    // pulled out towards the back by a third of the depth, with its grip.
+    var slide = (lid.type === "Grooved") && open;
+    var lidT = 0, lidZ0 = h, backTop = h;
+    if (slide) {
+      lidT = lid.thick > 0 ? lid.thick : t;
+      var Fo = (lid.ref === "Lid") ? (lid.off + lidT) : (lid.off + (lid.gw > 0 ? lid.gw : t));
+      Fo = Math.max(0, Math.min(Fo, h - t));
+      lidZ0 = h - Fo;
+      backTop = lidZ0;
+    }
+
     if (open) {
       var zb = noBottom ? 0 : Math.min(t, h);       // inside floor
-      // inside floor, inside of the Left wall (x = t), inside of the Back wall (y = d - t)
-      faces.push([ [Q(t,t,zb), Q(w-t,t,zb), Q(w-t,d-t,zb), Q(t,d-t,zb)], floor ]);
-      faces.push([ [Q(t,t,zb), Q(t,d-t,zb), Q(t,d-t,h), Q(t,t,h)], inner ]);
-      faces.push([ [Q(t,d-t,zb), Q(w-t,d-t,zb), Q(w-t,d-t,h), Q(t,d-t,h)], inner ]);
-      // the rim on top: front, right, back and left strips
-      faces.push([ [Q(0,0,h), Q(w,0,h), Q(w-t,t,h), Q(t,t,h)], top ]);
-      faces.push([ [Q(w,0,h), Q(w,d,h), Q(w-t,d-t,h), Q(w-t,t,h)], top ]);
-      faces.push([ [Q(w,d,h), Q(0,d,h), Q(t,d-t,h), Q(w-t,d-t,h)], top ]);
-      faces.push([ [Q(0,d,h), Q(0,0,h), Q(t,t,h), Q(t,d-t,h)], top ]);
+      F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor);
+      F([[t,t,zb],[t,d-t,zb],[t,d-t,h],[t,t,h]], inner);                 // inside of the Left wall
+      F([[t,d-t,zb],[w-t,d-t,zb],[w-t,d-t,backTop],[t,d-t,backTop]], inner);  // inside of the Back wall
+      if (slide) {
+        // Back's top (lower than the walls) and the ends of Left / Right above it
+        F([[t,d-t,backTop],[w-t,d-t,backTop],[w-t,d,backTop],[t,d,backTop]], top);
+        F([[w-t,d-t,backTop],[w-t,d,backTop],[w-t,d,h],[w-t,d-t,h]], inner);
+        // the lid, pulled out by a third of the depth
+        var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
+        var sl = d / 3;
+        var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
+        F([[lx0,ly0,lidZ0],[lx1,ly0,lidZ0],[lx1,ly0,lz1],[lx0,ly0,lz1]], lidFront);
+        F([[lx1,ly0,lidZ0],[lx1,ly1,lidZ0],[lx1,ly1,lz1],[lx1,ly0,lz1]], lidSide);
+        var cxm = (lx0 + lx1) / 2;
+        var topPts = [[lx0,ly0,lz1],[lx1,ly0,lz1],[lx1,ly1,lz1]];
+        var hasTab = (lid.grip === "Grab Handle" || lid.grip === "Indented Handle") && lid.ov > 0 && lid.gripW > 0;
+        if (hasTab) {
+          var hx = Math.min(lid.gripW, lx1 - lx0) / 2, ov = lid.ov, xr = cxm + hx, xl = cxm - hx, n, a;
+          var r = 0;
+          if (lid.gripShape === "Rounded") { r = Math.min(lid.gripR, hx, ov); }
+          if (lid.gripShape === "Arc") { r = Math.min(hx, ov); }
+          // right side of the tab, then its outline (corners rounded with r)
+          F([[xr,ly1,lidZ0],[xr,ly1+ov-r,lidZ0],[xr,ly1+ov-r,lz1],[xr,ly1,lz1]], lidSide);
+          topPts.push([xr, ly1, lz1]);
+          topPts.push([xr, ly1 + ov - r, lz1]);
+          for (n = 1; n <= 6; n++) { a = Math.PI / 2 * n / 6; topPts.push([xr - r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
+          for (n = 0; n <= 6; n++) { a = Math.PI / 2 + Math.PI / 2 * n / 6; topPts.push([xl + r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
+          topPts.push([xl, ly1, lz1]);
+        }
+        topPts.push([lx0, ly1, lz1]);
+        F(topPts, lidTop);
+        // finger hole on the lid's top
+        var hasHole = (lid.grip === "Finger Hole" || lid.grip === "Indented Handle") && lid.holeS > 0;
+        if (hasHole) {
+          var rear = ly1 + (hasTab ? lid.ov : 0);
+          var hs = lid.holeS, hl = (lid.holeShape === "Rectangle" && lid.holeL > 0) ? lid.holeL : hs;
+          var ht = rear - lid.holeD, hb = ht - hl, hp = [], m2;
+          if (lid.holeShape === "Rectangle") {
+            hp = [[cxm-hs/2,hb,lz1],[cxm+hs/2,hb,lz1],[cxm+hs/2,ht,lz1],[cxm-hs/2,ht,lz1]];
+          } else {
+            for (m2 = 0; m2 < 16; m2++) { a = 2 * Math.PI * m2 / 16; hp.push([cxm + hs/2 * Math.cos(a), (hb + ht)/2 + hs/2 * Math.sin(a), lz1]); }
+          }
+          F(hp, holeCol);
+        }
+      }
+      // the rim on top: front, right, (back), left strips
+      F([[0,0,h],[w,0,h],[w-t,t,h],[t,t,h]], top);
+      if (slide) {
+        F([[w-t,0,h],[w,0,h],[w,d,h],[w-t,d,h]], top);    // Right wall's top
+        F([[0,0,h],[t,0,h],[t,d,h],[0,d,h]], top);        // Left wall's top
+      } else {
+        F([[w,0,h],[w,d,h],[w-t,d-t,h],[w-t,t,h]], top);
+        F([[w,d,h],[0,d,h],[t,d-t,h],[w-t,d-t,h]], top);
+        F([[0,d,h],[0,0,h],[t,t,h],[t,d-t,h]], top);
+      }
     } else {
-      faces.push([ [Q(0,0,h), Q(w,0,h), Q(w,d,h), Q(0,d,h)], top ]);
+      F([[0,0,h],[w,0,h],[w,d,h],[0,d,h]], top);
     }
     // outside: front (y = 0) and right (x = w)
-    faces.push([ [Q(0,0,0), Q(w,0,0), Q(w,0,h), Q(0,0,h)], front ]);
-    faces.push([ [Q(w,0,0), Q(w,d,0), Q(w,d,h), Q(w,0,h)], side ]);
+    F([[0,0,0],[w,0,0],[w,0,h],[0,0,h]], front);
+    F([[w,0,0],[w,d,0],[w,d,h],[w,0,h]], side);
+
+    // A lid lifted off the box: Flat / Fingers a plain plate, Inset a plate with
+    // the plug that drops into the box under it.
+    if (open && (lid.type === "Flat" || lid.type === "Fingers" || lid.type === "Inset")) {
+      var gap = Math.max(h * 0.3, 2 * t), zL = h + gap;
+      if (lid.type === "Inset") {
+        block(t, w - t, t, d - t, zL, zL + t / 2, lidTop, lidFront, lidSide);
+        block(0, w, 0, d, zL + t / 2, zL + t, lidTop, lidFront, lidSide);
+      } else {
+        block(0, w, 0, d, zL, zL + t, lidTop, lidFront, lidSide);
+      }
+    }
+
+    // Isometric projection: width runs right-down, depth runs right-up, height up.
+    var c30 = Math.cos(Math.PI / 6), s30 = 0.5;
+    var P = function (x, y, z) { return [ (x + y) * c30, (x - y) * s30 - z ]; };
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i, j;
+    for (i = 0; i < faces.length; i++) {
+      for (j = 0; j < faces[i][0].length; j++) {
+        var pp = P(faces[i][0][j][0], faces[i][0][j][1], faces[i][0][j][2]);
+        minX = Math.min(minX, pp[0]); maxX = Math.max(maxX, pp[0]);
+        minY = Math.min(minY, pp[1]); maxY = Math.max(maxY, pp[1]);
+      }
+    }
+    // room for the labels around the box
+    var padL = 22, padR = 22, padT = 8, padB = 22;
+    var sc = Math.min((g_iso.W - padL - padR) / (maxX - minX), (g_iso.H - padT - padB) / (maxY - minY));
+    var offX = padL + ((g_iso.W - padL - padR) - (maxX - minX) * sc) / 2 - minX * sc;
+    var offY = padT + ((g_iso.H - padT - padB) - (maxY - minY) * sc) / 2 - minY * sc;
+    var Q = function (x, y, z) { var p = P(x, y, z); return [ p[0] * sc + offX, p[1] * sc + offY ]; };
+    for (i = 0; i < faces.length; i++) {
+      var sp = [];
+      for (j = 0; j < faces[i][0].length; j++) { sp.push(Q(faces[i][0][j][0], faces[i][0][j][1], faces[i][0][j][2])); }
+      faces[i][0] = sp;
+    }
 
     var q0 = Q(0,0,0), q1 = Q(w,0,0), q2 = Q(w,d,0), q4 = Q(0,0,h);
     var labels = [
