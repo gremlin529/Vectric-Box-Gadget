@@ -1149,7 +1149,9 @@
     var noBottom = bsel && bsel.selectedIndex === 3;   // Bottom Type None
     var dark = (document.body.className.indexOf("dark-mode") >= 0);
     var lid = isoLidSettings();
-    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField");
+    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField") +
+              "|" + isoNum("End1HeightField") + "|" + isoNum("End2HeightField") + "|" + isoNum("End1ChamferAngleField") + "|" + isoNum("End2ChamferAngleField") +
+              "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid");
     if (key === g_iso.key) { return; }
     g_iso.key = key;
     isoDraw(w, d, h, t, noBottom, dark, lid);
@@ -1184,6 +1186,66 @@
     for (n in L) { if (L.hasOwnProperty(n)) { k.push(n + "=" + L[n]); } }
     L.key = k.join(";");
     return L;
+  }
+
+  // Corner joints: the finger pattern up a corner (gap, [finger, gap] x n, pitch
+  // from the side joint width like the gadget's own). Where a finger of Left /
+  // Right comes through, its end grain shows on the Front face; where Front /
+  // Back fill a gap, theirs shows on the Right face. hFront / hBack are the
+  // corner heights, backLimit cuts the back corner (sliding lid). -- by Claude 10/31/2026
+  function isoCornerFingers(F, w, d, t, zStart, hFront, hBack, backLimit, colFront, colSide) {
+    var jw = isoNum("SideTabWidthField");
+    if (!(jw > 0)) { jw = 2 * t; }
+    var pattern = function (hTop) {
+      var hc = hTop - zStart;
+      var nf = Math.floor((0.5 * hc) / jw), segs = [], zc = zStart, k;
+      if (nf > 40) { nf = 40; }
+      var gapH = (hc - nf * jw) / (nf + 1);
+      for (k = 0; k <= nf; k++) {
+        segs.push([zc, zc + gapH, false]); zc += gapH;
+        if (k < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
+      }
+      return segs;
+    };
+    var sf = pattern(hFront), sb = pattern(hBack), i, sg;
+    for (i = 0; i < sf.length; i++) {
+      sg = sf[i];
+      if (sg[2]) {
+        F([[0,0,sg[0]],[t,0,sg[0]],[t,0,sg[1]],[0,0,sg[1]]], colSide);
+        F([[w-t,0,sg[0]],[w,0,sg[0]],[w,0,sg[1]],[w-t,0,sg[1]]], colSide);
+      } else {
+        F([[w,0,sg[0]],[w,t,sg[0]],[w,t,sg[1]],[w,0,sg[1]]], colFront);
+      }
+    }
+    for (i = 0; i < sb.length; i++) {
+      sg = sb[i];
+      if (!sg[2]) {
+        var zTop = Math.min(sg[1], backLimit);
+        if (zTop > sg[0]) { F([[w,d-t,sg[0]],[w,d,sg[0]],[w,d,zTop],[w,d-t,zTop]], colFront); }
+      }
+    }
+  }
+
+  // Fingers along a bottom / lid edge of length len: the walls' fingers sit in
+  // the inner part (t .. len - t), pattern gap, [finger, gap] x n, like the
+  // gadget's MakeEndFace / MakeSideFace. Returns [[from, to], ...]. -- by Claude 10/31/2026
+  function isoEdgeFingers(len, t, jw) {
+    var inner = len - 2 * t, res = [], k;
+    if (!(jw > 0) || inner <= 0) { return res; }
+    var n = Math.floor((0.5 * inner) / jw);
+    if (n > 60) { n = 60; }
+    var gap = (inner - n * jw) / (n + 1);
+    for (k = 0; k < n; k++) { res.push([t + gap + k * (jw + gap), t + gap + k * (jw + gap) + jw]); }
+    return res;
+  }
+
+  // Joint width the gadget uses for the bottom / the lid: their own field when
+  // "Show all joint widths" is ticked, otherwise the side joint width.
+  function isoJointWidth(which) {
+    var all = document.getElementById("AllJointWidths");
+    var v = 0;
+    if (all && all.checked) { v = isoNum(which === "lid" ? "TopTabWidthField" : "BottomTabWidthField"); }
+    return v > 0 ? v : isoNum("SideTabWidthField");
   }
 
   function isoDraw(w, d, h, t, noBottom, dark, lid) {
@@ -1232,114 +1294,168 @@
       backTop = lidZ0;
     }
 
-    if (open) {
-      var zb = noBottom ? 0 : Math.min(t, h);       // inside floor
-      F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor);
-      F([[t,t,zb],[t,d-t,zb],[t,d-t,h],[t,t,h]], inner);                 // inside of the Left wall
-      F([[t,d-t,zb],[w-t,d-t,zb],[w-t,d-t,backTop],[t,d-t,backTop]], inner);  // inside of the Back wall
-      if (slide) {
-        // Back's top (lower than the walls) and the ends of Left / Right above it
-        F([[t,d-t,backTop],[w-t,d-t,backTop],[w-t,d,backTop],[t,d,backTop]], top);
-        F([[w-t,d-t,backTop],[w-t,d,backTop],[w-t,d,h],[w-t,d-t,h]], inner);
-        // the lid, pulled out by a third of the depth
-        var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
-        var sl = d / 3;
-        var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
-        F([[lx0,ly0,lidZ0],[lx1,ly0,lidZ0],[lx1,ly0,lz1],[lx0,ly0,lz1]], lidFront);
-        F([[lx1,ly0,lidZ0],[lx1,ly1,lidZ0],[lx1,ly1,lz1],[lx1,ly0,lz1]], lidSide);
-        var cxm = (lx0 + lx1) / 2;
-        var topPts = [[lx0,ly0,lz1],[lx1,ly0,lz1],[lx1,ly1,lz1]];
-        var hasTab = (lid.grip === "Grab Handle" || lid.grip === "Indented Handle") && lid.ov > 0 && lid.gripW > 0;
-        if (hasTab) {
-          var hx = Math.min(lid.gripW, lx1 - lx0) / 2, ov = lid.ov, xr = cxm + hx, xl = cxm - hx, n, a;
-          var r = 0;
-          if (lid.gripShape === "Rounded") { r = Math.min(lid.gripR, hx, ov); }
-          if (lid.gripShape === "Arc") { r = Math.min(hx, ov); }
-          // right side of the tab, then its outline (corners rounded with r)
-          F([[xr,ly1,lidZ0],[xr,ly1+ov-r,lidZ0],[xr,ly1+ov-r,lz1],[xr,ly1,lz1]], lidSide);
-          topPts.push([xr, ly1, lz1]);
-          topPts.push([xr, ly1 + ov - r, lz1]);
-          for (n = 1; n <= 6; n++) { a = Math.PI / 2 * n / 6; topPts.push([xr - r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
-          for (n = 0; n <= 6; n++) { a = Math.PI / 2 + Math.PI / 2 * n / 6; topPts.push([xl + r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
-          topPts.push([xl, ly1, lz1]);
-        }
-        topPts.push([lx0, ly1, lz1]);
-        F(topPts, lidTop);
-        // finger hole on the lid's top
-        var hasHole = (lid.grip === "Finger Hole" || lid.grip === "Indented Handle") && lid.holeS > 0;
-        if (hasHole) {
-          var rear = ly1 + (hasTab ? lid.ov : 0);
-          var hs = lid.holeS, hl = (lid.holeShape === "Rectangle" && lid.holeL > 0) ? lid.holeL : hs;
-          var ht = rear - lid.holeD, hb = ht - hl, hp = [], m2;
-          if (lid.holeShape === "Rectangle") {
-            hp = [[cxm-hs/2,hb,lz1],[cxm+hs/2,hb,lz1],[cxm+hs/2,ht,lz1],[cxm-hs/2,ht,lz1]];
-          } else {
-            for (m2 = 0; m2 < 16; m2++) { a = 2 * Math.PI * m2 / 16; hp.push([cxm + hs/2 * Math.cos(a), (hb + ht)/2 + hs/2 * Math.sin(a), lz1]); }
-          }
-          F(hp, holeCol);
-        }
+    // Walls stand between zB and zT: a Flat / Fingers bottom or lid takes a full
+    // material thickness off them, an Inset one half of it (like the gadget's
+    // bottom_thickness / top_thickness).                      -- by Claude 10/31/2026
+    var bsel2 = document.getElementById("BottomTypeSelect");
+    var bType = ["Inset", "Fingers", "Flat", "None", "Grooved"][bsel2 ? bsel2.selectedIndex : 1] || "Fingers";
+    var botT = (bType === "Fingers" || bType === "Flat") ? t : (bType === "Inset" ? t / 2 : 0);
+    var topT = (lid.type === "Fingers" || lid.type === "Flat") ? t : (lid.type === "Inset" ? t / 2 : 0);
+    if (!open) { botT = 0; topT = 0; }
+    var zB = botT, zT = h - topT;
+    // bottom panel under the walls (its fingers are drawn over its edges below)
+    if (botT > 0) { block(0, w, 0, d, 0, botT, lidTop, lidFront, lidSide); }
+
+    // Open Chamfer: Front and Back have their own (lower) heights, Left / Right
+    // stay full height in the middle and run down to them in a chamfer at each
+    // end (angle from vertical), like MakeSideFace draws them.  -- by Claude 10/31/2026
+    var chamfer = (lid.type === "OpenChamfer") && open;
+    if (chamfer) {
+      var e1 = Math.min(isoNum("End1HeightField") || h, h), e2 = Math.min(isoNum("End2HeightField") || h, h);
+      var a1 = isoNum("End1ChamferAngleField"), a2 = isoNum("End2ChamferAngleField");
+      if (!(a1 > 0 && a1 < 90)) { a1 = 45; }
+      if (!(a2 > 0 && a2 < 90)) { a2 = 45; }
+      var r1 = (h - e1) * Math.tan(a1 * Math.PI / 180), r2 = (h - e2) * Math.tan(a2 * Math.PI / 180);
+      var inner_d = d - 2 * t;
+      if (r1 + r2 > inner_d && r1 + r2 > 0) { var scl = inner_d / (r1 + r2); r1 *= scl; r2 *= scl; }
+      // top line of the side walls along the depth: [y, z]
+      var prof = [[0, e1], [t, e1], [t + r1, h], [d - t - r2, h], [d - t, e2], [d, e2]];
+      var zbc = noBottom ? 0 : Math.max(zB, Math.min(t, e1, e2));
+      // inside: floor, Left wall's inside face (x = t), Back's inside face
+      F([[t,t,zbc],[w-t,t,zbc],[w-t,d-t,zbc],[t,d-t,zbc]], floor);
+      F([[t,t,zbc],[t,d-t,zbc],[t,d-t,e2],[t,d-t-r2,h],[t,t+r1,h],[t,t,e1]], inner);
+      F([[t,d-t,zbc],[w-t,d-t,zbc],[w-t,d-t,e2],[t,d-t,e2]], inner);
+      // tops: Back, Left wall (its strip along the profile), Front
+      F([[0,d-t,e2],[w,d-t,e2],[w,d,e2],[0,d,e2]], top);
+      var pi;
+      for (pi = 0; pi + 1 < prof.length; pi++) {
+        if (Math.abs(prof[pi + 1][0] - prof[pi][0]) < 1e-6) { continue; }
+        F([[0,prof[pi][0],prof[pi][1]],[t,prof[pi][0],prof[pi][1]],[t,prof[pi+1][0],prof[pi+1][1]],[0,prof[pi+1][0],prof[pi+1][1]]], top);
       }
-      // the rim on top, one strip per wall. The finger pattern ends with a gap at
-      // the top, so at the corners the top finger belongs to Front / Back: they
-      // run the full width there, Left / Right sit between them.  -- by Claude 10/31/2026
-      if (slide) {
-        // Back is lower, so Left / Right run through to the back at the top
-        F([[w-t,t,h],[w,t,h],[w,d,h],[w-t,d,h]], top);    // Right wall's top
-        F([[0,t,h],[t,t,h],[t,d,h],[0,d,h]], top);        // Left wall's top
-      } else {
-        F([[w-t,t,h],[w,t,h],[w,d-t,h],[w-t,d-t,h]], top);
-        F([[0,t,h],[t,t,h],[t,d-t,h],[0,d-t,h]], top);
-        F([[0,d-t,h],[w,d-t,h],[w,d,h],[0,d,h]], top);
+      // Right wall: inside face above Front's top is hidden by the wall itself; its top strip
+      for (pi = 0; pi + 1 < prof.length; pi++) {
+        if (Math.abs(prof[pi + 1][0] - prof[pi][0]) < 1e-6) { continue; }
+        F([[w-t,prof[pi][0],prof[pi][1]],[w,prof[pi][0],prof[pi][1]],[w,prof[pi+1][0],prof[pi+1][1]],[w-t,prof[pi+1][0],prof[pi+1][1]]], top);
       }
-      F([[0,0,h],[w,0,h],[w,t,h],[0,t,h]], top);
+      F([[0,0,e1],[w,0,e1],[w,t,e1],[0,t,e1]], top);
+      // outside: Front face, Right wall's face along the profile
+      F([[0,0,zB],[w,0,zB],[w,0,e1],[0,0,e1]], front);
+      var rf = [[w,0,zB],[w,d,zB]];
+      for (pi = prof.length - 1; pi >= 0; pi--) { rf.push([w, prof[pi][0], prof[pi][1]]); }
+      F(rf, side);
+      isoCornerFingers(F, w, d, t, zB, e1, e2, e2, front, side);
     } else {
-      F([[0,0,h],[w,0,h],[w,d,h],[0,d,h]], top);
-    }
-    // outside: front (y = 0) and right (x = w)
-    F([[0,0,0],[w,0,0],[w,0,h],[0,0,h]], front);
-    F([[w,0,0],[w,d,0],[w,d,h],[w,0,h]], side);
-
-    // Corner joints: the finger pattern up the corners (gap, [finger, gap] x n,
-    // pitch from the side joint width like the gadget's own). Where a finger of
-    // Left / Right comes through, its end grain shows on the Front face; where
-    // Front / Back fill the gap, theirs shows on the Right face.  -- by Claude 10/31/2026
-    if (open) {
-      var jw = isoNum("SideTabWidthField");
-      if (!(jw > 0)) { jw = 2 * t; }
-      var nf = Math.floor((0.5 * h) / jw);
-      if (nf > 40) { nf = 40; }
-      var gapH = (h - nf * jw) / (nf + 1), zc = 0, seg, k2;
-      var segs = [];   // [z0, z1, isFinger]
-      for (k2 = 0; k2 <= nf; k2++) {
-        segs.push([zc, zc + gapH, false]); zc += gapH;
-        if (k2 < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
-      }
-      for (k2 = 0; k2 < segs.length; k2++) {
-        seg = segs[k2];
-        if (seg[2]) {
-          // fingers of Left (x 0..t) and Right (x w-t..w), seen on the Front face
-          F([[0,0,seg[0]],[t,0,seg[0]],[t,0,seg[1]],[0,0,seg[1]]], side);
-          F([[w-t,0,seg[0]],[w,0,seg[0]],[w,0,seg[1]],[w-t,0,seg[1]]], side);
-        } else {
-          // Front (y 0..t) and Back (y d-t..d) filling the gaps, seen on the Right face
-          F([[w,0,seg[0]],[w,t,seg[0]],[w,t,seg[1]],[w,0,seg[1]]], front);
-          var zTop = Math.min(seg[1], backTop);
-          if (zTop > seg[0]) {
-            F([[w,d-t,seg[0]],[w,d,seg[0]],[w,d,zTop],[w,d-t,zTop]], front);
+      if (open) {
+        var zb = noBottom ? 0 : Math.max(zB, Math.min(t, zT));       // inside floor
+        F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor);
+        F([[t,t,zb],[t,d-t,zb],[t,d-t,zT],[t,t,zT]], inner);                 // inside of the Left wall
+        F([[t,d-t,zb],[w-t,d-t,zb],[w-t,d-t,backTop],[t,d-t,backTop]], inner);  // inside of the Back wall
+        if (slide) {
+          // Back's top (lower than the walls) and the ends of Left / Right above it
+          F([[t,d-t,backTop],[w-t,d-t,backTop],[w-t,d,backTop],[t,d,backTop]], top);
+          F([[w-t,d-t,backTop],[w-t,d,backTop],[w-t,d,zT],[w-t,d-t,zT]], inner);
+          // the lid, pulled out by a third of the depth
+          var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
+          var sl = d / 3;
+          var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
+          F([[lx0,ly0,lidZ0],[lx1,ly0,lidZ0],[lx1,ly0,lz1],[lx0,ly0,lz1]], lidFront);
+          F([[lx1,ly0,lidZ0],[lx1,ly1,lidZ0],[lx1,ly1,lz1],[lx1,ly0,lz1]], lidSide);
+          var cxm = (lx0 + lx1) / 2;
+          var topPts = [[lx0,ly0,lz1],[lx1,ly0,lz1],[lx1,ly1,lz1]];
+          var hasTab = (lid.grip === "Grab Handle" || lid.grip === "Indented Handle") && lid.ov > 0 && lid.gripW > 0;
+          if (hasTab) {
+            var hx = Math.min(lid.gripW, lx1 - lx0) / 2, ov = lid.ov, xr = cxm + hx, xl = cxm - hx, n, a;
+            var r = 0;
+            if (lid.gripShape === "Rounded") { r = Math.min(lid.gripR, hx, ov); }
+            if (lid.gripShape === "Arc") { r = Math.min(hx, ov); }
+            // right side of the tab, then its outline (corners rounded with r)
+            F([[xr,ly1,lidZ0],[xr,ly1+ov-r,lidZ0],[xr,ly1+ov-r,lz1],[xr,ly1,lz1]], lidSide);
+            topPts.push([xr, ly1, lz1]);
+            topPts.push([xr, ly1 + ov - r, lz1]);
+            for (n = 1; n <= 6; n++) { a = Math.PI / 2 * n / 6; topPts.push([xr - r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
+            for (n = 0; n <= 6; n++) { a = Math.PI / 2 + Math.PI / 2 * n / 6; topPts.push([xl + r + r * Math.cos(a), ly1 + ov - r + r * Math.sin(a), lz1]); }
+            topPts.push([xl, ly1, lz1]);
+          }
+          topPts.push([lx0, ly1, lz1]);
+          F(topPts, lidTop);
+          // finger hole on the lid's top
+          var hasHole = (lid.grip === "Finger Hole" || lid.grip === "Indented Handle") && lid.holeS > 0;
+          if (hasHole) {
+            var rear = ly1 + (hasTab ? lid.ov : 0);
+            var hs = lid.holeS, hl = (lid.holeShape === "Rectangle" && lid.holeL > 0) ? lid.holeL : hs;
+            var ht = rear - lid.holeD, hb = ht - hl, hp = [], m2;
+            if (lid.holeShape === "Rectangle") {
+              hp = [[cxm-hs/2,hb,lz1],[cxm+hs/2,hb,lz1],[cxm+hs/2,ht,lz1],[cxm-hs/2,ht,lz1]];
+            } else {
+              for (m2 = 0; m2 < 16; m2++) { a = 2 * Math.PI * m2 / 16; hp.push([cxm + hs/2 * Math.cos(a), (hb + ht)/2 + hs/2 * Math.sin(a), lz1]); }
+            }
+            F(hp, holeCol);
           }
         }
+        // the rim on top, one strip per wall. The finger pattern ends with a gap at
+        // the top, so at the corners the top finger belongs to Front / Back: they
+        // run the full width there, Left / Right sit between them.  -- by Claude 10/31/2026
+        if (slide) {
+          // Back is lower, so Left / Right run through to the back at the top
+          F([[w-t,t,zT],[w,t,zT],[w,d,zT],[w-t,d,zT]], top);    // Right wall's top
+          F([[0,t,zT],[t,t,zT],[t,d,zT],[0,d,zT]], top);        // Left wall's top
+        } else {
+          F([[w-t,t,zT],[w,t,zT],[w,d-t,zT],[w-t,d-t,zT]], top);
+          F([[0,t,zT],[t,t,zT],[t,d-t,zT],[0,d-t,zT]], top);
+          F([[0,d-t,zT],[w,d-t,zT],[w,d,zT],[0,d,zT]], top);
+        }
+        F([[0,0,zT],[w,0,zT],[w,t,zT],[0,t,zT]], top);
+      } else {
+        F([[0,0,zT],[w,0,zT],[w,d,zT],[0,d,zT]], top);
       }
+      // outside: front (y = 0) and right (x = w)
+      F([[0,0,zB],[w,0,zB],[w,0,zT],[0,0,zT]], front);
+      F([[w,0,zB],[w,d,zB],[w,d,zT],[w,0,zT]], side);
+
+      // Corner joints: the finger pattern up the corners  -- by Claude 10/31/2026
+      if (open) { isoCornerFingers(F, w, d, t, zB, zT, zT, Math.min(backTop, zT), front, side); }
     }
 
-    // A lid lifted off the box: Flat / Fingers a plain plate, Inset a plate with
-    // the plug that drops into the box under it.
-    if (open && (lid.type === "Flat" || lid.type === "Fingers" || lid.type === "Inset")) {
-      var gap = Math.max(h * 0.3, 2 * t), zL = h + gap;
+    // Bottom with finger joints: the walls' fingers come down through the
+    // bottom panel's edges - wall end grain on the Front and Right faces.
+    //                                                         -- by Claude 10/31/2026
+    if (open && bType === "Fingers") {
+      var bj = isoJointWidth("bottom"), fl, fi;
+      fl = isoEdgeFingers(w, t, bj);
+      for (fi = 0; fi < fl.length; fi++) { F([[fl[fi][0],0,0],[fl[fi][1],0,0],[fl[fi][1],0,zB],[fl[fi][0],0,zB]], front); }
+      fl = isoEdgeFingers(d, t, bj);
+      for (fi = 0; fi < fl.length; fi++) { F([[w,fl[fi][0],0],[w,fl[fi][1],0],[w,fl[fi][1],zB],[w,fl[fi][0],zB]], side); }
+    }
+
+    // Lid: Flat a plain plate lifted off the box, Inset a plate with the plug
+    // that drops into the box under it, Fingers shown closed on the box so its
+    // finger joints show (the walls' fingers come up through its edges).
+    if (open && (lid.type === "Flat" || lid.type === "Inset")) {
+      var gap = Math.max(h * 0.3, 2 * t), zL = zT + gap;
       if (lid.type === "Inset") {
         block(t, w - t, t, d - t, zL, zL + t / 2, lidTop, lidFront, lidSide);
         block(0, w, 0, d, zL + t / 2, zL + t, lidTop, lidFront, lidSide);
       } else {
         block(0, w, 0, d, zL, zL + t, lidTop, lidFront, lidSide);
+      }
+    }
+    if (open && lid.type === "Fingers") {
+      block(0, w, 0, d, zT, h, lidTop, lidFront, lidSide);
+      var lj = isoJointWidth("lid"), ll, li;
+      ll = isoEdgeFingers(w, t, lj);
+      for (li = 0; li < ll.length; li++) { F([[ll[li][0],0,zT],[ll[li][1],0,zT],[ll[li][1],0,h],[ll[li][0],0,h]], front); }
+      ll = isoEdgeFingers(d, t, lj);
+      for (li = 0; li < ll.length; li++) { F([[w,ll[li][0],zT],[w,ll[li][1],zT],[w,ll[li][1],h],[w,ll[li][0],h]], side); }
+      // the fingers' ends on the lid's top
+      ll = isoEdgeFingers(w, t, lj);
+      for (li = 0; li < ll.length; li++) {
+        F([[ll[li][0],0,h],[ll[li][1],0,h],[ll[li][1],t,h],[ll[li][0],t,h]], top);
+        F([[ll[li][0],d-t,h],[ll[li][1],d-t,h],[ll[li][1],d,h],[ll[li][0],d,h]], top);
+      }
+      ll = isoEdgeFingers(d, t, lj);
+      for (li = 0; li < ll.length; li++) {
+        F([[0,ll[li][0],h],[t,ll[li][0],h],[t,ll[li][1],h],[0,ll[li][1],h]], top);
+        F([[w-t,ll[li][0],h],[w,ll[li][0],h],[w,ll[li][1],h],[w-t,ll[li][1],h]], top);
       }
     }
 
