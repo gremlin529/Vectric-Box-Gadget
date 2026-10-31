@@ -1551,7 +1551,11 @@
 
     // Isometric projection: width runs right-down, depth runs right-up, height up.
     var c30 = Math.cos(Math.PI / 6), s30 = 0.5;
-    var P = function (x, y, z) { return [ (x + y) * c30, (x - y) * s30 - z ]; };
+    // Seen from the front LEFT, so the side wall shows Back on the left and Front
+    // on the right - the same way round as the dialog's sketches (Open Chamfer).
+    // The box is symmetric left/right, so the Right wall's faces drawn above
+    // simply show up mirrored as the Left wall.            -- by Claude 10/31/2026
+    var P = function (x, y, z) { return [ -(x + y) * c30, (x - y) * s30 - z ]; };
     var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i, j;
     for (i = 0; i < faces.length; i++) {
       for (j = 0; j < faces[i][0].length; j++) {
@@ -1574,12 +1578,12 @@
 
     var q0 = Q(0,0,0), q1 = Q(w,0,0), q2 = Q(w,d,0), q4 = Q(0,0,h);
     var labels = [
-      // width: under the front bottom edge
-      [ isoFmt(w), (q0[0] + q1[0]) / 2 - 24, (q0[1] + q1[1]) / 2 + 5 ],
-      // depth: under the right bottom edge
-      [ isoFmt(d), (q1[0] + q2[0]) / 2 + 2, (q1[1] + q2[1]) / 2 + 4 ],
-      // height: left of the front left edge
-      [ isoFmt(h), q0[0] - 4, (q0[1] + q4[1]) / 2 - 7, "right" ]
+      // width: under the front bottom edge (front face on the right)
+      [ isoFmt(w), (q0[0] + q1[0]) / 2 + 6, (q0[1] + q1[1]) / 2 + 6 ],
+      // depth: under the side wall's bottom edge (on the left)
+      [ isoFmt(d), (q1[0] + q2[0]) / 2 - 6, (q1[1] + q2[1]) / 2 + 6, "right" ],
+      // height: right of the front's outer edge
+      [ isoFmt(h), q0[0] + 6, (q0[1] + q4[1]) / 2 - 8 ]
     ];
 
     var html = "";
