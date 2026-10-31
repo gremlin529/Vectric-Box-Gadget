@@ -31,7 +31,11 @@
   <!-- ── Header: diagram + description ──────────────────────────────── -->
   <div class="card clearfix">
     <div class="header-image">
-      <img src="Images/boxdim.png" alt="Box dimensions diagram" />
+      <!-- Live isometric view of the box (Width / Depth / Height as entered). Drawn
+           with VML in VCarve's IE7 dialog, with canvas in other browsers; the
+           picture stays as the fallback if neither works. -- by Claude 10/31/2026 -->
+      <div id="BoxIsoView" style="position: relative; width: 170px; height: 150px; display: none;"></div>
+      <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
       <p>This gadget creates a box of the specified external dimensions.</p>
@@ -1090,6 +1094,143 @@
   setInterval(pollInvalidFieldFlags, 300);
   setInterval(updateLidTabLabels, 300);   // red tab label when a field on it is invalid -- by Claude 10/27/2026
 
+  // ── Live isometric box view ───────────────────────────────────────────
+  // Draws the box with the Width / Depth / Height entered, to scale, with the
+  // values at its edges. VCarve shows this dialog in IE7 mode, which has no
+  // canvas and no SVG but does have VML, so VML is used there; any other
+  // browser gets canvas. If neither works the old picture stays.
+  // Plain ES3, no textContent.                               -- by Claude 10/31/2026
+  var g_iso = { mode: "", key: "", W: 170, H: 150 };
+
+  function isoInit() {
+    var view = document.getElementById("BoxIsoView");
+    var img = document.getElementById("BoxDimImage");
+    if (!view) { return; }
+    if (document.namespaces) {
+      try {
+        if (!document.namespaces["v"]) {
+          document.namespaces.add("v", "urn:schemas-microsoft-com:vml", "#default#VML");
+        }
+        var ss = document.createStyleSheet();
+        ss.addRule("v\\:*", "behavior: url(#default#VML); position: absolute;");
+        g_iso.mode = "vml";
+      } catch (e) { g_iso.mode = ""; }
+    }
+    if (!g_iso.mode) {
+      var c = document.createElement("canvas");
+      if (c.getContext) { g_iso.mode = "canvas"; }
+    }
+    if (!g_iso.mode) { return; }   // keep the picture
+    view.style.display = "block";
+    if (img) { img.style.display = "none"; }
+    isoUpdate();
+    setInterval(isoUpdate, 300);
+  }
+
+  function isoNum(id) {
+    var el = document.getElementById(id);
+    var v = el ? parseFloat(el.value) : NaN;
+    return (isFinite(v) && v > 0) ? v : 0;
+  }
+
+  function isoFmt(v) {
+    var r = Math.round(v * 100) / 100;
+    return "" + r;
+  }
+
+  // Redraw only when something it shows has changed.
+  function isoUpdate() {
+    var w = isoNum("WidthField"), d = isoNum("DepthField"), h = isoNum("HeightField");
+    var dark = (document.body.className.indexOf("dark-mode") >= 0);
+    var key = w + "|" + d + "|" + h + "|" + dark;
+    if (key === g_iso.key) { return; }
+    g_iso.key = key;
+    isoDraw(w, d, h, dark);
+  }
+
+  function isoDraw(w, d, h, dark) {
+    var view = document.getElementById("BoxIsoView");
+    if (!view) { return; }
+    if (!(w > 0 && d > 0 && h > 0)) { view.innerHTML = ""; return; }
+
+    // Isometric projection: width runs right-down, depth runs right-up, height up.
+    var c30 = Math.cos(Math.PI / 6), s30 = 0.5;
+    var P = function (x, y, z) { return [ (x + y) * c30, (x - y) * s30 - z ]; };
+    var corners = [P(0,0,0), P(w,0,0), P(w,d,0), P(0,d,0), P(0,0,h), P(w,0,h), P(w,d,h), P(0,d,h)];
+    var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i;
+    for (i = 0; i < corners.length; i++) {
+      minX = Math.min(minX, corners[i][0]); maxX = Math.max(maxX, corners[i][0]);
+      minY = Math.min(minY, corners[i][1]); maxY = Math.max(maxY, corners[i][1]);
+    }
+    // room for the labels around the box
+    var padL = 22, padR = 22, padT = 8, padB = 22;
+    var sc = Math.min((g_iso.W - padL - padR) / (maxX - minX), (g_iso.H - padT - padB) / (maxY - minY));
+    var offX = padL + ((g_iso.W - padL - padR) - (maxX - minX) * sc) / 2 - minX * sc;
+    var offY = padT + ((g_iso.H - padT - padB) - (maxY - minY) * sc) / 2 - minY * sc;
+    var S = function (p) { return [ Math.round((p[0] * sc + offX) * 10) / 10, Math.round((p[1] * sc + offY) * 10) / 10 ]; };
+    var q = []; for (i = 0; i < corners.length; i++) { q.push(S(corners[i])); }
+
+    var line = dark ? "#c9d3e6" : "#1f2a3a";
+    var top = dark ? "#4a5a75" : "#dfe8f5";
+    var front = dark ? "#3a4860" : "#c4d3ea";
+    var side = dark ? "#2e3a4e" : "#a9bedd";
+    var text = dark ? "#e3e8f2" : "#1f3b63";
+
+    // visible faces: front (y = 0), right (x = w), top (z = h)
+    var faces = [
+      [ [q[0], q[1], q[5], q[4]], front ],
+      [ [q[1], q[2], q[6], q[5]], side ],
+      [ [q[4], q[5], q[6], q[7]], top ]
+    ];
+    var labels = [
+      // width: under the front bottom edge
+      [ isoFmt(w), (q[0][0] + q[1][0]) / 2 - 18, (q[0][1] + q[1][1]) / 2 + 4 ],
+      // depth: under the right bottom edge
+      [ isoFmt(d), (q[1][0] + q[2][0]) / 2 + 2, (q[1][1] + q[2][1]) / 2 + 4 ],
+      // height: left of the front left edge
+      [ isoFmt(h), q[0][0] - 4, (q[0][1] + q[4][1]) / 2 - 7, "right" ]
+    ];
+
+    var html = "";
+    if (g_iso.mode === "vml") {
+      // v:shape over the whole view; its path is in a coordinate space 10x the
+      // pixels (coordsize), since VML paths take whole numbers only.
+      for (i = 0; i < faces.length; i++) {
+        var pts = faces[i][0], path = "";
+        for (var k = 0; k < pts.length; k++) {
+          path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + Math.round(pts[k][0] * 10) + "," + Math.round(pts[k][1] * 10);
+        }
+        path += " x e";
+        html += '<v:shape coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" path="' + path +
+                '" filled="true" fillcolor="' + faces[i][1] + '" stroked="true" strokecolor="' + line +
+                '" strokeweight="1.2px" style="position:absolute; left:0; top:0; width:' + g_iso.W + 'px; height:' + g_iso.H + 'px;"></v:shape>';
+      }
+    } else {
+      html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
+    }
+    for (i = 0; i < labels.length; i++) {
+      var lb = labels[i];
+      var align = lb[3] === "right";
+      html += '<div style="position:absolute; top:' + Math.round(lb[2]) + 'px; ' +
+              (align ? ('left:' + Math.round(lb[1] - 60) + 'px; width:60px; text-align:right;') : ('left:' + Math.round(lb[1]) + 'px;')) +
+              ' font: bold 11px Tahoma, Arial, sans-serif; color:' + text + '; white-space:nowrap;">' + lb[0] + '</div>';
+    }
+    view.innerHTML = html;
+
+    if (g_iso.mode === "canvas") {
+      var cv = document.getElementById("BoxIsoCanvas");
+      var cx = cv.getContext("2d");
+      cx.lineWidth = 1.2; cx.strokeStyle = line; cx.lineJoin = "round";
+      for (i = 0; i < faces.length; i++) {
+        var fp = faces[i][0];
+        cx.beginPath(); cx.moveTo(fp[0][0], fp[0][1]);
+        for (var m = 1; m < fp.length; m++) { cx.lineTo(fp[m][0], fp[m][1]); }
+        cx.closePath(); cx.fillStyle = faces[i][1]; cx.fill(); cx.stroke();
+      }
+    }
+  }
+
+
   // ToolNameField is a <span> that Lua's tool picker updates directly when
   // the user picks a tool - not a form field, so there's no onchange to hook,
   // and (same reasoning as above) no event fires from that programmatic
@@ -1191,6 +1332,7 @@
     onLidGripShapeChanged();
     onLidGripTypeChanged();
     showLidTab("Groove");
+    isoInit();   // live isometric box view -- by Claude 10/31/2026
 
     var allWidths = document.getElementById("AllJointWidths");
     if (allWidths) { onShowAllWidthsChanged(allWidths); }
