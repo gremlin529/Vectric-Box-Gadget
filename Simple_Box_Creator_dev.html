@@ -1151,7 +1151,8 @@
     var lid = isoLidSettings();
     var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField") +
               "|" + isoNum("End1HeightField") + "|" + isoNum("End2HeightField") + "|" + isoNum("End1ChamferAngleField") + "|" + isoNum("End2ChamferAngleField") +
-              "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid");
+              "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid") +
+              "|" + document.body.style.zoom;   // Zoom Level changes the fix below
     if (key === g_iso.key) { return; }
     g_iso.key = key;
     isoDraw(w, d, h, t, noBottom, dark, lid);
@@ -1297,6 +1298,23 @@
     arc(xl + r, yb + ov - r, r, Math.PI / 2, Math.PI);
     pts.push([xl, yb]);
     return pts;
+  }
+
+  // VCarve's dialog zooms the page with CSS zoom (Zoom Level). In its IE7 mode
+  // that zoom is not applied to what is drawn into the view later (VML shapes
+  // and the label divs), while the view box itself is zoomed - at 175 % the
+  // drawing came out at 100 % size in its corner. So in VML mode the content is
+  // scaled by the zoom itself; other browsers zoom everything alike.
+  //                                                         -- by Claude 11/1/2026
+  function isoZoomFix(view) {
+    var z = 1;
+    if (g_iso.mode === "vml") {
+      var zs = "" + (document.body.style.zoom || "");
+      var v = parseFloat(zs);
+      if (isFinite(v) && v > 0) { z = (zs.indexOf("%") >= 0) ? v / 100 : v; }
+      if (!(z > 0.2 && z < 5)) { z = 1; }
+    }
+    return { div: z, vml: z };
   }
 
   function isoDraw(w, d, h, t, noBottom, dark, lid) {
@@ -1586,6 +1604,7 @@
       [ isoFmt(h), q0[0] + 6, (q0[1] + q4[1]) / 2 - 8 ]
     ];
 
+    var zf = isoZoomFix(view);
     var html = "";
     if (g_iso.mode === "vml") {
       // v:shape over the whole view; its path is in a coordinate space 10x the
@@ -1598,7 +1617,7 @@
         path += " x e";
         html += '<v:shape coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" path="' + path +
                 '" filled="true" fillcolor="' + faces[i][1] + '" stroked="true" strokecolor="' + line +
-                '" strokeweight="1px" style="position:absolute; left:0; top:0; width:' + g_iso.W + 'px; height:' + g_iso.H + 'px;"></v:shape>';
+                '" strokeweight="' + (zf.vml) + 'px" style="position:absolute; left:0; top:0; width:' + Math.round(g_iso.W * zf.vml) + 'px; height:' + Math.round(g_iso.H * zf.vml) + 'px;"></v:shape>';
       }
     } else {
       html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
@@ -1606,9 +1625,10 @@
     for (i = 0; i < labels.length; i++) {
       var lb = labels[i];
       var align = lb[3] === "right";
-      html += '<div style="position:absolute; top:' + Math.round(lb[2]) + 'px; ' +
-              (align ? ('left:' + Math.round(lb[1] - 60) + 'px; width:60px; text-align:right;') : ('left:' + Math.round(lb[1]) + 'px;')) +
-              ' font: bold 14px Tahoma, Arial, sans-serif; color:' + text + '; white-space:nowrap;">' + lb[0] + '</div>';
+      var zd = zf.div;   // zoom fix for the labels, see isoZoomFix
+      html += '<div style="position:absolute; top:' + Math.round(lb[2] * zd) + 'px; ' +
+              (align ? ('left:' + Math.round((lb[1] - 60) * zd) + 'px; width:' + Math.round(60 * zd) + 'px; text-align:right;') : ('left:' + Math.round(lb[1] * zd) + 'px;')) +
+              ' font: bold ' + Math.round(14 * zd) + 'px Tahoma, Arial, sans-serif; color:' + text + '; white-space:nowrap;">' + lb[0] + '</div>';
     }
     view.innerHTML = html;
 
