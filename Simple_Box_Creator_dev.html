@@ -1152,6 +1152,7 @@
     var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField") +
               "|" + isoNum("End1HeightField") + "|" + isoNum("End2HeightField") + "|" + isoNum("End1ChamferAngleField") + "|" + isoNum("End2ChamferAngleField") +
               "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid") +
+              "|" + isoDovetailFlare() +           // dovetail joints and their angle
               "|" + document.body.style.zoom;   // Zoom Level changes the fix below
     if (key === g_iso.key) { return; }
     g_iso.key = key;
@@ -1194,14 +1195,44 @@
     return L;
   }
 
+  // Dovetail joints: how far a tail flares out on each side over one material
+  // thickness (the gadget's max_width = min_width + 2 * t / tan(angle)), as a
+  // factor of t - 0 for box joints.                            -- by Claude 11/1/2026
+  function isoDovetailFlare() {
+    var dt = document.getElementById("TabTypeRadio2");
+    if (!(dt && dt.checked)) { return 0; }
+    var a = isoNum("DovetailAngleField");
+    if (!(a >= 45 && a < 90)) { a = 80; }
+    return 1 / Math.tan(a * Math.PI / 180);
+  }
+
+  // A face's corners cut off above z = lim (the lower Back of a sliding lid).
+  function isoClipZ(pts, lim) {
+    var res = [], i, a, b, f;
+    for (i = 0; i < pts.length; i++) {
+      a = pts[i]; b = pts[(i + 1) % pts.length];
+      if (a[2] <= lim) { res.push(a); }
+      if ((a[2] < lim && b[2] > lim) || (a[2] > lim && b[2] < lim)) {
+        f = (lim - a[2]) / (b[2] - a[2]);
+        res.push([a[0] + f * (b[0] - a[0]), a[1] + f * (b[1] - a[1]), lim]);
+      }
+    }
+    return res;
+  }
+
   // Corner joints: the finger pattern up a corner (gap, [finger, gap] x n, pitch
   // from the side joint width like the gadget's own). Where a finger of Left /
   // Right comes through, its end grain shows on the Front face; where Front /
   // Back fill a gap, theirs shows on the Right face. hFront / hBack are the
   // corner heights, backLimit cuts the back corner (sliding lid). -- by Claude 10/31/2026
+  // Dovetails: Left / Right carry the tails (MakeSideFace), so on the Right face
+  // the tails flare out towards the wall's end and Front's / Back's pins between
+  // them narrow towards it; on Front the tails' end grain is as wide as their
+  // tips.                                                      -- by Claude 11/1/2026
   function isoCornerFingers(F, w, d, t, zStart, hFront, hBack, backLimit, colFront, colSide) {
     var jw = isoNum("SideTabWidthField");
     if (!(jw > 0)) { jw = 2 * t; }
+    var ef = isoDovetailFlare() * t;
     var pattern = function (hTop) {
       var hc = hTop - zStart;
       var nf = Math.floor((0.5 * hc) / jw), segs = [], zc = zStart, k;
@@ -1211,23 +1242,31 @@
         segs.push([zc, zc + gapH, false]); zc += gapH;
         if (k < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
       }
-      return segs;
+      // a tail never flares past half the gap next to it
+      var e = Math.min(ef, Math.max(0, gapH / 2 - 1e-6));
+      return { segs: segs, e: e, bot: zStart, top: hTop };
     };
-    var sf = pattern(hFront), sb = pattern(hBack), i, sg;
+    // the pin of a gap: as wide as the gap at the tails' roots (yRoot), less the
+    // flare of the tails above / below it at their tips (yTip)
+    var pin = function (pt, sg, yTip, yRoot) {
+      var lo = (sg[0] > pt.bot + 1e-9) ? pt.e : 0, hi = (sg[1] < pt.top - 1e-9) ? pt.e : 0;
+      return [[w,yTip,sg[0]+lo],[w,yRoot,sg[0]],[w,yRoot,sg[1]],[w,yTip,sg[1]-hi]];
+    };
+    var pf = pattern(hFront), pb = pattern(hBack), sf = pf.segs, sb = pb.segs, i, sg, pts;
     for (i = 0; i < sf.length; i++) {
       sg = sf[i];
       if (sg[2]) {
-        F([[0,0,sg[0]],[t,0,sg[0]],[t,0,sg[1]],[0,0,sg[1]]], colSide);
-        F([[w-t,0,sg[0]],[w,0,sg[0]],[w,0,sg[1]],[w-t,0,sg[1]]], colSide);
+        F([[0,0,sg[0]-pf.e],[t,0,sg[0]-pf.e],[t,0,sg[1]+pf.e],[0,0,sg[1]+pf.e]], colSide);
+        F([[w-t,0,sg[0]-pf.e],[w,0,sg[0]-pf.e],[w,0,sg[1]+pf.e],[w-t,0,sg[1]+pf.e]], colSide);
       } else {
-        F([[w,0,sg[0]],[w,t,sg[0]],[w,t,sg[1]],[w,0,sg[1]]], colFront);
+        F(pin(pf, sg, 0, t), colFront);
       }
     }
     for (i = 0; i < sb.length; i++) {
       sg = sb[i];
-      if (!sg[2]) {
-        var zTop = Math.min(sg[1], backLimit);
-        if (zTop > sg[0]) { F([[w,d-t,sg[0]],[w,d,sg[0]],[w,d,zTop],[w,d-t,zTop]], colFront); }
+      if (!sg[2] && sg[0] < backLimit) {
+        pts = isoClipZ(pin(pb, sg, d, d - t), backLimit);
+        if (pts.length >= 3) { F(pts, colFront); }
       }
     }
   }
@@ -1530,11 +1569,12 @@
     // bottom panel's edges - wall end grain on the Front and Right faces.
     //                                                         -- by Claude 10/31/2026
     if (open && bType === "Fingers") {
-      var bj = isoJointWidth("bottom"), fl, fi;
+      // with dovetails the tails flare out towards their tips at the underside
+      var bj = isoJointWidth("bottom"), fl, fi, be = isoDovetailFlare() * zB;
       fl = isoEdgeFingers(w, t, bj);
-      for (fi = 0; fi < fl.length; fi++) { F([[fl[fi][0],0,0],[fl[fi][1],0,0],[fl[fi][1],0,zB],[fl[fi][0],0,zB]], front); }
+      for (fi = 0; fi < fl.length; fi++) { F([[fl[fi][0]-be,0,0],[fl[fi][1]+be,0,0],[fl[fi][1],0,zB],[fl[fi][0],0,zB]], front); }
       fl = isoEdgeFingers(d, t, bj);
-      for (fi = 0; fi < fl.length; fi++) { F([[w,fl[fi][0],0],[w,fl[fi][1],0],[w,fl[fi][1],zB],[w,fl[fi][0],zB]], side); }
+      for (fi = 0; fi < fl.length; fi++) { F([[w,fl[fi][0]-be,0],[w,fl[fi][1]+be,0],[w,fl[fi][1],zB],[w,fl[fi][0],zB]], side); }
     }
 
     // Lid: Flat a plain plate lifted off the box, Inset a plate with the plug
@@ -1551,21 +1591,22 @@
     }
     if (open && lid.type === "Fingers") {
       block(0, w, 0, d, zT, h, lidTop, lidFront, lidSide);
-      var lj = isoJointWidth("lid"), ll, li;
+      // with dovetails the tails flare out towards their tips on the lid's top
+      var lj = isoJointWidth("lid"), ll, li, le = isoDovetailFlare() * (h - zT);
       ll = isoEdgeFingers(w, t, lj);
-      for (li = 0; li < ll.length; li++) { F([[ll[li][0],0,zT],[ll[li][1],0,zT],[ll[li][1],0,h],[ll[li][0],0,h]], front); }
+      for (li = 0; li < ll.length; li++) { F([[ll[li][0],0,zT],[ll[li][1],0,zT],[ll[li][1]+le,0,h],[ll[li][0]-le,0,h]], front); }
       ll = isoEdgeFingers(d, t, lj);
-      for (li = 0; li < ll.length; li++) { F([[w,ll[li][0],zT],[w,ll[li][1],zT],[w,ll[li][1],h],[w,ll[li][0],h]], side); }
-      // the fingers' ends on the lid's top
+      for (li = 0; li < ll.length; li++) { F([[w,ll[li][0],zT],[w,ll[li][1],zT],[w,ll[li][1]+le,h],[w,ll[li][0]-le,h]], side); }
+      // the fingers' (tails') ends on the lid's top
       ll = isoEdgeFingers(w, t, lj);
       for (li = 0; li < ll.length; li++) {
-        F([[ll[li][0],0,h],[ll[li][1],0,h],[ll[li][1],t,h],[ll[li][0],t,h]], top);
-        F([[ll[li][0],d-t,h],[ll[li][1],d-t,h],[ll[li][1],d,h],[ll[li][0],d,h]], top);
+        F([[ll[li][0]-le,0,h],[ll[li][1]+le,0,h],[ll[li][1]+le,t,h],[ll[li][0]-le,t,h]], top);
+        F([[ll[li][0]-le,d-t,h],[ll[li][1]+le,d-t,h],[ll[li][1]+le,d,h],[ll[li][0]-le,d,h]], top);
       }
       ll = isoEdgeFingers(d, t, lj);
       for (li = 0; li < ll.length; li++) {
-        F([[0,ll[li][0],h],[t,ll[li][0],h],[t,ll[li][1],h],[0,ll[li][1],h]], top);
-        F([[w-t,ll[li][0],h],[w,ll[li][0],h],[w,ll[li][1],h],[w-t,ll[li][1],h]], top);
+        F([[0,ll[li][0]-le,h],[t,ll[li][0]-le,h],[t,ll[li][1]+le,h],[0,ll[li][1]+le,h]], top);
+        F([[w-t,ll[li][0]-le,h],[w,ll[li][0]-le,h],[w,ll[li][1]+le,h],[w-t,ll[li][1]+le,h]], top);
       }
     }
 
