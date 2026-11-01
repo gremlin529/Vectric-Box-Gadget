@@ -1438,14 +1438,21 @@
       F([[t,d-t,zbc],[w-t,d-t,zbc],[w-t,d-t,e2],[t,d-t,e2]], inner);
       // tops: Back, Left wall (its strip along the profile), Front
       F([[0,d-t,e2],[w,d-t,e2],[w,d,e2],[0,d,e2]], top);
+      // Left / Right strips only between Front and Back: at the top of the corners
+      // Front and Back run the full width (no lines across their tops) -- by Claude 11/1/2026
+      var sideSeg = function (k) {
+        var ya = prof[k][0], yb = prof[k + 1][0];
+        if (Math.abs(yb - ya) < 1e-6) { return false; }
+        return !(Math.max(ya, yb) <= t + 1e-6 || Math.min(ya, yb) >= d - t - 1e-6);
+      };
       var pi;
       for (pi = 0; pi + 1 < prof.length; pi++) {
-        if (Math.abs(prof[pi + 1][0] - prof[pi][0]) < 1e-6) { continue; }
+        if (!sideSeg(pi)) { continue; }
         F([[0,prof[pi][0],prof[pi][1]],[t,prof[pi][0],prof[pi][1]],[t,prof[pi+1][0],prof[pi+1][1]],[0,prof[pi+1][0],prof[pi+1][1]]], top);
       }
       // Right wall: inside face above Front's top is hidden by the wall itself; its top strip
       for (pi = 0; pi + 1 < prof.length; pi++) {
-        if (Math.abs(prof[pi + 1][0] - prof[pi][0]) < 1e-6) { continue; }
+        if (!sideSeg(pi)) { continue; }
         F([[w-t,prof[pi][0],prof[pi][1]],[w,prof[pi][0],prof[pi][1]],[w,prof[pi+1][0],prof[pi+1][1]],[w-t,prof[pi+1][0],prof[pi+1][1]]], top);
       }
       F([[0,0,e1],[w,0,e1],[w,t,e1],[0,t,e1]], top);
