@@ -1391,7 +1391,8 @@
       var prof = [[0, e1], [t, e1], [t + r1, h], [d - t - r2, h], [d - t, e2], [d, e2]];
       var zbc = noBottom ? 0 : Math.max(zB, Math.min(t, e1, e2));
       // inside: floor, Left wall's inside face (x = t), Back's inside face
-      F([[t,t,zbc],[w-t,t,zbc],[w-t,d-t,zbc],[t,d-t,zbc]], floor);
+      // no floor at all with Bottom Type None -- by Claude 11/1/2026
+      if (!noBottom) { F([[t,t,zbc],[w-t,t,zbc],[w-t,d-t,zbc],[t,d-t,zbc]], floor); }
       F([[t,t,zbc],[t,d-t,zbc],[t,d-t,e2],[t,d-t-r2,h],[t,t+r1,h],[t,t,e1]], inner);
       F([[t,d-t,zbc],[w-t,d-t,zbc],[w-t,d-t,e2],[t,d-t,e2]], inner);
       // tops: Back, Left wall (its strip along the profile), Front
@@ -1416,7 +1417,8 @@
     } else {
       if (open) {
         var zb = noBottom ? 0 : Math.max(zB, Math.min(t, zT));       // inside floor
-        F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor);
+        // no floor at all with Bottom Type None -- by Claude 11/1/2026
+        if (!noBottom) { F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor); }
         F([[t,t,zb],[t,d-t,zb],[t,d-t,zT],[t,t,zT]], inner);                 // inside of the Left wall
         F([[t,d-t,zb],[w-t,d-t,zb],[w-t,d-t,backTop],[t,d-t,backTop]], inner);  // inside of the Back wall
         if (slide) {
