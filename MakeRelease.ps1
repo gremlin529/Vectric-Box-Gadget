@@ -38,6 +38,28 @@ $moduleToCreate = $config.ModuleToCreate
 $mainLuaFile = $config.MainLuaFile
 $mainHTMLFile = $config.MainHTMLFile
 
+# Vectric gadgets are built with either a .html or a .htm dialog file - whichever
+# MainHTMLFile uses, the released/renamed copy keeps that same extension rather
+# than assuming .html.
+$htmlExtension = [System.IO.Path]::GetExtension($mainHTMLFile)
+if ([string]::IsNullOrEmpty($htmlExtension)) {
+    Write-Warning "MainHTMLFile '$mainHTMLFile' has no file extension - the released dialog file will have none either."
+}
+
+# Optionally leave the version number out of the released file names.
+# Config field "AppendVersionToFileNames": true (default, or absent) stamps the
+# version into the lua/html file names and the .vgadget; false releases them as
+# <ModuleToCreate>.lua / <ModuleToCreate>$htmlExtension / <ModuleToCreate>.vgadget.
+$appendVersionToFileNames = $true
+if ($null -ne $config.AppendVersionToFileNames) {
+    if ($config.AppendVersionToFileNames -is [bool]) {
+        $appendVersionToFileNames = $config.AppendVersionToFileNames
+    }
+    elseif ("$($config.AppendVersionToFileNames)" -match "^(false|0|no)$") {
+        $appendVersionToFileNames = $false
+    }
+}
+
 # manually add extra files here (in the config file), but it will automatically include the main lua
 # and html file based on the config above, so no need to add those to FilesToRelease
 $filesToRelease = @($mainLuaFile, $mainHTMLFile) + @($config.FilesToRelease)
@@ -101,6 +123,15 @@ else {
 
 Save-ReleaseVer -filePath $releaseVerFile -version $version -subversion $subversion
 
+# Base name used for the released files, the staging folder and the .vgadget.
+if ($appendVersionToFileNames) {
+    $releaseName = $moduleToCreate + "_" + $version
+}
+else {
+    $releaseName = $moduleToCreate
+    Write-Host "AppendVersionToFileNames is false: released file names will not include the version."
+}
+
 # Release directory
 $releaseDir = "release"
 
@@ -108,8 +139,10 @@ function UpdateVersionInLuaFile {
     param (
         [string]$filePath,
         [string]$version,
-        [string]$subversion
-    )       
+        [string]$subversion,
+        [bool]$removeVersionFromHtmlName = $false,
+        [string]$htmlExtension = ".html"
+    )
 
     # Read file content
     $content = Get-Content -Path $filePath -Raw
@@ -134,6 +167,20 @@ function UpdateVersionInLuaFile {
         Write-Warning "No matching G_subVersion line found in '$filePath'. Subversion not updated."
     }
 
+    # The dialog HTML file name is built from G_version (e.g. "Simple_Box_Creator" .. G_version .. ".html",
+    # or "...htm" for a gadget whose MainHTMLFile uses that extension instead).
+    # When the released files carry no version, that reference has to lose it as well.
+    if ($removeVersionFromHtmlName) {
+        $escapedExtension = [regex]::Escape($htmlExtension)
+        $htmlNamePattern = '"([^"]*)_"\s*\.\.\s*G_version\s*\.\.\s*"' + $escapedExtension + '"'
+        if ($content -match $htmlNamePattern) {
+            $content = $content -replace $htmlNamePattern, ('"${1}' + $htmlExtension + '"')
+            Write-Host "HTML dialog file reference in '$filePath' changed to the unversioned name."
+        } else {
+            Write-Warning "No versioned HTML file name expression found in '$filePath'. Check that it opens the unversioned $htmlExtension file."
+        }
+    }
+
     # Write updated content back to file
     Set-Content -Path $filePath -Value $content
 }
@@ -148,7 +195,7 @@ try {
     # note inorder for the gadget file to have the correct folder structure when unzipped, 
     # the version directory needs to be created under the release directory and then the files 
     # copied there before creating the zip file
-    $releaseFileDirectory = $moduleToCreate + "_" + $version + "\" + $moduleToCreate + "_" + $version
+    $releaseFileDirectory = $releaseName + "\" + $releaseName
     $versionDir = Join-Path $releaseDir $releaseFileDirectory
 
     Write-Host "Creating version directory at '$versionDir' and copying files..."
@@ -174,7 +221,7 @@ try {
     $luaFileInRelease = Join-Path $versionDir $mainLuaFile
     Write-Host "Updating version in '$luaFileInRelease' file in release directory to '$version'..."
     if (Test-Path $luaFileInRelease) {  
-        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion
+        UpdateVersionInLuaFile -filePath $luaFileInRelease -version $version -subversion $subversion -removeVersionFromHtmlName (-not $appendVersionToFileNames) -htmlExtension $htmlExtension
     }
     else {
         Write-Warning "Lua file not found in release directory: $luaFileInRelease (skipping version update)"
@@ -184,7 +231,7 @@ try {
     # now rename the lua and html file in the reslease directory with a version
 
     $luaFile = Join-Path $versionDir $mainLuaFile
-    $luaFileVersioned = Join-Path $versionDir ($moduleToCreate + "_" + $version + ".lua")
+    $luaFileVersioned = Join-Path $versionDir ($releaseName + ".lua")
 
     write-Host ""
 
@@ -192,21 +239,21 @@ try {
         if (Test-Path $luaFileVersioned) {  
             Remove-Item $luaFileVersioned -Force
         }
-        Write-Host "Renaming '$luaFile' to '$moduleToCreate_$version.lua'..."
-        Rename-Item -Path $luaFile -NewName ($moduleToCreate + "_" + $version + ".lua") -Force
+        Write-Host "Renaming '$luaFile' to '$releaseName.lua'..."
+        Rename-Item -Path $luaFile -NewName ($releaseName + ".lua") -Force
     }
     else {
         Write-Warning "File not found: $luaFile (skipping rename)"
     }
 
-    $htmlFile = Join-Path $versionDir $mainHTMLFile    
-    $htmlFileVersioned = Join-Path $versionDir ($moduleToCreate + "_" + $version + ".html")
+    $htmlFile = Join-Path $versionDir $mainHTMLFile
+    $htmlFileVersioned = Join-Path $versionDir ($releaseName + $htmlExtension)
     if (Test-Path $htmlFile) {
-        if (Test-Path $htmlFileVersioned) {  
+        if (Test-Path $htmlFileVersioned) {
             Remove-Item $htmlFileVersioned -Force
         }
-        Write-Host "Renaming '$htmlFile' to '$moduleToCreate_$version.html'..."
-        Rename-Item -Path $htmlFile -NewName ($moduleToCreate + "_" + $version + ".html") -Force
+        Write-Host "Renaming '$htmlFile' to '$releaseName$htmlExtension'..."
+        Rename-Item -Path $htmlFile -NewName ($releaseName + $htmlExtension) -Force
     }
     else {
         Write-Warning "File not found: $htmlFile (skipping rename)"
@@ -214,7 +261,7 @@ try {
 
     # ZIP file path, this zip file will be renamed to .vgadget after creation, but needs to be created as a zip file 
     # first in order to create it
-    $zipPath = Join-Path $releaseDir ("\" + $moduleToCreate + "_Ver_" + $version + ".zip")
+    $zipPath = Join-Path $releaseDir ($releaseName + "_staging.zip")
     Write-Debug "Preparing to create ZIP file at '$zipPath'..."
 
     # Remove old ZIP if exists
@@ -225,19 +272,19 @@ try {
     #Create a zip file from the version directory incluuding all files and subdirectories
     #Note the release path looks doubled, but it needs to otherwise the gadget file
     #will not have the correct folder structure when unzipped
-    $releaseTree = $moduleToCreate + "_" + $version 
+    $releaseTree = $releaseName
     $releasePath = Join-Path $releaseDir $releaseTree
     Write-Debug "Creating ZIP file from '$releasePath'..."
     Compress-Archive -Path (Join-Path $releasePath "*") -DestinationPath $zipPath -Force
 
     #Rename the zip file with a .vgadget extension
-    $vgadgetPath = Join-Path $releaseDir ("\\" + $moduleToCreate + "_" + $version + ".vgadget")
+    $vgadgetPath = Join-Path $releaseDir ($releaseName + ".vgadget")
     Write-Debug "Renaming ZIP file to '$vgadgetPath'..." 
     if (Test-Path $vgadgetPath) {
         Write-Host "Versioned gadget file already exists: $vgadgetPath. Removing old versioned gadget file..."
         Remove-Item $vgadgetPath -Force
     }
-    Rename-Item -Path $zipPath -NewName ($moduleToCreate + "_" + $version + ".vgadget") -Force
+    Rename-Item -Path $zipPath -NewName ($releaseName + ".vgadget") -Force
 
     #remove the version directory after creating the zip
     Write-Host "Removing temporary version directory '$releasePath'..."  
