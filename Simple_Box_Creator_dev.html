@@ -57,19 +57,19 @@
           <div class="sub-panel-title">Box Dimensions</div>
           <div class="field-row" title="Side to side width of the box outside">
             <label for="WidthField">Width</label>
-            <input type="number" step="any" id="WidthField" placeholder="Width of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" step="any" id="WidthField" placeholder="Width of Box" onchange="onGeometryFieldChanged()"/>
           </div>
           <div class="field-row" title="Front to back depth of the box outside">
             <label for="DepthField">Depth</label>
-            <input type="number" step="any" id="DepthField" placeholder="Depth of Box" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" step="any" id="DepthField" placeholder="Depth of Box" onchange="onGeometryFieldChanged()"/>
           </div>
           <div class="field-row" title="Top to bottom height of the box outside">
             <label for="HeightField">Height</label>
-            <input type="number" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
           </div>
           <div class="field-row" id="showHideDovetailAngle" style="display: none" title="Angle of the dovetail joint, between 45 and 85 degrees">
             <label for="DovetailAngleField">Dovetail Angle</label>
-            <input type="number" step="any" id="DovetailAngleField" placeholder="Dovetail Angle" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" step="any" id="DovetailAngleField" placeholder="Dovetail Angle" onchange="onGeometryFieldChanged()"/>
           </div>
         </div>
       </div>
@@ -84,16 +84,16 @@
           </div>
           <div class="field-row" title="Width of the fingers">
             <label for="SideTabWidthField" id="SideJointLabel">Side joints</label>
-            <input type="number" id="SideTabWidthField" placeholder="Width of Joint" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" id="SideTabWidthField" placeholder="Width of Joint" onchange="onGeometryFieldChanged()"/>
           </div>
           <div id="showHideTopBottomJoints" style="display: none">
             <div class="field-row" id="showHideLidJointWidth" title="Width of the lid fingers">
               <label for="TopTabWidthField">Lid joints</label>
-              <input type="number" id="TopTabWidthField" placeholder="Width of Lid Joint" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              <input type="number" class="calcfield" id="TopTabWidthField" placeholder="Width of Lid Joint" onchange="onGeometryFieldChanged()"/>
             </div>
             <div class="field-row" id="showHideBottomJointWidth" title="Width of the bottom fingers">
               <label for="BottomTabWidthField">Bottom joints</label>
-              <input type="number" id="BottomTabWidthField" placeholder="Width of Bottom Joint" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+              <input type="number" class="calcfield" id="BottomTabWidthField" placeholder="Width of Bottom Joint" onchange="onGeometryFieldChanged()"/>
             </div>
           </div>
         </div>
@@ -105,15 +105,15 @@
           <div class="sub-panel-title">Machining &amp; Layout</div>
           <div class="field-row" title="Additional material removed in joints for better fitment, can be maximum of 1/2 the bit diameter.">
             <label for="AllowanceField">Allowance</label>
-            <input type="number" id="AllowanceField" placeholder="Allowance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+            <input type="number" class="calcfield" id="AllowanceField" placeholder="Allowance" onchange="onGeometryFieldChanged()"/>
           </div>
           <div class="field-row" title="Spacing between parts when laying out on the material, should be at least twice bit diameter, if less than that will use twice bit diameter instead">
             <label for="PartSpacingField">Part Spacing</label>
-            <input type="number" id="PartSpacingField" placeholder="Part Spacing" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+            <input type="number" class="calcfield" id="PartSpacingField" placeholder="Part Spacing"/>
           </div>
           <div class="field-row" title="Margin on the edge for clamping the workpiece">
             <label for="ClampingMargin">Clamping Margin</label>
-            <input type="number" id="ClampingMargin" placeholder="Clamping Margin" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+            <input type="number" class="calcfield" id="ClampingMargin" placeholder="Clamping Margin"/>
           </div>
           <div class="checkbox-row" id="showHideDogbones" title="When checked will create the dogbones. Warning! parts will require additional processing for joints to work">
             <input type="checkbox" class="LuaButton" id="CreateDogbones" onclick="updateRoundoverToolVisibility()" />
@@ -224,11 +224,11 @@
               <div class="sub-panel-title">Backside</div>
               <div class="field-row" title="Angle of Back's own chamfer, measured from vertical (degrees), independently of Front's. 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer.">
                 <label for="End2ChamferAngleField">Chamfer Angle</label>
-                <input type="number" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" min="1" max="89" id="End2ChamferAngleField" placeholder="Degrees" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Height of Back. Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
                 <label for="End2HeightField">Height</label>
-                <input type="number" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="End2HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
               </div>
             </div>
           </td>
@@ -240,11 +240,11 @@
               <div class="sub-panel-title">Frontside</div>
               <div class="field-row" title="Angle of Front's own chamfer, measured from vertical (degrees). 45 = classic symmetric chamfer; smaller = steeper/shorter, bigger = shallower/longer. Its horizontal run is worked out from this angle and the actual overhang.">
                 <label for="End1ChamferAngleField">Chamfer Angle</label>
-                <input type="number" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" min="1" max="89" id="End1ChamferAngleField" placeholder="Degrees" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Height of Front. Must be less than or equal to the box height - set it lower to create the overhang on that side. Defaults to the box height (= no overhang).">
                 <label for="End1HeightField">Height</label>
-                <input type="number" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="End1HeightField" placeholder="End height" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
               </div>
             </div>
           </td>
@@ -276,15 +276,15 @@
               <div class="sub-panel-title">Lid Panel</div>
               <div class="field-row" title="Thickness of the lid - defaults to the material thickness. If it is thinner than the material, the lid is cut from separate stock: it is placed on its own sheet (Lid Panel + thickness) and its own layers (Lid Panel / CutOut Lid), with its own cutout toolpath at the lid thickness. If the bottom is a Grooved panel of exactly the same thickness, bottom and lid share one sheet (Bottom + Lid Panel + thickness) and one cutout toolpath. If it is thicker than the lid groove width, a rabbet is milled on the lid's TOP face along its Left, Right and Front edges down to the groove width, so the lid's underside runs on the groove floor and its top can sit flush with the walls.">
                 <label for="LidThicknessField">Lid Thickness</label>
-                <input type="number" step="any" id="LidThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="LidThicknessField" placeholder="Thickness" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (lid thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the lid is thicker than the groove width (i.e. a rabbet is milled).">
                 <label for="LidRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
-                <input type="number" step="any" id="LidRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="LidRabbetCorrectionField" placeholder="Correction" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the lid reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
                 <label for="LidGrooveClearanceField" style="color: #1155A2;">Lid Clearance</label>
-                <input type="number" step="any" id="LidGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGrooveClearanceField" placeholder="Clearance" onchange="onGeometryFieldChanged()"/>
               </div>
             </div>
           </td>
@@ -296,15 +296,15 @@
               <div class="sub-panel-title">Lid Groove</div>
               <div class="field-row" title="Width of the lid groove slot. A lid thicker than this gets a rabbet on its top face down to this width.">
                 <label for="LidGrooveWidthField">Groove width</label>
-                <input type="number" step="any" id="LidGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="LidGrooveWidthField" placeholder="Groove width" onkeyup="updateLidRabbetInfo()" onchange="updateLidRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="How deep the lid groove is cut into Left, Right and Front - less than the material thickness. More than half the thickness is allowed, but gives an orange warning (the wall gets weak behind the groove).">
                 <label for="LidGrooveDepthField">Groove depth</label>
-                <input type="number" step="any" id="LidGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGrooveDepthField" placeholder="Groove depth" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" title="Distance from the top edge of the walls down to the top of the lid groove, or down to the top face of the lid - see 'Offset to' below. 0 with 'Lid' = lid flush with the top of the walls.">
                 <label for="LidGrooveOffsetField">Groove offset</label>
-                <input type="number" step="any" id="LidGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGrooveOffsetField" placeholder="Groove offset" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="What the lid groove offset is measured to, from the top edge of the walls. Groove: down to the top of the groove. Lid: down to the top face of the lid - the groove position is then worked out from the lid thickness.">
                 <label for="LidGrooveOffsetRef">Offset to</label>
@@ -338,25 +338,25 @@
               <div id="showHideLidGripFields">
               <div class="field-row" title="How far the grip tab sticks out past the Back (0 = no grip tab, the lid ends flush with the Back).">
                 <label for="LidGripOverhangField">Grip overhang</label>
-                <input type="number" step="any" id="LidGripOverhangField" placeholder="Overhang" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGripOverhangField" placeholder="Overhang" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Width of the grip tab, centred on the lid. The rest of the overhang is cut flush left and right. At most the inside width minus twice the lid groove depth.">
                 <label for="LidGripWidthField">Grip width</label>
-                <input type="number" step="any" id="LidGripWidthField" placeholder="Grip width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGripWidthField" placeholder="Grip width" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
               <div id="showHideLidHoleFields" style="display: none;">
               <div class="field-row" title="Diameter of a Round finger hole, or the width (across the lid) of a Rectangle one. Must be bigger than the tool and at most the inside width minus twice the lid groove depth.">
                 <label for="LidHoleSizeField" id="LidHoleSizeLabel">Hole size</label>
-                <input type="number" step="any" id="LidHoleSizeField" placeholder="Size" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidHoleSizeField" placeholder="Size" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" id="showHideLidHoleLength" title="Length of a Rectangle finger hole, along the depth of the box (towards the Front). Must be bigger than the tool.">
                 <label for="LidHoleLengthField">Hole length</label>
-                <input type="number" step="any" id="LidHoleLengthField" placeholder="Length" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidHoleLengthField" placeholder="Length" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Distance from the lid's rearmost edge to the near edge of the finger hole - the back edge (flush with the outside of the Back), or with Indented Handle the tip of the grip tab. The hole may go right up to that edge - at least 3 mm of lid has to stay behind it (and, inside the grip tab, on each side of it). The hole must end before the Front's inside face.">
                 <label for="LidHoleDistanceField">Distance from edge</label>
-                <input type="number" step="any" id="LidHoleDistanceField" placeholder="Distance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidHoleDistanceField" placeholder="Distance" onchange="onGeometryFieldChanged()"/>
               </div>
               <!-- cut through, or a finger recess of a set depth -- by Claude 10/27/2026 -->
               <div class="checkbox-row" style="margin-top: 6px;" title="When checked, the finger hole is cut right through the lid. Unchecked, it becomes a finger recess in the lid's top face, as deep as 'Hole depth'.">
@@ -365,7 +365,7 @@
               </div>
               <div class="field-row" id="showHideLidHoleDepth" style="margin-bottom: 0;" title="Depth of the finger recess in the lid's top face - more than 0, and less than the lid thickness. More than half the lid thickness is allowed, but gives an orange warning (the lid gets weak under the recess).">
                 <label for="LidHoleDepthField">Hole depth</label>
-                <input type="number" step="any" id="LidHoleDepthField" placeholder="Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidHoleDepthField" placeholder="Depth" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
             </div>
@@ -387,7 +387,7 @@
               </div>
               <div class="field-row" id="showHideLidGripRadius" style="margin-bottom: 0;" title="Radius of the two outer corners of a Rounded grip tab. A radius equal to or larger than the grip overhang runs out into the back edge in a smooth S-curve (the tab stays the grip width wide at the back edge); it is reduced automatically if the tab is too narrow for it.">
                 <label for="LidGripRadiusField">Corner radius</label>
-                <input type="number" step="any" id="LidGripRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidGripRadiusField" placeholder="Radius" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
               <div id="showHideLidHoleShape" style="display: none;">
@@ -400,7 +400,7 @@
               </div>
               <div class="field-row" id="showHideLidHoleRadius" style="margin-bottom: 0;" title="Corner radius of a Rectangle finger hole (0 up to half the shorter side). Corners smaller than the tool radius come out with the tool radius.">
                 <label for="LidHoleRadiusField" id="LidHoleRadiusLabel">Corner radius</label>
-                <input type="number" step="any" id="LidHoleRadiusField" placeholder="Radius" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="LidHoleRadiusField" placeholder="Radius" onchange="onGeometryFieldChanged()"/>
               </div>
               </div>
             </div>
@@ -430,15 +430,15 @@
               <div class="sub-panel-title">Bottom Panel</div>
               <div class="field-row" title="Thickness of the bottom panel - defaults to the material thickness. If it is thinner than the material, the bottom is cut from separate stock: it is placed on its own sheet (Bottom Panel + thickness) and its own layers (Bottom Panel / CutOut Bottom), with its own cutout toolpath at the bottom thickness. If it is thicker than the groove width, a rabbet is milled along its Left, Right and Front edges down to the groove width, so it still seats in the groove; Back's edge stays full thickness, since the panel is slid in from that opening. If it is not thicker than the groove, no rabbet is milled (e.g. a thinner plywood bottom cut from separate material).">
                 <label for="BottomThicknessField">Bottom Thickness</label>
-                <input type="number" step="any" id="BottomThicknessField" placeholder="Thickness" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="BottomThicknessField" placeholder="Thickness" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="Fine-tune correction added to the computed rabbet depth (bottom thickness minus groove width), e.g. a small positive value for a looser fit, negative for tighter. Only used when the bottom is thicker than the groove width (i.e. a rabbet is milled).">
                 <label for="BottomRabbetCorrectionField" style="color: #1155A2;">Rabbet correction</label>
-                <input type="number" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="BottomRabbetCorrectionField" placeholder="Correction" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
                 <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
-                <input type="number" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+                <input type="number" class="calcfield" step="any" id="BottomGrooveClearanceField" placeholder="Clearance"/>
               </div>
             </div>
           </td>
@@ -450,15 +450,15 @@
               <div class="sub-panel-title">Groove</div>
               <div class="field-row" title="Width of the groove slot (vertical height of the dado), independent of material thickness - set this to the actual thickness of the bottom panel you'll slide in, e.g. 4mm for a thin plywood/hardboard bottom. If 'Same material' is checked, set this to whatever width you want the rabbeted edge to seat at (can be smaller than the material thickness).">
                 <label for="BottomGrooveWidthField">Groove width</label>
-                <input type="number" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
+                <input type="number" class="calcfield" step="any" id="BottomGrooveWidthField" placeholder="Groove width" onkeyup="updateBottomRabbetInfo()" onchange="updateBottomRabbetInfo(); onGeometryFieldChanged();"/>
               </div>
               <div class="field-row" title="How deep the groove is plowed into Left, Right and Front - less than the material thickness. More than half the thickness is allowed, but gives an orange warning (the wall gets weak behind the groove).">
                 <label for="BottomGrooveDepthField">Groove depth</label>
-                <input type="number" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="BottomGrooveDepthField" placeholder="Groove depth" onchange="onGeometryFieldChanged()"/>
               </div>
               <div class="field-row" title="Distance from the outer bottom edge of the walls up to the bottom of the groove, or up to the underside of the bottom panel - see 'Offset to' below. Must be 0 or more.">
                 <label for="BottomGrooveOffsetField">Groove offset</label>
-                <input type="number" step="any" id="BottomGrooveOffsetField" placeholder="Groove offset" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;" onchange="onGeometryFieldChanged()"/>
+                <input type="number" class="calcfield" step="any" id="BottomGrooveOffsetField" placeholder="Groove offset" onchange="onGeometryFieldChanged()"/>
               </div>
               <!-- What the groove offset is measured to (#86) -- by Claude 10/15/2026 -->
               <div class="field-row" style="margin-bottom: 0;" title="What the groove offset is measured to, from the outer bottom edge of the walls. Groove: up to the bottom (floor) of the groove. Bottom: up to the underside of the bottom panel (e.g. the clearance under a drawer) - the groove position is then worked out from the bottom thickness, groove width and rabbet correction.">
@@ -506,7 +506,7 @@
         </div>
         <div class="tool-bar-right">
           <label for="RoundoverCutDepthField" class="cut-depth-label">Cut Depth</label>
-          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input" placeholder="Cut Depth" onkeydown="return event.keyCode !== 189 && event.keyCode !== 109;"/>
+          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input calcfield" placeholder="Cut Depth"/>
         </div>
       </div>
 
@@ -594,6 +594,13 @@
     <input type="text" id="InvalidLidHoleLength" value=""/>
     <input type="text" id="InvalidLidHoleRadius" value=""/>
     <input type="text" id="InvalidLidHoleDepth" value=""/>
+    <!-- Material size, filled by Lua when the dialog opens. These feed the -->
+    <!-- field calculator's W/X, H/Y and T/Z variables, and MaterialInMM tells -->
+    <!-- it which unit ' (feet) and " (inches) have to land in. -->
+    <input type="text" id="MaterialWidth" value=""/>
+    <input type="text" id="MaterialHeight" value=""/>
+    <input type="text" id="MaterialThickness" value=""/>
+    <input type="text" id="MaterialInMM" value="0"/>
   </fieldset>
 
 
@@ -976,8 +983,349 @@
   // Clicking the hidden DimensionsChanged checkbox both flips its value and
   // fires the LuaButton click that notifies Lua.
   function onGeometryFieldChanged() {
+    // This round-trip makes Lua re-read EVERY field (ReadOptionsFromDialog), not
+    // just the one that was edited, so make sure none of them is still sitting
+    // on an un-computed expression first. Cheap, and it closes the gap for a
+    // field that never got a blur of its own. Only rewrites field values - fires
+    // no events - so it cannot re-enter here.      -- by Claude 11/1/2026
+    calcEvaluateAllFields();
     var dimensionsChanged = document.getElementById("DimensionsChanged");
     if (dimensionsChanged) { dimensionsChanged.click(); }
+  }
+
+  // ===========================================================================
+  // Field calculator -- by Claude 11/1/2026
+  //
+  // Every numeric field takes an expression instead of a plain number and works
+  // it out when you leave the field (or the moment you type "=" or press Enter).
+  // Variables, upper or lower case:
+  //
+  //   W or X   material width        P   pi
+  //   H or Y   material height       I   mm -> inch factor  (25.4*I = 25.4mm in inches)
+  //   T or Z   material thickness    M   inch -> mm factor  (2*M   = 2 inches in mm)
+  //
+  // A trailing ' means feet and " means inches, both landing in whatever unit
+  // the job is in, so 2'+10 works and so does the carpenter's 2'10 and 2'10".
+  // On an inch job " is a no-op; on a mm job it multiplies by 25.4, which is why
+  // 2'10" comes out as 863.6 there instead of being quietly wrong.
+  //
+  // W/H/T come from the hidden MaterialWidth/MaterialHeight/MaterialThickness
+  // fields that Lua fills from the job and material block as the dialog opens.
+  //
+  // This is a hand-rolled tokenizer plus recursive descent rather than eval().
+  // IE7's eval reads a leading zero as octal (010 is 8, 08 is a syntax error),
+  // and quietly cutting a part to the wrong size is far worse than refusing an
+  // expression - so nothing here ever guesses. An expression that doesn't parse
+  // is left on screen exactly as typed, and the Lua side's existing validation
+  // refuses it when OK is pressed.
+  // ===========================================================================
+
+  // IE7 has no String.prototype.trim.
+  function calcTrim(s) {
+    return String(s).replace(/^[\s ]+/, "").replace(/[\s ]+$/, "");
+  }
+
+  // null, not 0, when the field is missing or not a number: parsePrimary then
+  // refuses the whole expression rather than quietly treating W as nothing and
+  // cutting a part to the wrong size.
+  function calcHiddenNumber(id) {
+    var el = document.getElementById(id);
+    if (!el) { return null; }
+    var value = parseFloat(el.value);
+    return isFinite(value) ? value : null;
+  }
+
+  // Re-read every time rather than cached, so the first evaluation can't latch
+  // onto values from before Lua had filled the hidden fields in.
+  function calcVars() {
+    var inMMRaw = calcHiddenNumber("MaterialInMM");
+    var inMM = (inMMRaw !== null) && (inMMRaw >= 0.5);
+    return {
+      w: calcHiddenNumber("MaterialWidth"),
+      h: calcHiddenNumber("MaterialHeight"),
+      t: calcHiddenNumber("MaterialThickness"),
+      p: Math.PI,
+      i: 1 / 25.4,
+      m: 25.4,
+      foot: inMM ? 304.8 : 12,
+      inch: inMM ? 25.4 : 1
+    };
+  }
+
+  // Tokens: {k:"num",v:number} {k:"var",v:"w"} {k:"op",v:"+"} {k:"("} {k:")"}
+  //         {k:"ft"} (the ' feet marker) {k:"in"} (the " inch marker)
+  // Returns null for any character we have no meaning for, rather than skipping
+  // it and computing something the user never asked for.
+  function calcTokenize(src) {
+    var tokens = [];
+    var i = 0;
+    while (i < src.length) {
+      var c = src.charAt(i);
+
+      if (c === " " || c === "\t" || c === " ") { i++; continue; }
+
+      if ((c >= "0" && c <= "9") || c === ".") {
+        var start = i;
+        var seenDot = false;
+        while (i < src.length) {
+          var d = src.charAt(i);
+          if (d >= "0" && d <= "9") { i++; }
+          else if (d === "." && !seenDot) { seenDot = true; i++; }
+          else { break; }
+        }
+        var value = parseFloat(src.substring(start, i));
+        if (!isFinite(value)) { return null; }
+        tokens[tokens.length] = { k: "num", v: value };
+        continue;
+      }
+
+      var lower = c.toLowerCase();
+      if (lower >= "a" && lower <= "z") {
+        tokens[tokens.length] = { k: "var", v: lower };
+        i++;
+        continue;
+      }
+
+      if (c === "+" || c === "-" || c === "*" || c === "/") {
+        tokens[tokens.length] = { k: "op", v: c };
+        i++;
+        continue;
+      }
+      if (c === "(") { tokens[tokens.length] = { k: "(" }; i++; continue; }
+      if (c === ")") { tokens[tokens.length] = { k: ")" }; i++; continue; }
+      // Straight quotes and the typographic prime/double-prime, in case one gets
+      // pasted in from a spec sheet.
+      if (c === "'" || c === "′") { tokens[tokens.length] = { k: "ft" }; i++; continue; }
+      if (c === '"' || c === "″") { tokens[tokens.length] = { k: "in" }; i++; continue; }
+
+      return null;
+    }
+    return tokens;
+  }
+
+  // expr    := term (("+"|"-") term)*
+  // term    := unary (("*"|"/") unary)*
+  // unary   := ("+"|"-")* postfix
+  // postfix := primary unitmarkers?
+  // primary := number | variable | "(" expr ")"
+  //
+  // Returns the value, or null if anything at all is wrong. null is safe as the
+  // failure signal because every real result is a number - all the checks below
+  // use === null so a legitimate 0 still passes.
+  function calcParse(tokens, vars) {
+    var pos = 0;
+
+    function peek() { return pos < tokens.length ? tokens[pos] : null; }
+
+    function parsePrimary() {
+      var t = peek();
+      if (t === null) { return null; }
+
+      if (t.k === "num") { pos++; return t.v; }
+
+      if (t.k === "var") {
+        pos++;
+        if (t.v === "w" || t.v === "x") { return vars.w; }
+        if (t.v === "h" || t.v === "y") { return vars.h; }
+        if (t.v === "t" || t.v === "z") { return vars.t; }
+        if (t.v === "p") { return vars.p; }
+        if (t.v === "i") { return vars.i; }
+        if (t.v === "m") { return vars.m; }
+        return null;  // some other letter: no guessing
+      }
+
+      if (t.k === "(") {
+        pos++;
+        var inner = parseExpr();
+        if (inner === null) { return null; }
+        var close = peek();
+        if (close === null || close.k !== ")") { return null; }
+        pos++;
+        return inner;
+      }
+
+      return null;
+    }
+
+    function parsePostfix() {
+      var value = parsePrimary();
+      if (value === null) { return null; }
+
+      var t = peek();
+      if (t !== null && t.k === "ft") {
+        pos++;
+        value = value * vars.foot;
+        // The carpenter's 2'10: a number straight after the feet marker is
+        // inches, exactly like the 2'+10 the same person might have typed. It is
+        // inches and not job units, because the ' already put us in imperial.
+        var next = peek();
+        if (next !== null && next.k === "num") {
+          pos++;
+          value = value + next.v * vars.inch;
+          var trailing = peek();
+          if (trailing !== null && trailing.k === "in") { pos++; }
+        }
+        return value;  // at most one feet marker per quantity
+      }
+      if (t !== null && t.k === "in") {
+        pos++;
+        return value * vars.inch;
+      }
+      return value;
+    }
+
+    function parseUnary() {
+      var t = peek();
+      if (t !== null && t.k === "op" && (t.v === "+" || t.v === "-")) {
+        pos++;
+        var inner = parseUnary();
+        if (inner === null) { return null; }
+        return (t.v === "-") ? -inner : inner;
+      }
+      return parsePostfix();
+    }
+
+    function parseTerm() {
+      var value = parseUnary();
+      if (value === null) { return null; }
+      for (;;) {
+        var t = peek();
+        if (t === null || t.k !== "op" || (t.v !== "*" && t.v !== "/")) { return value; }
+        pos++;
+        var rhs = parseUnary();
+        if (rhs === null) { return null; }
+        if (t.v === "/") {
+          if (rhs === 0) { return null; }
+          value = value / rhs;
+        } else {
+          value = value * rhs;
+        }
+      }
+    }
+
+    function parseExpr() {
+      var value = parseTerm();
+      if (value === null) { return null; }
+      for (;;) {
+        var t = peek();
+        if (t === null || t.k !== "op" || (t.v !== "+" && t.v !== "-")) { return value; }
+        pos++;
+        var rhs = parseTerm();
+        if (rhs === null) { return null; }
+        value = (t.v === "+") ? value + rhs : value - rhs;
+      }
+    }
+
+    var result = parseExpr();
+    // Trailing junk means we misread the expression, so refuse the whole thing.
+    if (result === null || pos !== tokens.length) { return null; }
+    return result;
+  }
+
+  // Six decimals: enough to keep 1/64" (0.015625) exact while dropping the
+  // float noise that would otherwise show up as 0.30000000000000004. toFixed
+  // always writes a decimal point, so stripping trailing zeros can never eat
+  // the zeros in a round number like 100.
+  function calcFormat(value) {
+    var text = (Math.round(value * 1000000) / 1000000).toFixed(6);
+    text = text.replace(/0+$/, "").replace(/\.$/, "");
+    if (text === "" || text === "-" || text === "-0") { text = "0"; }
+    return text;
+  }
+
+  var g_calcPlainNumber = /^[+-]?(\d+\.?\d*|\.\d+)$/;
+
+  // Computes el's contents in place unless they are already a plain number.
+  // Returns true if the field now holds a number, false if what is in there
+  // couldn't be computed (in which case it is left alone to be corrected).
+  function calcEvaluateField(el) {
+    if (!el) { return true; }
+
+    var raw = calcTrim(el.value);
+    if (raw === "") { return true; }
+
+    // A trailing "=" is just the user asking for the answer, calculator style.
+    raw = calcTrim(raw.replace(/=+$/, ""));
+    if (raw === "") { return true; }
+
+    if (g_calcPlainNumber.test(raw)) {
+      if (el.value !== raw) { el.value = raw; }   // drops a lone trailing "="
+      return true;
+    }
+
+    var tokens = calcTokenize(raw);
+    if (tokens === null || tokens.length === 0) { return false; }
+
+    var value = calcParse(tokens, calcVars());
+    // The magnitude cap keeps calcFormat away from toFixed's exponential range.
+    if (value === null || !isFinite(value) || Math.abs(value) >= 1e15) { return false; }
+
+    el.value = calcFormat(value);
+    return true;
+  }
+
+  // Identified by the "calcfield" class rather than by type="number": IE7 does
+  // not implement that input type and normalises it away, so getAttribute("type")
+  // can come back as "text" and find nothing at all.
+  var g_calcFieldClass = /(^|\s)calcfield(\s|$)/;
+
+  function calcIsField(el) {
+    return el && el.className && g_calcFieldClass.test(el.className);
+  }
+
+  function calcEvaluateAllFields() {
+    var inputs = document.getElementsByTagName("input");
+    for (var i = 0; i < inputs.length; i++) {
+      if (calcIsField(inputs[i])) { calcEvaluateField(inputs[i]); }
+    }
+  }
+
+  function calcAttachField(el) {
+    // onchange has to be WRAPPED, not just added alongside: in IE it fires
+    // before onblur, and it is what the existing live-validation handlers hang
+    // off (onGeometryFieldChanged, updateBottomRabbetInfo, ...). Computing first
+    // and then calling the original is what stops those handlers - and Lua -
+    // from ever seeing the raw "10*2".
+    var previousChange = el.onchange;
+    el.onchange = function () {
+      calcEvaluateField(this);
+      if (previousChange) { return previousChange.call(this); }
+      return true;
+    };
+
+    // Safety net for leaving a field without changing it (and it is idempotent:
+    // a plain number stays exactly as it is).
+    var previousBlur = el.onblur;
+    el.onblur = function () {
+      calcEvaluateField(this);
+      if (previousBlur) { return previousBlur.call(this); }
+      return true;
+    };
+
+    // "=" or Enter computes straight away instead of waiting for focus to leave,
+    // then runs the field's own onchange so the live validation keeps up.
+    var previousKeyUp = el.onkeyup;
+    el.onkeyup = function (e) {
+      var ev = e || window.event;
+      var code = ev ? (ev.keyCode || ev.which) : 0;
+      if (code === 13 || code === 187 || code === 61) {
+        if (calcEvaluateField(this) && this.onchange) { this.onchange(); }
+      }
+      if (previousKeyUp) { return previousKeyUp.call(this, ev); }
+      return true;
+    };
+  }
+
+  // The host renders type="number" as a plain text input (IE7 doesn't implement
+  // it), so these fields already accept letters and symbols - they just need
+  // computing before anything reads them. Attached by scanning for the class
+  // rather than from 35 inline attributes, so a new field joins in just by
+  // carrying class="calcfield".
+  function calcAttachAll() {
+    var inputs = document.getElementsByTagName("input");
+    for (var i = 0; i < inputs.length; i++) {
+      if (calcIsField(inputs[i])) { calcAttachField(inputs[i]); }
+    }
   }
 
   // Maps each hidden "InvalidXxx" text field (set by Lua to an error message,
@@ -1806,6 +2154,8 @@
     if (allWidths) { onShowAllWidthsChanged(allWidths); }
 
     for (var invalidFieldId in g_invalidFieldMap) { updateInvalidFieldFlag(invalidFieldId); }
+
+    calcAttachAll();   // expressions in every numeric field -- by Claude 11/1/2026
 
     onJointTypeChanged();
   }, 100);

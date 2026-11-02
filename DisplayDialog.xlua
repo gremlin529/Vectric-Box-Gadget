@@ -1293,6 +1293,27 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidLidHoleRadius", "")      -- Added by Claude 10/27/2026
   dialog:AddTextField("InvalidLidHoleDepth", "")       -- Added by Claude 10/27/2026
 
+  -- The job's material size, for the field calculator in the HTML: every numeric
+  -- field accepts an expression, and W/X, H/Y and T/Z stand for these three (see
+  -- the calculator block in Simple_Box_Creator_dev.html). Plain text fields - the
+  -- JS only ever reads them, Lua never writes them back, and keeping them out of
+  -- AddDoubleField means the host won't reformat them to the UI's precision.
+  -- MaterialInMM is what makes ' (feet) and " (inches) land in the job's own unit.
+  --                                                              -- by Claude 11/1/2026
+  -- T/Z comes from options.thickness rather than straight off the material block,
+  -- so it is the same thickness the rest of the gadget actually builds the box
+  -- from and the two can never drift apart. MaterialThicknessInfo (further down,
+  -- for the isometric preview) carries this same number at 4dp - worth folding
+  -- the two into one field once that preview settles.
+  do
+    local calc_material_job = VectricJob()
+    local calc_material_block = MaterialBlock()
+    dialog:AddTextField("MaterialWidth", tostring(calc_material_job.XLength))
+    dialog:AddTextField("MaterialHeight", tostring(calc_material_job.YLength))
+    dialog:AddTextField("MaterialThickness", tostring(options.thickness or calc_material_block.Thickness))
+    dialog:AddTextField("MaterialInMM", calc_material_block.InMM and "1" or "0")
+  end
+
   -- Add Tool picker
   -- Add toolpath name field
   dialog:AddLabelField("ToolNameField", "")
