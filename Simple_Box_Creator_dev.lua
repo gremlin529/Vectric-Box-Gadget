@@ -51,8 +51,8 @@ require("strict")
 G_version = "dev"                                                 
 G_subVersion = "development"                                      
 G_title = "Simple Box"
-G_width = 890
-G_height = 962                                               
+G_width = 1240
+G_height = 1220                                               
 G_htmlFile = "Simple_Box_Creator_" .. G_version .. ".html"       
 G_fingerSideLayerName = "Finger Roundover"
 G_boxLayerName = "Box"

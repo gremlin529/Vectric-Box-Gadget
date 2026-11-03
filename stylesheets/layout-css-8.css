@@ -395,8 +395,22 @@ input.ToolPicker:hover {
 }
 .footer-options {
   float: left;
-  padding-top: 4px;
-  width: 390px;
+  padding-top: 13px;
+  width: 620px;
+}
+.footer-option-cell {
+  float: left;
+  width: 206px;
+  height: 26px;
+  line-height: 26px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.footer-option-cell input {
+  vertical-align: middle;
+}
+.footer-option-cell label {
+  vertical-align: middle;
 }
 .footer-options-col {
   float: left;
@@ -414,7 +428,7 @@ input.ToolPicker:hover {
   font-family: Tahoma, Arial, sans-serif;
   font-size: 15px;
   width: 75px;
-  vertical-align: baseline;
+  vertical-align: middle;
 }
 .footer-cancel-button {
   float: right;

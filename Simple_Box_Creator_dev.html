@@ -166,6 +166,21 @@
 
     </div>
     <div class="right-column">
+  <!-- ── Faces to machine ─────────────────────────────────────────────── -->
+  <div class="section-header">Faces To Machine</div>
+  <div class="card">
+    <div class="card-body clearfix">
+      <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
+      <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
+      <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
+        <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
+    </div>
+  </div>
+
   <!-- ── Tools ─────────────────────────────────────────────────────────── -->
   <div class="section-header">Tools</div>
   <div class="card">
@@ -453,7 +468,7 @@
   <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
   <div class="card" id="showHideGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine above to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
 
       <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
            field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
@@ -517,21 +532,6 @@
     </div>
   </div>
 
-  <!-- ── Faces to machine ─────────────────────────────────────────────── -->
-  <div class="section-header">Faces To Machine</div>
-  <div class="card">
-    <div class="card-body clearfix">
-      <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
-      <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
-      <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
-        <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
-    </div>
-  </div>
-
     </div>
   </div>
 
@@ -541,12 +541,15 @@
       <button type="button" id="ButtonOK">OK</button>
     </div>
     <div class="footer-options">
-      <div class="clearfix" style="margin-bottom: 4px;">
-        <div class="footer-option-item" style="float: left; line-height: 26px;">
+      <div class="clearfix">
+        <div class="footer-option-item footer-option-cell">
+          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
+        </div>
+        <div class="footer-option-item footer-option-cell">
           <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable dark mode</label>
         </div>
-        <div class="footer-option-item" style="float: right;">
-          <label for="ZoomLevel" style="margin-right: 6px; vertical-align: baseline;">Zoom Level</label>
+        <div class="footer-option-item footer-option-cell">
+          <label for="ZoomLevel" style="margin-right: 6px;">Zoom Level</label>
           <select id="ZoomLevel" onchange="onZoomLevelChanged(this)">
             <option value="Auto">Auto</option>
             <option value="100%">100%</option>
@@ -558,9 +561,6 @@
             <option value="250%">250%</option>
           </select>
         </div>
-      </div>
-      <div class="footer-option-item">
-        <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
       </div>
     </div>
     <div class="footer-cancel-button">
@@ -2374,23 +2374,32 @@
           panel(0, t, t, d, backZ, zT, inner, front, top, omit("", false, false, fc.front));
         }
         if (fc.left) {
+          // With Front and Back both there, Left's outer face is one piece of wood
+          // running the whole depth (its tails fill the gaps between Front's / Back's
+          // pins), so it goes out as ONE polygon with those pins laid over it. Drawn
+          // as the wall between the corners plus a strip under each neighbour, every
+          // seam got a line stroked down it, and the step where a sliding lid's lower
+          // Back meets the full-height wall read as a line across the face.
+          //                                                  -- by Claude 11/3/2026
+          var wholeL = fc.front && fc.back;
           var polyL = !!(loD || hiOutD || sFW || eBW);
           panel(w-t, w, t, d - t, zB, backZ, side, front, top,
-                omit("px", polyL, topTeeth, fc.front || sFW));
+                omit("px", polyL || wholeL, topTeeth, fc.front || sFW));
           if (topTeeth) { rimSegments("y", w - t, w, t, d - t, zT, lidD, top, pinLeft - DETAIL); }
           if (sFW) { tailBits(w - t, w, patF, t, 0); }
           if (eBW) { tailBits(w - t, w, patB, d - t, d); }
-          if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
-          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front));
+          if (wholeL) { wallPoly("y", w, 0, d, zB, zT, loD, hiOutD, null, null, side, pinLeft); }
+          else if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
+          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front) + (wholeL ? " px" : ""));
         }
         if (fc.front) {
           var polyF = !!(loW || hiOutW);
-          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false));
+          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + ((fc.left && fc.back) ? " px" : ""));
           if (topTeeth) { rimSegments("x", 0, t, 0, w, zT, lidW, top, pinFront - DETAIL); }
           if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, null, null, front, pinFront); }
         }
         if (fc.back) {
-          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true));
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((fc.left && fc.front) ? " px" : ""));
           // Back's rim runs the full width even where its inside face is clipped
           if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
           // Back's inside face, across only the span Left / Right are not standing
@@ -2420,6 +2429,10 @@
           // the lid, pulled out by half the depth
           var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
           var sl = d / 2;   // pulled out halfway, so the groove shows in front of it
+          // Sorted as if still sitting at the middle of the box: pulled out, its centre
+          // lies so far back that Right's inner face and rim, which really are behind
+          // it, came out nearer the camera and painted over it.  -- by Claude 11/3/2026
+          layer = sl;
           var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
           // The lid's outline in plan (anti-clockwise), with the grip tab exactly as
           // CreateFaces cuts it (AddLidGripTab), then its edges as side faces - only
@@ -2488,6 +2501,10 @@
             // on its own centre it would sort under the lid and never show
             F(hp, holeCol, depthAt(cxm, (ly0 + ly1) / 2, lz1));
           }
+          layer = 0;
+          // Left stands nearer the camera than the lid sliding in its groove, so its
+          // rim goes back on top of the lid's edge.        -- by Claude 11/3/2026
+          if (fc.left) { F([[w-t,t,zT],[w,t,zT],[w,d,zT],[w-t,d,zT]], top, OUTER - 1); }
         }
         // The rims, outer faces and end grain all came with the four wall blocks
         // above - nothing left to add here by hand. With a sliding lid Left and
@@ -2579,7 +2596,12 @@
       layer = LIDS;
       var gap = Math.max(h * 0.3, 2 * t), zL = zT + gap;
       if (lid.type === "Inset") {
+        // The plug is under the plate, so it goes just behind it: sorted on its own
+        // centre its +x / -y faces came out in front of the plate's top and showed
+        // as a step along two edges.                       -- by Claude 11/3/2026
+        layer = LIDS - 1000;
         block(t, w - t, t, d - t, zL, zL + t / 2, lidTop, lidFront, lidSide);
+        layer = LIDS;
         block(0, w, 0, d, zL + t / 2, zL + t, lidTop, lidFront, lidSide);
       } else {
         block(0, w, 0, d, zL, zL + t, lidTop, lidFront, lidSide);
