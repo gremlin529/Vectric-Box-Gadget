@@ -213,16 +213,19 @@ body {
   padding: 8px 10px;
   margin-bottom: 10px;
 }
+/* Widths fill the ~822px inside of the tool bar (right-column 866 minus card
+   and tool-bar border/padding) so long tool names run nearly up to the
+   No toolpath checkbox instead of wrapping early -- by Claude 11/3/2026 */
 .tool-bar-left {
   float: left;
-  width: 490px;
+  width: 650px;
   /* Matches tool-bar-right's line-height so both floated columns render
      the same height and their vertical-align:middle content lines up. */
   line-height: 36px;
 }
 .tool-bar-right {
   float: left;
-  width: 225px;
+  width: 170px;
   line-height: 36px;
   font-size: 15px;
   color: #6b7280;
