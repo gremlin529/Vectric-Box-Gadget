@@ -65,7 +65,7 @@ body {
   float: left;
   width: 66%;
   background-color: #f2f4f8;
-  border-right: 1px solid #d0d4de;
+  border-left: 1px solid #d0d4de;   /* ISO view now sits on the right -- by Claude 11/3/2026 */
   padding: 10px;
   text-align: center;
 }
@@ -83,6 +83,16 @@ body {
   color: #6b7280;
   line-height: 1.6;
   margin-bottom: 5px;
+}
+/* Tight line box + no bottom margin so the gap above the External Box
+   Dimensions header is set only by that header's margin-top -- by Claude 11/3/2026 */
+.header-text p.release-link-row {
+  line-height: 1.2;
+  margin-bottom: 0;
+}
+.header-text a.release-link {
+  font-size: 20px;
+  font-weight: bold;
 }
 .header-text p:last-child {
   margin-bottom: 0;
@@ -493,7 +503,7 @@ body.dark-mode .sub-panel-title {
 }
 body.dark-mode .header-image {
   background-color: #2a2f3b;
-  border-right-color: #383d4a;
+  border-left-color: #383d4a;
 }
 body.dark-mode .header-text p {
   color: #8a92a8;
