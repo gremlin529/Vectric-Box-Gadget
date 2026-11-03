@@ -38,9 +38,23 @@
       <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
     </div>
     <div class="header-text">
-      <p>This gadget creates a box of the specified external dimensions.</p>
-      <p>There are several layers created depending on the options selected. Please hover over any option to see a description.</p>
       <p><a href="https://github.com/gremlin529/Vectric-Box-Gadget/releases" target="_blank">Simple Box Creator Releases</a></p>
+      <!-- Box dimensions moved here from Geometry Options to tighten the dialog -- by Claude 11/3/2026 -->
+      <div class="section-header" style="margin-top: 10px;">ExternalBox Dimensions</div>
+      <div class="sub-panel">
+        <div class="field-row" title="Side to side width of the box outside">
+          <label for="WidthField">Width</label>
+          <input type="number" class="calcfield" step="any" id="WidthField" placeholder="Width of Box" onchange="onGeometryFieldChanged()"/>
+        </div>
+        <div class="field-row" title="Front to back depth of the box outside">
+          <label for="DepthField">Depth</label>
+          <input type="number" class="calcfield" step="any" id="DepthField" placeholder="Depth of Box" onchange="onGeometryFieldChanged()"/>
+        </div>
+        <div class="field-row" style="margin-bottom: 0;" title="Top to bottom height of the box outside">
+          <label for="HeightField">Height</label>
+          <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -51,33 +65,15 @@
   <div class="card">
     <div class="card-body clearfix">
 
-      <!-- Box dimensions -->
+      <!-- Joint widths (Dovetail Angle lives here now that the box dimensions
+           moved to the header -- by Claude 11/3/2026) -->
       <div class="geometry-column">
         <div class="sub-panel">
-          <div class="sub-panel-title">Box Dimensions</div>
-          <div class="field-row" title="Side to side width of the box outside">
-            <label for="WidthField">Width</label>
-            <input type="number" class="calcfield" step="any" id="WidthField" placeholder="Width of Box" onchange="onGeometryFieldChanged()"/>
-          </div>
-          <div class="field-row" title="Front to back depth of the box outside">
-            <label for="DepthField">Depth</label>
-            <input type="number" class="calcfield" step="any" id="DepthField" placeholder="Depth of Box" onchange="onGeometryFieldChanged()"/>
-          </div>
-          <div class="field-row" title="Top to bottom height of the box outside">
-            <label for="HeightField">Height</label>
-            <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
-          </div>
+          <div class="sub-panel-title">Joint Widths</div>
           <div class="field-row" id="showHideDovetailAngle" style="display: none" title="Angle of the dovetail joint, between 45 and 85 degrees">
             <label for="DovetailAngleField">Dovetail Angle</label>
             <input type="number" class="calcfield" step="any" id="DovetailAngleField" placeholder="Dovetail Angle" onchange="onGeometryFieldChanged()"/>
           </div>
-        </div>
-      </div>
-
-      <!-- Joint widths -->
-      <div class="geometry-column">
-        <div class="sub-panel">
-          <div class="sub-panel-title">Joint Widths</div>
           <div class="checkbox-row" title="When checked, shows all joint width options">
             <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)" />
             <label for="AllJointWidths">Show all joint widths</label>
