@@ -1497,14 +1497,66 @@
     var noBottom = bsel && bsel.selectedIndex === 3;   // Bottom Type None
     var dark = (document.body.className.indexOf("dark-mode") >= 0);
     var lid = isoLidSettings();
-    var key = w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField") +
+    var fc = isoFaceSettings(noBottom, lid.type);
+    var key = fc.key + "|" + w + "|" + d + "|" + h + "|" + t + "|" + noBottom + "|" + dark + "|" + lid.key + "|" + isoNum("SideTabWidthField") +
               "|" + isoNum("End1HeightField") + "|" + isoNum("End2HeightField") + "|" + isoNum("End1ChamferAngleField") + "|" + isoNum("End2ChamferAngleField") +
               "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid") +
               "|" + isoDovetailFlare() +           // dovetail joints and their angle
               "|" + document.body.style.zoom;   // Zoom Level changes the fix below
     if (key === g_iso.key) { return; }
     g_iso.key = key;
-    isoDraw(w, d, h, t, noBottom, dark, lid);
+    isoDraw(w, d, h, t, noBottom, dark, lid, fc);
+  }
+
+  // Which panels are actually being machined ("Faces to Machine"), plus whether
+  // joints are still cut towards the ones that aren't. The checkboxes all carry
+  // class="LuaButton" so Lua already hears about them; the view picks them up
+  // through isoUpdate's 300ms poll, same as every other control here, so they
+  // need no callback of their own.
+  //
+  // Panel names follow the dialog's labels, not the field ids: Side1 is Left,
+  // Side2 is Right, End1 is Front, End2 is Back.             -- by Claude 11/2/2026
+  function isoFaceSettings(noBottom, lidType) {
+    var checked = function (id, dflt) {
+      var el = document.getElementById(id);
+      return el ? !!el.checked : dflt;
+    };
+    var f = {
+      lid:    checked("MakeLid", true),
+      bottom: checked("MakeBottom", true),
+      left:   checked("MakeSide1", true),
+      right:  checked("MakeSide2", true),
+      front:  checked("MakeEnd1", true),
+      back:   checked("MakeEnd2", true),
+      tabs:   checked("CreateTabsForMissingFaces", false)
+    };
+    // Same two overrides main() applies to computedFacesToMake: with no lid or no
+    // bottom there is nothing for the checkbox to make either way.
+    if (lidType === "None" || lidType === "OpenChamfer") { f.lid = false; }
+    if (noBottom) { f.bottom = false; }
+
+    // A joint only exists where the panel carrying it is being made AND the panel
+    // it reaches into is either being made too or is getting joints anyway.
+    //
+    // The view's x axis runs right-to-left across the screen, so the dialog's Left
+    // wall is the one drawn at x = w and Right the one at x = 0 - that is what puts
+    // Left on the left of the picture. These four are named for where they land
+    // rather than for whose joint they are, since that is what the drawing code
+    // needs to know.                                            -- by Claude 11/2/2026
+    var reaches = function (neighbour) { return neighbour || f.tabs; };
+    f.tailAtX0    = f.right && reaches(f.front);  // Right's tails, x = 0..t on the y = 0 plane
+    f.tailAtXW    = f.left  && reaches(f.front);  // Left's tails,  x = w-t..w on the y = 0 plane
+    f.pinsFrontXW = f.front && reaches(f.left);   // Front's pins through the x = w wall
+    f.pinsBackXW  = f.back  && reaches(f.left);   // Back's pins through the x = w wall
+    f.tailBackX0  = f.right && reaches(f.back);   // Right's tails at the back corner
+    f.tailBackXW  = f.left  && reaches(f.back);   // Left's tails at the back corner
+    f.jointBottom     = f.bottom || f.tabs;            // fingers along the walls' bottom edge
+    f.jointLid        = f.lid    || f.tabs;            // fingers along the walls' top edge
+
+    var k = [], n;
+    for (n in f) { if (f.hasOwnProperty(n)) { k.push(n + "=" + f[n]); } }
+    f.key = k.join(";");
+    return f;
   }
 
   // Lid settings the view shows: Lid Type and, for a Grooved (sliding) lid, its
@@ -1577,23 +1629,45 @@
   // the tails flare out towards the wall's end and Front's / Back's pins between
   // them narrow towards it; on Front the tails' end grain is as wide as their
   // tips.                                                      -- by Claude 11/1/2026
-  function isoCornerFingers(F, w, d, t, zStart, hFront, hBack, backLimit, colFront, colSide) {
+  // fc carries the "Faces to Machine" state: each of the three things drawn here
+  // is one half of a corner joint, so it only appears when the panel carrying it
+  // is being machined AND the panel it reaches into is being machined too (or
+  // "Create joints to un-checked faces" is on). With that box ticked the tails
+  // and pins stay, standing in open air where the missing panel would have been -
+  // which is exactly what the gadget cuts.                     -- by Claude 11/2/2026
+  // pinNY / pinPX are the sort depths of the two panel faces the fingers are cut
+  // into - Front's outer face (y = 0) and Right's outer face (x = w). They have to
+  // be pinned to their parent rather than sorted on their own centres: a finger up
+  // near the far end of a wall sits well behind that wall's own centre and would
+  // otherwise sort underneath it and disappear.                -- by Claude 11/2/2026
+  // The finger pattern up one corner, from zStart to hTop: [z0, z1, isTail]
+  // segments, gap first and last, plus how far each tail flares out at its tip for
+  // dovetails. Shared by the corner joints drawn on a face (isoCornerFingers) and
+  // the tails built into a side wall's own outline when its neighbour is not being
+  // made (isoDraw), so the two can never disagree.          -- by Claude 11/2/2026
+  function isoCornerPattern(zStart, hTop, t) {
     var jw = isoNum("SideTabWidthField");
     if (!(jw > 0)) { jw = 2 * t; }
     var ef = isoDovetailFlare() * t;
-    var pattern = function (hTop) {
-      var hc = hTop - zStart;
-      var nf = Math.floor((0.5 * hc) / jw), segs = [], zc = zStart, k;
-      if (nf > 40) { nf = 40; }
-      var gapH = (hc - nf * jw) / (nf + 1);
-      for (k = 0; k <= nf; k++) {
-        segs.push([zc, zc + gapH, false]); zc += gapH;
-        if (k < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
-      }
-      // a tail never flares past half the gap next to it
-      var e = Math.min(ef, Math.max(0, gapH / 2 - 1e-6));
-      return { segs: segs, e: e, bot: zStart, top: hTop };
-    };
+    var hc = hTop - zStart;
+    var nf = Math.floor((0.5 * hc) / jw), segs = [], zc = zStart, k;
+    if (!(nf >= 0)) { nf = 0; }
+    if (nf > 40) { nf = 40; }
+    var gapH = (hc - nf * jw) / (nf + 1);
+    for (k = 0; k <= nf; k++) {
+      segs.push([zc, zc + gapH, false]); zc += gapH;
+      if (k < nf) { segs.push([zc, zc + jw, true]); zc += jw; }
+    }
+    // a tail never flares past half the gap next to it
+    var e = Math.min(ef, Math.max(0, gapH / 2 - 1e-6));
+    return { segs: segs, e: e, bot: zStart, top: hTop };
+  }
+
+  // tailsInWall: the caller builds the side walls' tails into their own outlines
+  // whenever the end wall they belong in is not being made, so only draw them here
+  // while it is (as end grain showing through its face).
+  function isoCornerFingers(F, w, d, t, zStart, hFront, hBack, backLimit, colFront, colSide, colTop, fc, pinNY, pinPX, tailsInWall) {
+    var pattern = function (hTop) { return isoCornerPattern(zStart, hTop, t); };
     // the pin of a gap: as wide as the gap at the tails' roots (yRoot), less the
     // flare of the tails above / below it at their tips (yTip)
     var pin = function (pt, sg, yTip, yRoot) {
@@ -1604,17 +1678,38 @@
     for (i = 0; i < sf.length; i++) {
       sg = sf[i];
       if (sg[2]) {
-        F([[0,0,sg[0]-pf.e],[t,0,sg[0]-pf.e],[t,0,sg[1]+pf.e],[0,0,sg[1]+pf.e]], colSide);
-        F([[w-t,0,sg[0]-pf.e],[w,0,sg[0]-pf.e],[w,0,sg[1]+pf.e],[w-t,0,sg[1]+pf.e]], colSide);
-      } else {
-        F(pin(pf, sg, 0, t), colFront);
+        // The side walls' tails at the front corner. With Front there they are its
+        // end grain showing through its face, so one flat run on the y = 0 plane is
+        // all there is to see. With Front NOT being made the same tails stand out
+        // in the open, and a flat run leaves them as squares floating off the end
+        // of the wall - so they get their remaining two camera-facing sides, which
+        // turns them back into solid tabs.                      -- by Claude 11/2/2026
+        if (tailsInWall && !fc.front) { continue; }
+        if (fc.tailAtX0) {
+          F([[0,0,sg[0]-pf.e],[t,0,sg[0]-pf.e],[t,0,sg[1]+pf.e],[0,0,sg[1]+pf.e]], colSide, pinNY);
+          if (!fc.front) {
+            F([[t,0,sg[0]-pf.e],[t,t,sg[0]],[t,t,sg[1]],[t,0,sg[1]+pf.e]], colSide, pinNY);          // +x side
+            F([[0,0,sg[1]+pf.e],[t,0,sg[1]+pf.e],[t,t,sg[1]],[0,t,sg[1]]], colTop, pinNY);           // +z top
+          }
+        }
+        if (fc.tailAtXW) {
+          F([[w-t,0,sg[0]-pf.e],[w,0,sg[0]-pf.e],[w,0,sg[1]+pf.e],[w-t,0,sg[1]+pf.e]], colSide, pinNY);
+          if (!fc.front) {
+            F([[w,0,sg[0]-pf.e],[w,t,sg[0]],[w,t,sg[1]],[w,0,sg[1]+pf.e]], colSide, pinNY);          // +x side
+            F([[w-t,0,sg[1]+pf.e],[w,0,sg[1]+pf.e],[w,t,sg[1]],[w-t,t,sg[1]]], colTop, pinNY);       // +z top
+          }
+        }
+      } else if (fc.pinsFrontXW) {
+        // Front's own pins, end grain showing through the x = w wall's face
+        F(pin(pf, sg, 0, t), colFront, pinPX);
       }
     }
     for (i = 0; i < sb.length; i++) {
       sg = sb[i];
-      if (!sg[2] && sg[0] < backLimit) {
+      // Back's pins, end grain showing through the x = w wall's face
+      if (!sg[2] && sg[0] < backLimit && fc.pinsBackXW) {
         pts = isoClipZ(pin(pb, sg, d, d - t), backLimit);
-        if (pts.length >= 3) { F(pts, colFront); }
+        if (pts.length >= 3) { F(pts, colFront, pinPX); }
       }
     }
   }
@@ -1704,7 +1799,7 @@
     return { div: z, vml: z };
   }
 
-  function isoDraw(w, d, h, t, noBottom, dark, lid) {
+  function isoDraw(w, d, h, t, noBottom, dark, lid, fc) {
     var view = document.getElementById("BoxIsoView");
     if (!view) { return; }
     if (!(w > 0 && d > 0 && h > 0)) { view.innerHTML = ""; return; }
@@ -1722,22 +1817,211 @@
     var lidFront = dark ? "#655539" : "#e3c99c";
     var lidSide = dark ? "#54462f" : "#d2b07a";
     var holeCol = dark ? "#1d2430" : "#5d6f8c";
+    // inside an empty socket cut into a panel: the panel's own wood, in shadow
+    var sockCol = dark ? "#3f3423" : "#b8955e";
 
-    // Faces are collected in box coordinates (x = width, y = depth, z = height)
-    // in painter's order, then projected and scaled to fit the view together.
+    // Faces are collected in box coordinates (x = width, y = depth, z = height),
+    // then sorted back to front and projected together.
+    //
+    // The camera looks along (1,-1,1): that is the one direction this projection
+    // collapses - solve P(v) = [0,0] and you get v = (1,-1,1) - so a face points at
+    // the viewer exactly when its outward normal has a positive dot product with
+    // it. For an axis-aligned block that means only its +x, -y and +z faces can
+    // ever be seen, which is what `panel` below emits.
+    //
+    // Everything is then painted far-to-near on its centre's depth along that same
+    // axis, rather than relying on the order calls happen to be made in. That is
+    // what lets a panel simply be left out of the list: whatever stood behind it -
+    // the end grain of the walls it butted against, the far wall's inside face, the
+    // floor - is already there and comes forward on its own, with no per-case
+    // clipping to maintain.                                     -- by Claude 11/2/2026
     var faces = [];
-    var F = function (pts, col) { faces.push([pts, col]); };
-    // visible faces of a block: top, front (y0) and right (x1)
-    var block = function (x0, x1, y0, y1, z0, z1, cTop, cFront, cSide) {
-      F([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]], cTop);
-      F([[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]], cFront);
-      F([[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]], cSide);
+    var depthOf = function (pts) {
+      var s = 0, k;
+      for (k = 0; k < pts.length; k++) { s += pts[k][0] - pts[k][1] + pts[k][2]; }
+      return s / pts.length;
+    };
+    // `pin`, when given, sorts the face as if it sat at that depth instead of at
+    // its own centre. Coplanar detail - fingers, the lid groove, the finger hole -
+    // needs this: a few fingers near the far end of a big face have a centre well
+    // behind that face's own centre, so on their own depth they would sort *under*
+    // the very panel they are cut into and vanish. Pinning them to the parent face's
+    // depth plus a hair keeps each group together and in the right order.
+    //
+    // On top of that, three things hold for any box this draws, and are applied
+    // here rather than face by face:                           -- by Claude 11/2/2026
+    //
+    //  * Nothing is ever in front of the outer planes y = 0 and x = w: a point is
+    //    hidden only by one at p + s(1,-1,1), s > 0, and from either plane that
+    //    leaves the box at once. Faces lying in them go LAST, in the order they
+    //    were added (so a detail added after its face stays on top of it).
+    //  * The bottom panel never hides anything: whatever could hide it is higher
+    //    up, and moving away from the camera only goes lower. It goes FIRST
+    //    (layer = BOTTOM while it is being drawn).
+    //  * The Fingers / Flat / Inset lid is never hidden by the box: the box is all
+    //    below it and moving towards the camera only goes higher. It goes after
+    //    everything but the outer planes (layer = LIDS while it is drawn).
+    //
+    // Most of the pinning that came before was approximating these one face at a
+    // time, which is why fixing one corner kept upsetting another.
+    var OUTER = 1e9, LIDS = 1e6, BOTTOM = -1e6, layer = 0;
+    var onOuterPlane = function (pts) {
+      var k, allY0 = true, allXW = true;
+      for (k = 0; k < pts.length; k++) {
+        if (Math.abs(pts[k][1]) > 1e-9) { allY0 = false; }
+        if (Math.abs(pts[k][0] - w) > 1e-9) { allXW = false; }
+      }
+      return allY0 || allXW;
+    };
+    var F = function (pts, col, pin) {
+      var dep = (typeof pin === "number") ? pin : depthOf(pts);
+      faces.push([pts, col, onOuterPlane(pts) ? OUTER : dep + layer]);
+    };
+    var DETAIL = 1e-6;                                   // "just in front of my parent"
+    var depthAt = function (xc, yc, zc) { return xc - yc + zc + DETAIL; };
+
+    // The three faces of an axis-aligned block that can face the viewer.
+    //
+    // `omit` ("px", "ny", "pz", space separated) drops one a present neighbour
+    // covers completely. That matters because sorting whole faces by depth cannot
+    // order a small face lying flat against a much bigger one: the big face's
+    // centre can easily be nearer the camera than the little face standing in front
+    // of it, and then it paints straight over it. A surface that is never exposed
+    // is therefore not emitted at all, and the sort is only ever left to order
+    // surfaces that really can all be seen - which it does correctly. The callers
+    // key every `omit` off the neighbour's own checkbox, so unchecking a panel
+    // brings the surfaces behind it back.                      -- by Claude 11/2/2026
+    var EPSB = 1e-9;
+    var panel = function (x0, x1, y0, y1, z0, z1, cPX, cNY, cPZ, omit) {
+      if (!(x1 - x0 > EPSB && y1 - y0 > EPSB && z1 - z0 > EPSB)) { return; }
+      omit = omit || "";
+      if (omit.indexOf("px") < 0) { F([[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[x1,y0,z1]], cPX); }
+      if (omit.indexOf("ny") < 0) { F([[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1]], cNY); }
+      if (omit.indexOf("pz") < 0) { F([[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1]], cPZ); }
+    };
+    // Same block, in the colour order the lid code already asks for.
+    var block = function (x0, x1, y0, y1, z0, z1, cTop, cFront, cSide, omit) {
+      panel(x0, x1, y0, y1, z0, z1, cSide, cFront, cTop, omit);
+    };
+
+    // A wall's outer face with its bottom joint teeth built into the outline,
+    // instead of a plain rectangle with the teeth painted on underneath it. The
+    // rectangle ran a stroked line straight across the base of every tooth, so the
+    // fingers read as a separate strip stuck on below the wall rather than as the
+    // wall's own material with notches cut between them. The notches show the panel
+    // beneath, which is already drawn by then.                 -- by Claude 11/2/2026
+    //
+    // axis "x": the face lies in the plane y = v and runs along x (Front / Back).
+    // axis "y": the face lies in the plane x = v and runs along y (the side walls).
+    // teeth are [from, to] pairs on that axis, reaching from zRoot down to zTip and
+    // widening by `fl` at the tip for dovetails.
+    // Any of the four edges may be toothed; pass null to leave one straight.
+    //   lo / hi : {teeth: [[a,b],...] along u, tip: z they reach, fl: tip flare}
+    //   s  / e  : {segs: [[z0,z1],...] up the end, tip: u they reach, fl: flare}
+    // lo / hi are the joints into the bottom and the lid; s / e are the corner
+    // tails at the u0 and u1 ends, for when the end wall they would fit into is not
+    // being made. The outline is walked top (u0 -> u1), end (down), bottom
+    // (u1 -> u0), start (up), so it stays one simple polygon.
+    //                                                          -- by Claude 11/2/2026
+    var wallPoly = function (axis, v, u0, u1, zLo, zHi, lo, hi, s, e, col, pin) {
+      var pts = [], k, a, b, g;
+      var at = (axis === "x") ? function (u, z) { return [u, v, z]; }
+                              : function (u, z) { return [v, u, z]; };
+      var clamp = function (u) { return u < u0 ? u0 : (u > u1 ? u1 : u); };
+      pts.push(at(u0, zHi));
+      if (hi) {
+        for (k = 0; k < hi.teeth.length; k++) {
+          a = hi.teeth[k][0]; b = hi.teeth[k][1];
+          pts.push(at(a, zHi)); pts.push(at(clamp(a - hi.fl), hi.tip));
+          pts.push(at(clamp(b + hi.fl), hi.tip)); pts.push(at(b, zHi));
+        }
+      }
+      pts.push(at(u1, zHi));
+      if (e) {
+        for (k = e.segs.length - 1; k >= 0; k--) {
+          g = e.segs[k];
+          pts.push(at(u1, g[1])); pts.push(at(e.tip, g[1] + e.fl));
+          pts.push(at(e.tip, g[0] - e.fl)); pts.push(at(u1, g[0]));
+        }
+      }
+      pts.push(at(u1, zLo));
+      if (lo) {
+        for (k = lo.teeth.length - 1; k >= 0; k--) {
+          a = lo.teeth[k][0]; b = lo.teeth[k][1];
+          pts.push(at(b, zLo)); pts.push(at(clamp(b + lo.fl), lo.tip));
+          pts.push(at(clamp(a - lo.fl), lo.tip)); pts.push(at(a, zLo));
+        }
+      }
+      pts.push(at(u0, zLo));
+      if (s) {
+        for (k = 0; k < s.segs.length; k++) {
+          g = s.segs[k];
+          pts.push(at(u0, g[0])); pts.push(at(s.tip, g[0] - s.fl));
+          pts.push(at(s.tip, g[1] + s.fl)); pts.push(at(u0, g[1]));
+        }
+      }
+      F(pts, col, pin);
+    };
+
+    // A wall's top surface as the stretches BETWEEN its lid teeth, rather than one
+    // quad running the whole length. A single quad is one face at one depth, and
+    // its centre sits nearer the camera than the teeth standing on its far half -
+    // so it sorts in front of them and paints them out. Cut into segments, each
+    // piece sorts against the teeth beside it.                 -- by Claude 11/2/2026
+    var rimSegments = function (axis, c0, c1, u0, u1, z, teeth, col, pin) {
+      var k, prev = u0;
+      var quad = (axis === "x")
+        ? function (p, q) { return [[p,c0,z],[q,c0,z],[q,c1,z],[p,c1,z]]; }
+        : function (p, q) { return [[c0,p,z],[c1,p,z],[c1,q,z],[c0,q,z]]; };
+      for (k = 0; k < teeth.length; k++) {
+        if (teeth[k][0] - prev > EPSB) { F(quad(prev, teeth[k][0]), col, pin); }
+        prev = teeth[k][1];
+      }
+      if (u1 - prev > EPSB) { F(quad(prev, u1), col, pin); }
+    };
+
+    // A panel's edge where the wall that should fill its sockets is not being made:
+    // the edge face becomes the comb BETWEEN the sockets, and each socket shows its
+    // own back wall one material thickness in. Painting flat recesses onto a solid
+    // edge face - what this used to do - gave nothing to read them by; as real
+    // notches they get their own outline and some depth. -- by Claude 11/2/2026
+    //
+    // v is the plane the edge is in, vBack the socket's back one thickness behind.
+    // colWall is the socket's one side wall that faces the camera - its +x side on
+    // an edge running along x, its -y side on one running along y.
+    var combEdge = function (axis, v, vBack, u0, u1, zRoot, zTip, teeth, fl, colFace, colBack, colWall, filled) {
+      var k, a, b, prev = u0;
+      var at  = (axis === "x") ? function (u, z) { return [u, v, z]; }
+                               : function (u, z) { return [v, u, z]; };
+      var atB = (axis === "x") ? function (u, z) { return [u, vBack, z]; }
+                               : function (u, z) { return [vBack, u, z]; };
+      var clamp = function (u) { return u < u0 ? u0 : (u > u1 ? u1 : u); };
+      for (k = 0; k < teeth.length; k++) {
+        a = teeth[k][0]; b = teeth[k][1];
+        if (a - prev > EPSB) {
+          // the panel between this socket and the last, tapering to match them
+          F([at(prev, zRoot), at(a, zRoot), at(clamp(a - fl), zTip),
+             at(k === 0 ? prev : clamp(prev + fl), zTip)], colFace);
+        }
+        // `filled`: the wall is being made, so its teeth fill these sockets and are
+        // drawn as part of that wall's own face - only the comb pieces are left here
+        if (!filled) {
+          F([atB(a, zRoot), atB(b, zRoot), atB(clamp(b + fl), zTip), atB(clamp(a - fl), zTip)], colBack);
+          if (axis === "x") {
+            F([at(a, zRoot), atB(a, zRoot), atB(clamp(a - fl), zTip), at(clamp(a - fl), zTip)], colWall);
+          } else {
+            F([at(b, zRoot), atB(b, zRoot), atB(clamp(b + fl), zTip), at(clamp(b + fl), zTip)], colWall);
+          }
+        }
+        prev = b;
+      }
+      if (u1 - prev > EPSB) {
+        F([at(prev, zRoot), at(u1, zRoot), at(u1, zTip), at(clamp(prev + fl), zTip)], colFace);
+      }
     };
 
     // Open box with its wall thickness - only when the walls leave an inside
-    // (otherwise, or without a thickness, a solid block). Painter's order: the
-    // inside first, then the rim, then the outside faces, which hide whatever
-    // lies behind the walls.                              -- by Claude 10/31/2026
+    // (otherwise, or without a thickness, a solid block).  -- by Claude 10/31/2026
     var open = (t > 0) && (2 * t < w) && (2 * t < d) && (t < h);
 
     // Grooved (sliding) lid: Back ends at the lid's underside; the lid is shown
@@ -1760,9 +2044,61 @@
     var botT = (bType === "Fingers" || bType === "Flat") ? t : (bType === "Inset" ? t / 2 : 0);
     var topT = (lid.type === "Fingers" || lid.type === "Flat") ? t : (lid.type === "Inset" ? t / 2 : 0);
     if (!open) { botT = 0; topT = 0; }
+    // A Fingers bottom / lid that isn't being made AND isn't getting joints anyway
+    // leaves the walls running the whole way to that edge - the same case
+    // MakeSideFace spells out as "the bottom edge has no tabs, and starts at 0,0".
+    // The other joint types keep their bottom_thickness / top_thickness regardless
+    // of the checkbox, exactly as MakeSideFace computes them.   -- by Claude 11/2/2026
+    if (bType === "Fingers" && !fc.jointBottom) { botT = 0; }
+    if (lid.type === "Fingers" && !fc.jointLid) { topT = 0; }
     var zB = botT, zT = h - topT;
     // bottom panel under the walls (its fingers are drawn over its edges below)
-    if (botT > 0) { block(0, w, 0, d, 0, botT, lidTop, lidFront, lidSide); }
+    layer = BOTTOM;   // the bottom panel never hides anything, see F
+    if (botT > 0 && fc.bottom) {
+      // Where a wall is not being made but its joints still are, the panel keeps
+      // the sockets with nothing in them - so that edge is cut as a real comb with
+      // the socket backs showing, instead of a solid face with recesses painted on.
+      //                                                         -- by Claude 11/2/2026
+      var sockJw = isoJointWidth("bottom"), sockFl = isoDovetailFlare() * botT;
+      var sockNY = (bType === "Fingers") && fc.tabs && !fc.front;   // panel's y = 0 edge
+      var sockPX = (bType === "Fingers") && fc.tabs && !fc.left;    // panel's x = w edge
+      var sockW = isoEdgeFingers(w, t, sockJw), sockD = isoEdgeFingers(d, t, sockJw);
+      block(0, w, 0, d, 0, botT, lidTop, lidFront, lidSide,
+            "pz" + (sockNY ? " ny" : "") + (sockPX ? " px" : ""));
+      if (sockNY) {
+        combEdge("x", 0, t, 0, w, botT, 0, sockW, sockFl, lidFront, sockCol, lidSide);
+      }
+      if (sockPX) {
+        combEdge("y", w, w - t, 0, d, botT, 0, sockD, sockFl, lidSide, sockCol, lidFront);
+      }
+      // Its top comes as the ring of cells around the floor, one per wall footprint,
+      // and only where that wall is not standing on it. Emitting the whole w x d top
+      // instead would paint over the very walls sitting on it (see `panel`); the
+      // middle is the floor, drawn with the walls further down.  -- by Claude 11/2/2026
+      var cxs = [0, t, w - t, w], cys = [0, t, d - t, d];
+      // which wall stands on cell [ix][iy] - Front and Back run the full width, so
+      // they own a whole row each; null is the floor itself
+      // (x = 0 is the dialog's Right wall and x = w its Left, see isoFaceSettings)
+      var cellWall = [["front", "right", "back"],
+                      ["front", null,    "back"],
+                      ["front", "left",  "back"]];
+      var ix, iy, cw;
+      for (ix = 0; ix < 3; ix++) {
+        for (iy = 0; iy < 3; iy++) {
+          cw = cellWall[ix][iy];
+          if (cw === null || fc[cw]) { continue; }
+          // Over an edge cut as a comb the top is notched too: the sockets go right
+          // through the panel's thickness. Left whole, this strip sits in front of
+          // every socket back and paints it out, leaving the comb's teeth looking
+          // like icicles hung off a solid edge.               -- by Claude 11/2/2026
+          if (sockNY && ix === 1 && iy === 0) { rimSegments("x", 0, t, t, w - t, botT, sockW, lidTop); continue; }
+          if (sockPX && ix === 2 && iy === 1) { rimSegments("y", w - t, w, t, d - t, botT, sockD, lidTop); continue; }
+          F([[cxs[ix],cys[iy],botT],[cxs[ix+1],cys[iy],botT],
+             [cxs[ix+1],cys[iy+1],botT],[cxs[ix],cys[iy+1],botT]], lidTop);
+        }
+      }
+    }
+    layer = 0;
 
     // Open Chamfer: Front and Back have their own (lower) heights, Left / Right
     // stay full height in the middle and run down to them in a chamfer at each
@@ -1776,58 +2112,226 @@
       var r1 = (h - e1) * Math.tan(a1 * Math.PI / 180), r2 = (h - e2) * Math.tan(a2 * Math.PI / 180);
       var inner_d = d - 2 * t;
       if (r1 + r2 > inner_d && r1 + r2 > 0) { var scl = inner_d / (r1 + r2); r1 *= scl; r2 *= scl; }
-      // top line of the side walls along the depth: [y, z]
-      var prof = [[0, e1], [t, e1], [t + r1, h], [d - t - r2, h], [d - t, e2], [d, e2]];
       var zbc = noBottom ? 0 : Math.max(zB, Math.min(t, e1, e2));
-      // inside: floor, Left wall's inside face (x = t), Back's inside face
-      // no floor at all with Bottom Type None -- by Claude 11/1/2026
-      if (!noBottom) { F([[t,t,zbc],[w-t,t,zbc],[w-t,d-t,zbc],[t,d-t,zbc]], floor); }
-      F([[t,t,zbc],[t,d-t,zbc],[t,d-t,e2],[t,d-t-r2,h],[t,t+r1,h],[t,t,e1]], inner);
-      F([[t,d-t,zbc],[w-t,d-t,zbc],[w-t,d-t,e2],[t,d-t,e2]], inner);
-      // tops: Back, Left wall (its strip along the profile), Front
-      F([[0,d-t,e2],[w,d-t,e2],[w,d,e2],[0,d,e2]], top);
-      // Left / Right strips only between Front and Back: at the top of the corners
-      // Front and Back run the full width (no lines across their tops) -- by Claude 11/1/2026
-      var sideSeg = function (k) {
-        var ya = prof[k][0], yb = prof[k + 1][0];
-        if (Math.abs(yb - ya) < 1e-6) { return false; }
-        return !(Math.max(ya, yb) <= t + 1e-6 || Math.min(ya, yb) >= d - t - 1e-6);
+      // no floor at all with Bottom Type None, nor when the bottom is not one of
+      // the faces being machined -- by Claude 11/1/2026, 11/2/2026
+      if (!noBottom && fc.bottom) { layer = BOTTOM; F([[t,t,zbc],[w-t,t,zbc],[w-t,d-t,zbc],[t,d-t,zbc]], floor, depthAt(w/2, d/2, zbc)); layer = 0; }
+
+      // Front and Back run the full width, each at its own height; Left / Right sit
+      // between them carrying the profiled top. Taking it apart this way instead of
+      // one full-depth polygon per side wall gives the same silhouette while letting
+      // any one of the four be left out and reveal what is behind it.
+      //                                                         -- by Claude 11/2/2026
+      if (fc.front) { panel(0, w, 0, t, zB, e1, side, front, top); }
+      if (fc.back) {
+        panel(0, w, d - t, d, zB, e2, side, inner, top, "ny");
+        // only across the span Left / Right are not standing in front of
+        var cbx0 = fc.right ? t : 0, cbx1 = fc.left ? w - t : w;
+        if (cbx1 - cbx0 > EPSB) {
+          F([[cbx0,d-t,zB],[cbx1,d-t,zB],[cbx1,d-t,e2],[cbx0,d-t,e2]], inner);
+        }
+      }
+
+      // the side walls' top line between Front and Back: [y, z]
+      var sprof = [[t, e1], [t + r1, h], [d - t - r2, h], [d - t, e2]];
+      var sideWall = function (x0, x1, cPX) {
+        var q, pts;
+        // +x face: along the bottom, then back down the profile from Back to Front
+        pts = [[x1, t, zB], [x1, d - t, zB]];
+        for (q = sprof.length - 1; q >= 0; q--) { pts.push([x1, sprof[q][0], sprof[q][1]]); }
+        F(pts, cPX);
+        // -y end grain where it butts up against Front: only exposed once Front is
+        // gone, which is the whole point of having it
+        if (!fc.front) { F([[x0,t,zB],[x1,t,zB],[x1,t,e1],[x0,t,e1]], front); }
+        // +z strips, one per run of the profile
+        for (q = 0; q + 1 < sprof.length; q++) {
+          if (Math.abs(sprof[q+1][0] - sprof[q][0]) < 1e-6) { continue; }
+          F([[x0,sprof[q][0],sprof[q][1]],[x1,sprof[q][0],sprof[q][1]],
+             [x1,sprof[q+1][0],sprof[q+1][1]],[x0,sprof[q+1][0],sprof[q+1][1]]], top);
+        }
       };
-      var pi;
-      for (pi = 0; pi + 1 < prof.length; pi++) {
-        if (!sideSeg(pi)) { continue; }
-        F([[0,prof[pi][0],prof[pi][1]],[t,prof[pi][0],prof[pi][1]],[t,prof[pi+1][0],prof[pi+1][1]],[0,prof[pi+1][0],prof[pi+1][1]]], top);
-      }
-      // Right wall: inside face above Front's top is hidden by the wall itself; its top strip
-      for (pi = 0; pi + 1 < prof.length; pi++) {
-        if (!sideSeg(pi)) { continue; }
-        F([[w-t,prof[pi][0],prof[pi][1]],[w,prof[pi][0],prof[pi][1]],[w,prof[pi+1][0],prof[pi+1][1]],[w-t,prof[pi+1][0],prof[pi+1][1]]], top);
-      }
-      F([[0,0,e1],[w,0,e1],[w,t,e1],[0,t,e1]], top);
-      // outside: Front face, Right wall's face along the profile
-      F([[0,0,zB],[w,0,zB],[w,0,e1],[0,0,e1]], front);
-      var rf = [[w,0,zB],[w,d,zB]];
-      for (pi = prof.length - 1; pi >= 0; pi--) { rf.push([w, prof[pi][0], prof[pi][1]]); }
-      F(rf, side);
-      isoCornerFingers(F, w, d, t, zB, e1, e2, e2, front, side);
+      if (fc.right) { sideWall(0,     t, inner); }   // Right is the x = 0 wall
+      if (fc.left)  { sideWall(w - t, w, side); }    // Left is the x = w wall
+
+      isoCornerFingers(F, w, d, t, zB, e1, e2, e2, front, side, top, fc,
+        depthAt(w / 2, 0, (zB + e1) / 2), depthAt(w, d / 2, (zB + Math.max(e1, e2)) / 2));
     } else {
       if (open) {
         var zb = noBottom ? 0 : Math.max(zB, Math.min(t, zT));       // inside floor
-        // no floor at all with Bottom Type None -- by Claude 11/1/2026
-        if (!noBottom) { F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor); }
-        F([[t,t,zb],[t,d-t,zb],[t,d-t,zT],[t,t,zT]], inner);                 // inside of the Left wall
-        F([[t,d-t,zb],[w-t,d-t,zb],[w-t,d-t,backTop],[t,d-t,backTop]], inner);  // inside of the Back wall
-        if (slide) {
-          // Back's top (lower than the walls) and the ends of Left / Right above it
-          F([[t,d-t,backTop],[w-t,d-t,backTop],[w-t,d,backTop],[t,d,backTop]], top);
-          // Left wall's inside face above the lower Back (visible from here), then the
-          // lid groove along it: from just behind Front right out through the back,
-          // as wide as the groove, its lower edge = the lid's underside.  -- by Claude 10/31/2026
-          F([[t,d-t,backTop],[t,d,backTop],[t,d,zT],[t,d-t,zT]], inner);
+        // no floor at all with Bottom Type None, nor when the bottom panel is not
+        // one of the faces being machined -- by Claude 11/1/2026, 11/2/2026
+        // A Grooved / None bottom has no panel block of its own (botT is 0), so the
+        // floor is this one plate; with a Flat / Fingers / Inset bottom it sits on
+        // top of that panel's own block.
+        if (!noBottom && fc.bottom) { layer = BOTTOM; F([[t,t,zb],[w-t,t,zb],[w-t,d-t,zb],[t,d-t,zb]], floor, depthAt(w/2, d/2, zb)); layer = 0; }
+
+        // The four walls as real blocks, so each one carries every face of its own
+        // that can face the viewer - including the end grain where it butts against
+        // a neighbour, which the old hand-written face list left out altogether
+        // because something always covered it. Here each face is dropped only while
+        // the specific neighbour that covers it is actually being machined, so
+        // unchecking that neighbour brings it straight back. -- by Claude 11/2/2026
+        //
+        // Front and Back run the full width and Left / Right sit between them,
+        // which is how the gadget cuts them: "at the corners the top finger
+        // belongs to Front / Back, Left / Right sit between them".
+        //
+        // Left's +x face looks into the cavity, so it takes the darker inner
+        // shade; Right's +x face is the outside of the box. Likewise Back's -y
+        // face is an inside face while Front's is the outside.
+        //
+        // Left / Right come in two blocks because of the sliding lid: Back only
+        // reaches backZ there, and above that the side walls carry the groove on
+        // through to the back opening, so they run the full depth. With any other
+        // lid backZ is just zT, the upper block collapses to nothing and `panel`
+        // drops it, leaving exactly one block per side.
+        //
+        // backTop itself is h unless a lid slides, so it has to be clamped to the
+        // walls' own top - otherwise every non-sliding box grows a Back wall that
+        // runs up through where the lid sits.
+        var backZ = Math.min(backTop, zT);
+
+        // ---- the four walls -------------------------------------------------
+        // Each wall's one visible face goes out as a SINGLE polygon (wallPoly)
+        // carrying every joint that belongs to it - teeth into the bottom, teeth
+        // into the lid, and the corner tails at either end when the end wall they
+        // would fit into is not being made. Drawn as separate pieces laid against
+        // the face, each of those got a line stroked across its base and read as a
+        // separate part stuck on.                               -- by Claude 11/2/2026
+
+        // Bottom joint: teeth only ever show on the two OUTER faces; on an inside
+        // face they are buried in the bottom panel.
+        var toothed = (bType === "Fingers") && fc.bottom && (zB > 0);
+        var bjw = isoJointWidth("bottom"), bflare = isoDovetailFlare() * zB;
+        var loW = toothed ? { teeth: isoEdgeFingers(w, t, bjw), tip: 0, fl: bflare } : null;
+        var loD = toothed ? { teeth: isoEdgeFingers(d, t, bjw), tip: 0, fl: bflare } : null;
+
+        // Lid joint. lidJoint: the walls carry top teeth at all (lid being made, or
+        // joints cut for a missing one). With no lid they stand in the open on all
+        // four walls (topTeeth); with the lid there they run up through its edges
+        // and only show on the two outer faces.
+        var lidJoint = (lid.type === "Fingers") && fc.jointLid && (h - zT > EPSB);
+        var topTeeth = lidJoint && !fc.lid;
+        var ljw = lidJoint ? isoJointWidth("lid") : 0;
+        var lidFlare = lidJoint ? isoDovetailFlare() * (h - zT) : 0;
+        var lidW = lidJoint ? isoEdgeFingers(w, t, ljw) : null;
+        var lidD = lidJoint ? isoEdgeFingers(d, t, ljw) : null;
+        var hiOutW = lidJoint ? { teeth: lidW, tip: h, fl: lidFlare } : null;
+        var hiOutD = lidJoint ? { teeth: lidD, tip: h, fl: lidFlare } : null;
+        var hiInW  = topTeeth ? hiOutW : null;
+        var hiInD  = topTeeth ? hiOutD : null;
+
+        // Corner tails standing in the open: a side wall keeps the tails that would
+        // have gone into Front (or Back) when that wall is not being made but its
+        // joints are. Not with a sliding lid, whose side walls come in two blocks.
+        var patF = (!slide && !fc.front) ? isoCornerPattern(zB, zT, t) : null;
+        var patB = (!slide && !fc.back)  ? isoCornerPattern(zB, backZ, t) : null;
+        var tailEnd = function (pat, tip) {
+          var r = [], k;
+          for (k = 0; k < pat.segs.length; k++) { if (pat.segs[k][2]) { r.push([pat.segs[k][0], pat.segs[k][1]]); } }
+          return { segs: r, tip: tip, fl: pat.e };
+        };
+        var sF0 = (patF && fc.tailAtX0)   ? tailEnd(patF, 0) : null;   // x = 0 wall, front end
+        var sFW = (patF && fc.tailAtXW)   ? tailEnd(patF, 0) : null;   // x = w wall, front end
+        var eB0 = (patB && fc.tailBackX0) ? tailEnd(patB, d) : null;   // x = 0 wall, back end
+        var eBW = (patB && fc.tailBackXW) ? tailEnd(patB, d) : null;   // x = w wall, back end
+
+        // What else of those tails shows, outside the wall's own face: the end
+        // grain at the tip (front only - at the back it faces away), the top, and
+        // at the front the wall's own end face in the gaps between the tails.
+        var tailBits = function (x0, x1, pat, yRoot, yTip) {
+          var k, g, e = pat.e, front_ = yTip < yRoot;
+          for (k = 0; k < pat.segs.length; k++) {
+            g = pat.segs[k];
+            if (g[2]) {
+              if (front_) { F([[x0,yTip,g[0]-e],[x1,yTip,g[0]-e],[x1,yTip,g[1]+e],[x0,yTip,g[1]+e]], front); }
+              F([[x0,yTip,g[1]+e],[x1,yTip,g[1]+e],[x1,yRoot,g[1]],[x0,yRoot,g[1]]], top);
+            } else if (front_) {
+              F([[x0,yRoot,g[0]],[x1,yRoot,g[0]],[x1,yRoot,g[1]],[x0,yRoot,g[1]]], front);
+            }
+          }
+        };
+
+        // Left's / Right's -y face is their end grain where they butt into Front;
+        // it only shows once Front is gone, and then only between their tails.
+        // A Fingers lid closes straight down onto the walls, putting their rims
+        // underneath it; a Flat / Inset lid is drawn lifted clear and a sliding lid
+        // sits in a groove below the rim, so both of those leave the rims on show.
+        var rimHidden = fc.lid && lid.type === "Fingers";
+        var raw = function (xc, yc, zc) { return xc - yc + zc; };
+        var bx0 = fc.right ? t : 0, bx1 = fc.left ? w - t : w;
+
+        // Sort depths for the two INSIDE faces (the outer two go last anyway, see
+        // F). The x = 0 wall's face has to come after its own tails' tops and end
+        // grain - the tail above stands in front of the one below - so when it has
+        // corner tails it is lifted to just past the highest of them.
+        var pinRight = raw(t, d / 2, (zB + backZ) / 2);
+        if (sF0)      { pinRight = raw(t, 0, zT) + DETAIL; }
+        else if (eB0) { pinRight = Math.max(pinRight, raw(t, d - t, backZ) + DETAIL); }
+        var pinLeft  = raw(w, d / 2, (zB + backZ) / 2);
+        var pinFront = raw(w / 2, 0, (zB + zT) / 2);
+        var pinBack  = raw((bx0 + bx1) / 2, d - t, (zB + backZ) / 2);
+
+        // panel() still draws each wall's other faces; these say which of its faces
+        // the polygon and the rim segments have taken over.
+        var omit = function (face, poly, rimSeg, endFace) {
+          return (poly ? " " + face : "") + ((rimHidden || rimSeg) ? " pz" : "") + (endFace ? " ny" : "");
+        };
+
+        if (fc.right) {
+          var polyR = !!(hiInD || sF0 || eB0);
+          panel(0, t, t, d - t, zB, backZ, inner, front, top,
+                omit("px", polyR, topTeeth, fc.front || sF0));
+          if (topTeeth) { rimSegments("y", 0, t, t, d - t, zT, lidD, top, pinRight - DETAIL); }
+          if (sF0) { tailBits(0, t, patF, t, 0); }
+          if (eB0) { tailBits(0, t, patB, d - t, d); }
+          if (polyR) { wallPoly("y", t, t, d - t, zB, backZ, null, hiInD, sF0, eB0, inner, pinRight); }
+          panel(0, t, t, d, backZ, zT, inner, front, top, omit("", false, false, fc.front));
+        }
+        if (fc.left) {
+          var polyL = !!(loD || hiOutD || sFW || eBW);
+          panel(w-t, w, t, d - t, zB, backZ, side, front, top,
+                omit("px", polyL, topTeeth, fc.front || sFW));
+          if (topTeeth) { rimSegments("y", w - t, w, t, d - t, zT, lidD, top, pinLeft - DETAIL); }
+          if (sFW) { tailBits(w - t, w, patF, t, 0); }
+          if (eBW) { tailBits(w - t, w, patB, d - t, d); }
+          if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
+          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front));
+        }
+        if (fc.front) {
+          var polyF = !!(loW || hiOutW);
+          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false));
+          if (topTeeth) { rimSegments("x", 0, t, 0, w, zT, lidW, top, pinFront - DETAIL); }
+          if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, null, null, front, pinFront); }
+        }
+        if (fc.back) {
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true));
+          // Back's rim runs the full width even where its inside face is clipped
+          if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
+          // Back's inside face, across only the span Left / Right are not standing
+          // in front of - they are nearer the camera over their own footprints.
+          if (bx1 - bx0 > EPSB) {
+            if (hiInW) {
+              wallPoly("x", d - t, bx0, bx1, zB, backZ, null, hiInW, null, null, inner, pinBack);
+            } else {
+              F([[bx0,d-t,zB],[bx1,d-t,zB],[bx1,d-t,backZ],[bx0,d-t,backZ]], inner);
+            }
+          }
+        }
+
+        if (slide && fc.right) {
+          // The lid groove along the Left wall's inside face: from just behind Front
+          // right out through the back, as wide as the groove, its lower edge at the
+          // lid's underside. The groove belongs to the WALL, so unchecking Lid does
+          // not remove it - the gadget still plows it so you can slide your own
+          // panel in. Back's lowered top and the side walls' faces above it now come
+          // from their own blocks.       -- by Claude 10/31/2026, reworked 11/2/2026
           var gwid = Math.min(lid.gw > 0 ? lid.gw : t / 2, zT - lidZ0);
           if (gwid > 0) {
-            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol);
+            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol, depthAt(t, (t + d) / 2, (backZ + zT) / 2));
           }
+        }
+        if (slide && fc.lid) {
           // the lid, pulled out by half the depth
           var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
           var sl = d / 2;   // pulled out halfway, so the groove shows in front of it
@@ -1895,49 +2399,89 @@
             } else {
               for (m2 = 0; m2 < 16; m2++) { a = 2 * Math.PI * m2 / 16; hp.push([cxm + hs/2 * Math.cos(a), (hb + ht)/2 + hs/2 * Math.sin(a), lz1]); }
             }
-            F(hp, holeCol);
+            // pinned to the lid's top face: the hole sits towards the back of it, so
+            // on its own centre it would sort under the lid and never show
+            F(hp, holeCol, depthAt(cxm, (ly0 + ly1) / 2, lz1));
           }
         }
-        // the rim on top, one strip per wall. The finger pattern ends with a gap at
-        // the top, so at the corners the top finger belongs to Front / Back: they
-        // run the full width there, Left / Right sit between them.  -- by Claude 10/31/2026
-        if (slide) {
-          // Back is lower, so Left / Right run through to the back at the top
-          F([[w-t,t,zT],[w,t,zT],[w,d,zT],[w-t,d,zT]], top);    // Right wall's top
-          F([[0,t,zT],[t,t,zT],[t,d,zT],[0,d,zT]], top);        // Left wall's top
-        } else {
-          F([[w-t,t,zT],[w,t,zT],[w,d-t,zT],[w-t,d-t,zT]], top);
-          F([[0,t,zT],[t,t,zT],[t,d-t,zT],[0,d-t,zT]], top);
-          F([[0,d-t,zT],[w,d-t,zT],[w,d,zT],[0,d,zT]], top);
-        }
-        F([[0,0,zT],[w,0,zT],[w,t,zT],[0,t,zT]], top);
+        // The rims, outer faces and end grain all came with the four wall blocks
+        // above - nothing left to add here by hand. With a sliding lid Left and
+        // Right run through to the back over the lower Back, which their blocks
+        // already do (they span y = t .. d - t while Back only reaches backTop).
       } else {
-        F([[0,0,zT],[w,0,zT],[w,d,zT],[0,d,zT]], top);
+        // No inside to speak of: one solid block.
+        panel(0, w, 0, d, zB, zT, side, front, top);
       }
-      // outside: front (y = 0) and right (x = w)
-      F([[0,0,zB],[w,0,zB],[w,0,zT],[0,0,zT]], front);
-      F([[w,0,zB],[w,d,zB],[w,d,zT],[w,0,zT]], side);
 
       // Corner joints: the finger pattern up the corners  -- by Claude 10/31/2026
-      if (open) { isoCornerFingers(F, w, d, t, zB, zT, zT, Math.min(backTop, zT), front, side); }
+      if (open) { isoCornerFingers(F, w, d, t, zB, zT, zT, Math.min(backTop, zT), front, side, top, fc,
+        depthAt(w / 2, 0, (zB + zT) / 2), depthAt(w, d / 2, (zB + zT) / 2), !slide); }
     }
 
-    // Bottom with finger joints: the walls' fingers come down through the
-    // bottom panel's edges - wall end grain on the Front and Right faces.
-    //                                                         -- by Claude 10/31/2026
-    if (open && bType === "Fingers") {
-      // with dovetails the tails flare out towards their tips at the underside
+    // Panel sockets follow MakeBottomFaceContour / MakeLid, which cut them on
+    // "create_tabs_for_missing_faces or facesToMake.<wall>" - so a socket is there
+    // whenever its wall is being made (and filled by it) or joints are being cut
+    // for a missing one (and empty).                           -- by Claude 11/2/2026
+
+    // One free-standing finger on the end of a wall, with its dovetail taper: the
+    // tail widens from its root by `fl` on each side as it reaches its tip, so with
+    // box joints (fl = 0) this is just a plain rectangular finger. A box cannot
+    // express that taper, which is why these are three explicit faces rather than a
+    // `panel` call.
+    //
+    // `along` is "x" when the finger runs across the width (Front / Back) and "y"
+    // when it runs along the depth (the side walls); a..b is its span on that axis
+    // at the root, c0..c1 the wall's thickness across it. zRoot is the end against
+    // the wall and zTip the free end, so a lid finger passes zRoot < zTip and a
+    // bottom one zRoot > zTip. cPZ is null for a bottom finger: its upper face is
+    // the wall's own underside, with the wall sitting directly on it.
+    //                                                           -- by Claude 11/2/2026
+    // `pin` sorts all three faces together, just in front of the wall face the
+    // finger stands on - see the call sites for why that is needed.
+    var taperFinger = function (along, a, b, c0, c1, zRoot, zTip, fl, cPX, cNY, cPZ, pin) {
+      var aT = a - fl, bT = b + fl;
+      if (along === "x") {
+        if (cPX) { F([[b,c0,zRoot],[b,c1,zRoot],[bT,c1,zTip],[bT,c0,zTip]], cPX, pin); }   // +x
+        if (cNY) { F([[a,c0,zRoot],[b,c0,zRoot],[bT,c0,zTip],[aT,c0,zTip]], cNY, pin); }   // -y
+        if (cPZ) { F([[aT,c0,zTip],[bT,c0,zTip],[bT,c1,zTip],[aT,c1,zTip]], cPZ, pin); } // +z tip
+      } else {
+        if (cPX) { F([[c1,a,zRoot],[c1,b,zRoot],[c1,bT,zTip],[c1,aT,zTip]], cPX, pin); }   // +x
+        if (cNY) { F([[c0,a,zRoot],[c1,a,zRoot],[c1,aT,zTip],[c0,aT,zTip]], cNY, pin); }   // -y
+        if (cPZ) { F([[c0,aT,zTip],[c1,aT,zTip],[c1,bT,zTip],[c0,bT,zTip]], cPZ, pin); } // +z tip
+      }
+    };
+
+    // With the panel being made there is nothing to add here on either count: where
+    // the wall is being made too its teeth are part of that wall's own face
+    // (wallFace, up in the shell), and where it is not, the panel's edge is already
+    // cut as a comb with its socket backs showing (combEdge, where the panel is
+    // emitted). Only the no-panel case is left.                 -- by Claude 11/2/2026
+    if (open && bType === "Fingers" && fc.jointBottom && !fc.bottom) {
+      // No bottom panel, but joints are still being cut: each wall keeps the
+      // fingers that would have gone into it, hanging free underneath. All three
+      // camera-facing sides of each one show, and for the far two that is their
+      // INNER side, which a run drawn on the wall's outer plane cannot reach. "pz"
+      // comes off because the finger's top is the wall's underside, with the wall
+      // sitting directly on it. They taper downwards to their tips for dovetails.
       var bj = isoJointWidth("bottom"), fl, fi, be = isoDovetailFlare() * zB;
       fl = isoEdgeFingers(w, t, bj);
-      for (fi = 0; fi < fl.length; fi++) { F([[fl[fi][0]-be,0,0],[fl[fi][1]+be,0,0],[fl[fi][1],0,zB],[fl[fi][0],0,zB]], front); }
+      for (fi = 0; fi < fl.length; fi++) {
+        if (fc.front) { taperFinger("x", fl[fi][0], fl[fi][1], 0,     t, zB, 0, be, side, front, null); }
+        if (fc.back)  { taperFinger("x", fl[fi][0], fl[fi][1], d - t, d, zB, 0, be, side, inner, null); }
+      }
       fl = isoEdgeFingers(d, t, bj);
-      for (fi = 0; fi < fl.length; fi++) { F([[w,fl[fi][0]-be,0],[w,fl[fi][1]+be,0],[w,fl[fi][1],zB],[w,fl[fi][0],zB]], side); }
+      for (fi = fl.length - 1; fi >= 0; fi--) {
+        if (fc.right) { taperFinger("y", fl[fi][0], fl[fi][1], 0,     t, zB, 0, be, inner, front, null); }
+        if (fc.left)  { taperFinger("y", fl[fi][0], fl[fi][1], w - t, w, zB, 0, be, side,  front, null); }
+      }
     }
 
     // Lid: Flat a plain plate lifted off the box, Inset a plate with the plug
     // that drops into the box under it, Fingers shown closed on the box so its
-    // finger joints show (the walls' fingers come up through its edges).
-    if (open && (lid.type === "Flat" || lid.type === "Inset")) {
+    // finger joints show (the walls' fingers come up through its edges). All of
+    // them in the LIDS layer: nothing of the box can be in front of a lid.
+    if (open && fc.lid && (lid.type === "Flat" || lid.type === "Inset")) {
+      layer = LIDS;
       var gap = Math.max(h * 0.3, 2 * t), zL = zT + gap;
       if (lid.type === "Inset") {
         block(t, w - t, t, d - t, zL, zL + t / 2, lidTop, lidFront, lidSide);
@@ -1945,34 +2489,125 @@
       } else {
         block(0, w, 0, d, zL, zL + t, lidTop, lidFront, lidSide);
       }
+      layer = 0;
     }
-    if (open && lid.type === "Fingers") {
-      block(0, w, 0, d, zT, h, lidTop, lidFront, lidSide);
-      // with dovetails the tails flare out towards their tips on the lid's top
-      var lj = isoJointWidth("lid"), ll, li, le = isoDovetailFlare() * (h - zT);
-      ll = isoEdgeFingers(w, t, lj);
-      for (li = 0; li < ll.length; li++) { F([[ll[li][0],0,zT],[ll[li][1],0,zT],[ll[li][1]+le,0,h],[ll[li][0]-le,0,h]], front); }
-      ll = isoEdgeFingers(d, t, lj);
-      for (li = 0; li < ll.length; li++) { F([[w,ll[li][0],zT],[w,ll[li][1],zT],[w,ll[li][1]+le,h],[w,ll[li][0]-le,h]], side); }
-      // the fingers' (tails') ends on the lid's top
-      ll = isoEdgeFingers(w, t, lj);
+    if (open && lidJoint && !fc.lid) {
+      // No lid, but joints are still being cut: every wall keeps the fingers that
+      // would have gone into it, standing free where the lid would have been. The
+      // face of each finger lying in its wall's visible plane is part of that
+      // wall's own polygon (wallPoly, up in the shell); only its end grain and its
+      // tip are added here. Those go just BEHIND the wall's face: where the gap
+      // between two fingers is narrower than the wall is thick, the finger in front
+      // stands across the end grain of the one behind it. Within a wall they still
+      // go far-to-near, which along the depth means back-to-front.
+      //                                                       -- by Claude 11/2/2026
+      var ll, li, le = lidFlare;
+      ll = lidW;
       for (li = 0; li < ll.length; li++) {
-        F([[ll[li][0]-le,0,h],[ll[li][1]+le,0,h],[ll[li][1]+le,t,h],[ll[li][0]-le,t,h]], top);
-        F([[ll[li][0]-le,d-t,h],[ll[li][1]+le,d-t,h],[ll[li][1]+le,d,h],[ll[li][0]-le,d,h]], top);
+        if (fc.front) { taperFinger("x", ll[li][0], ll[li][1], 0,     t, zT, h, le, side, null, top, pinFront - DETAIL); }
+        if (fc.back)  { taperFinger("x", ll[li][0], ll[li][1], d - t, d, zT, h, le, side, null, top, pinBack  - DETAIL); }
       }
-      ll = isoEdgeFingers(d, t, lj);
-      for (li = 0; li < ll.length; li++) {
-        F([[0,ll[li][0]-le,h],[t,ll[li][0]-le,h],[t,ll[li][1]+le,h],[0,ll[li][1]+le,h]], top);
-        F([[w-t,ll[li][0]-le,h],[w,ll[li][0]-le,h],[w,ll[li][1]+le,h],[w-t,ll[li][1]+le,h]], top);
+      ll = lidD;
+      for (li = ll.length - 1; li >= 0; li--) {
+        if (fc.right) { taperFinger("y", ll[li][0], ll[li][1], 0,     t, zT, h, le, null, front, top, pinRight - DETAIL); }
+        if (fc.left)  { taperFinger("y", ll[li][0], ll[li][1], w - t, w, zT, h, le, null, front, top, pinLeft  - DETAIL); }
       }
     }
+    if (open && lidJoint && fc.lid) {
+      // The Fingers lid, cut the same way as the bottom panel rather than painted.
+      // Along each edge it has sockets wherever that wall is being made (filled by
+      // the wall's teeth, which are part of the wall's own face) or wherever it is
+      // not but joints are still cut (empty). Its two edges that face the camera
+      // become combs, with an empty socket also showing its back and its side
+      // wall; its top is notched over every empty socket - they go right through
+      // its thickness - and carries the walls' end grain where they are filled.
+      // The sockets widen towards the top for dovetails, matching the tails.
+      //                                                       -- by Claude 11/2/2026
+      layer = LIDS;
+      var sk = { front: fc.front || fc.tabs, back: fc.back || fc.tabs,
+                 left:  fc.left  || fc.tabs, right: fc.right || fc.tabs };
+      var widen = function (teeth) {
+        var r = [], k;
+        for (k = 0; k < teeth.length; k++) { r.push([teeth[k][0] - lidFlare, teeth[k][1] + lidFlare]); }
+        return r;
+      };
+      var topW = widen(lidW), topD = widen(lidD), k2, a2, b2;
+
+      block(0, w, 0, d, zT, h, lidTop, lidFront, lidSide,
+            "pz" + (sk.front ? " ny" : "") + (sk.left ? " px" : ""));
+      if (sk.front) { combEdge("x", 0, t, 0, w, zT, h, lidW, lidFlare, lidFront, sockCol, lidSide, fc.front); }
+      if (sk.left)  { combEdge("y", w, w - t, 0, d, zT, h, lidD, lidFlare, lidSide, sockCol, lidFront, fc.left); }
+
+      // its top, as the same 3 x 3 grid as the bottom: corners and middle whole,
+      // the four edge strips notched or carrying end grain
+      var lxs = [0, t, w - t, w], lys = [0, t, d - t, d];
+      var cell = function (ix, iy) {
+        F([[lxs[ix],lys[iy],h],[lxs[ix+1],lys[iy],h],[lxs[ix+1],lys[iy+1],h],[lxs[ix],lys[iy+1],h]], lidTop);
+      };
+      cell(0, 0); cell(2, 0); cell(0, 2); cell(2, 2); cell(1, 1);
+      // Front strip (y 0..t) and Back strip (y d-t..d) run along x
+      var stripX = function (y0, y1, has, filled, hidden) {
+        var pinS = raw(w / 2, (y0 + y1) / 2, h) + DETAIL;
+        if (has && !filled) {
+          rimSegments("x", y0, y1, t, w - t, h, topW, lidTop);
+          if (hidden) {   // Back: its sockets open away from the camera, so of each
+            for (k2 = 0; k2 < lidW.length; k2++) {   // only its +x side wall shows
+              a2 = lidW[k2][0];
+              F([[a2,y0,zT],[a2,y1,zT],[a2 - lidFlare,y1,h],[a2 - lidFlare,y0,h]], lidSide);
+            }
+          }
+        } else {
+          cell(1, y0 < t ? 0 : 2);
+          if (has) {      // filled: the wall's end grain coming up through it
+            for (k2 = 0; k2 < topW.length; k2++) {
+              F([[topW[k2][0],y0,h],[topW[k2][1],y0,h],[topW[k2][1],y1,h],[topW[k2][0],y1,h]], top, pinS);
+            }
+          }
+        }
+      };
+      // the x = 0 strip (Right) and x = w strip (Left) run along y
+      var stripY = function (x0, x1, has, filled, hidden) {
+        var pinS = raw((x0 + x1) / 2, d / 2, h) + DETAIL;
+        if (has && !filled) {
+          rimSegments("y", x0, x1, t, d - t, h, topD, lidTop);
+          if (hidden) {   // Right: only each socket's -y side wall shows
+            for (k2 = 0; k2 < lidD.length; k2++) {
+              b2 = lidD[k2][1];
+              F([[x0,b2,zT],[x1,b2,zT],[x1,b2 + lidFlare,h],[x0,b2 + lidFlare,h]], lidFront);
+            }
+          }
+        } else {
+          cell(x0 < t ? 0 : 2, 1);
+          if (has) {
+            for (k2 = 0; k2 < topD.length; k2++) {
+              F([[x0,topD[k2][0],h],[x1,topD[k2][0],h],[x1,topD[k2][1],h],[x0,topD[k2][1],h]], top, pinS);
+            }
+          }
+        }
+      };
+      stripX(0, t, sk.front, fc.front, false);
+      stripX(d - t, d, sk.back, fc.back, true);
+      stripY(0, t, sk.right, fc.right, true);
+      stripY(w - t, w, sk.left, fc.left, false);
+      layer = 0;
+    }
+
+    // Painter's order, worked out rather than assumed: farthest along the camera
+    // axis first, so each face is covered by whatever genuinely stands in front of
+    // it. Ties keep the order they were added in (JS sort is not required to be
+    // stable, so the index is part of the comparison).         -- by Claude 11/2/2026
+    for (var si = 0; si < faces.length; si++) { faces[si][3] = si; }
+    faces.sort(function (u, v) {
+      if (u[2] !== v[2]) { return u[2] - v[2]; }
+      return u[3] - v[3];
+    });
 
     // Isometric projection: width runs right-down, depth runs right-up, height up.
     var c30 = Math.cos(Math.PI / 6), s30 = 0.5;
     // Seen from the front LEFT, so the side wall shows Back on the left and Front
     // on the right - the same way round as the dialog's sketches (Open Chamfer).
-    // The box is symmetric left/right, so the Right wall's faces drawn above
-    // simply show up mirrored as the Left wall.            -- by Claude 10/31/2026
+    // This is the projection that collapses the (1,-1,1) camera axis the culling
+    // and the sort above are built on.                     -- by Claude 10/31/2026
     var P = function (x, y, z) { return [ -(x + y) * c30, (x - y) * s30 - z ]; };
     var minX = 1e9, maxX = -1e9, minY = 1e9, maxY = -1e9, i, j;
     for (i = 0; i < faces.length; i++) {
