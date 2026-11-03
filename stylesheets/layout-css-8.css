@@ -14,7 +14,7 @@ body {
 }
 
 #page-wrapper {
-  width: 800px;
+  width: 1180px;
   margin: 0 auto;
   padding: 10px;
 }
@@ -63,20 +63,20 @@ body {
 /* ── Header banner ────────────────────────────────────────────────── */
 .header-image {
   float: left;
-  width: 170px;
+  width: 66%;
   background-color: #f2f4f8;
   border-right: 1px solid #d0d4de;
   padding: 10px;
   text-align: center;
 }
 .header-image img {
-  max-width: 170px;
+  max-width: 780px;
   height: auto;
 }
 .header-text {
   float: left;
-  width: 558px;
-  padding: 10px 14px;
+  width: 27%;
+  padding: 10px 20px;
 }
 .header-text p {
   font-size: 18px;
@@ -93,21 +93,32 @@ body {
   font-weight: bold;
 }
 
-/* ── Geometry columns ─────────────────────────────────────────────── */
+/* ── Main two-column workspace ────────────────────────────────────── */
+.left-column {
+  float: left;
+  width: 300px;
+  margin-right: 14px;
+}
+.right-column {
+  float: left;
+  width: 866px;
+}
+
+/* ── Geometry panels, stacked in the left column ──────────────────── */
 .has-tip {
     position: relative;
 }
 
 /* Hidden tooltip box */
 .geometry-column {
-  float: left;
-  width: 245px;
-  margin-right: 20px;
+  float: none;
+  width: auto;
+  margin-right: 0;
   margin-bottom: 10px;
 }
 .geometry-column-last {
-  float: left;
-  width: 245px;
+  float: none;
+  width: auto;
   margin-bottom: 10px;
 }
 
@@ -262,15 +273,42 @@ input.ToolPicker:hover {
   font-size: 15px;
 }
 
-/* ── Joint type / Lid type side-by-side panels ────────────────────── */
+/* ── Joint type / Lid type panels ─────────────────────────────────── */
 .type-column {
+  float: none;
+  width: auto;
+  margin-right: 0;
+  margin-bottom: 10px;
+}
+.type-column-wide {
+  width: auto;
+}
+.type-column-wide .type-dropdown-content {
+  zoom: 1;
+}
+.type-column-wide .type-dropdown-content:after {
+  content: ".";
+  display: block;
+  height: 0;
+  clear: both;
+  visibility: hidden;
+}
+.type-column-wide .type-dropdown-content select {
   float: left;
   width: 260px;
-  margin-right: 10px;
+}
+.type-column-wide .type-dropdown-preview {
+  float: left;
+  margin-top: 0;
+  margin-left: 14px;
+  min-height: 0;
+}
+.type-column-wide .type-dropdown-preview img {
+  height: 28px;
 }
 .type-column-last {
-  float: left;
-  width: 260px;
+  float: none;
+  width: auto;
 }
 .type-panel {
   background-color: #ffffff;
