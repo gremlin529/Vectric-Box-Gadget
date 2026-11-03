@@ -55,6 +55,27 @@
           <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
         </div>
       </div>
+      <!-- Joint type moved up here under the box dimensions (Lid / Bottom type
+           live in the right column) -- by Claude 11/3/2026 -->
+      <div class="type-panel" style="margin-top: 10px;">
+        <div class="type-panel-header">Joint Type</div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabs.png" alt="Finger joint preview" />
+          </div>
+        </div>
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" onclick="onJointTypeChanged()" />Dovetail</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/dovetails.png" alt="Dovetail joint preview" />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -131,33 +152,6 @@
       </div>
 
     </div>
-  </div>
-
-  <!-- ── Joint type (Lid / Bottom type live in the right column) ───── -->
-  <div class="clearfix type-options" style="margin-bottom:10px;">
-
-    <div class="type-column">
-      <div class="type-panel">
-        <div class="type-panel-header">Joint Type</div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabs.png" alt="Finger joint preview" />
-          </div>
-        </div>
-        <div class="type-option-last clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" onclick="onJointTypeChanged()" />Dovetail</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/dovetails.png" alt="Dovetail joint preview" />
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
     </div>
