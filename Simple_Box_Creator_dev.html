@@ -2392,21 +2392,58 @@
           else if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
           panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front) + (wholeL ? " px" : ""));
         }
+        // Front / Back's own ends where Left / Right are not being made but their
+        // joints are: the sockets the side walls' tails would sit in are cut into
+        // the end of the panel, leaving its pins standing. The tails flare along
+        // the panel's thickness, so on the face itself a socket is a plain
+        // rectangle (widened by the flare on the outer face, not on Back's inner
+        // one).                                                 -- by Claude 11/3/2026
+        var notchEnd = function (pat, flare, zMax, tip) {
+          var r = [], k, g;
+          for (k = 0; k < pat.segs.length; k++) {
+            g = pat.segs[k];
+            if (g[2] && g[0] < zMax - EPSB) { r.push([g[0] - flare, Math.min(g[1] + flare, zMax)]); }
+          }
+          return { segs: r, tip: tip, fl: 0 };
+        };
+        // what shows inside a socket: its back wall (only at the x = w end, the
+        // other faces away) and the top of the pin below it
+        var notchBits = function (pat, yO, yI, zMax, xIn, xEnd, atW) {
+          var k, g, e = pat.e, zt, pn = (yO < yI) ? pinFront : pinBack;
+          for (k = 0; k < pat.segs.length; k++) {
+            g = pat.segs[k];
+            if (!g[2] || g[0] >= zMax - EPSB) { continue; }
+            zt = Math.min(g[1], zMax);
+            F([[xIn,yO,g[0]-e],[xEnd,yO,g[0]-e],[xEnd,yI,g[0]],[xIn,yI,g[0]]], top, pn + DETAIL);
+            if (atW) { F([[xIn,yO,g[0]-e],[xIn,yI,g[0]],[xIn,yI,zt],[xIn,yO,Math.min(g[1]+e, zMax)]], side, pn + DETAIL); }
+          }
+        };
+        var patFm = (fc.front && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var patBm = (fc.back  && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var nF0 = (patFm && !fc.right) ? notchEnd(patFm, patFm.e, zT, t) : null;
+        var nFW = (patFm && !fc.left)  ? notchEnd(patFm, patFm.e, zT, w - t) : null;
+        var nB0 = (patBm && !fc.right) ? notchEnd(patBm, 0, backZ, t) : null;
+        var nBW = (patBm && !fc.left)  ? notchEnd(patBm, 0, backZ, w - t) : null;
+
         if (fc.front) {
-          var polyF = !!(loW || hiOutW);
-          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + ((fc.left && fc.back) ? " px" : ""));
+          var polyF = !!(loW || hiOutW || nF0 || nFW);
+          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + (((fc.left && fc.back) || nFW) ? " px" : ""));
           if (topTeeth) { rimSegments("x", 0, t, 0, w, zT, lidW, top, pinFront - DETAIL); }
-          if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, null, null, front, pinFront); }
+          if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, nF0, nFW, front, pinFront); }
+          if (nF0) { notchBits(patFm, 0, t, zT, 0, t, false); }
+          if (nFW) { notchBits(patFm, 0, t, zT, w - t, w, true); }
         }
         if (fc.back) {
-          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((fc.left && fc.front) ? " px" : ""));
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + (((fc.left && fc.front) || nBW) ? " px" : ""));
           // Back's rim runs the full width even where its inside face is clipped
           if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
+          if (nB0) { notchBits(patBm, d, d - t, backZ, 0, t, false); }
+          if (nBW) { notchBits(patBm, d, d - t, backZ, w - t, w, true); }
           // Back's inside face, across only the span Left / Right are not standing
           // in front of - they are nearer the camera over their own footprints.
           if (bx1 - bx0 > EPSB) {
-            if (loInW || hiInW) {
-              wallPoly("x", d - t, bx0, bx1, zB, backZ, loInW, hiInW, null, null, inner, pinBack);
+            if (loInW || hiInW || nB0 || nBW) {
+              wallPoly("x", d - t, bx0, bx1, zB, backZ, loInW, hiInW, nB0, nBW, inner, pinBack);
             } else {
               F([[bx0,d-t,zB],[bx1,d-t,zB],[bx1,d-t,backZ],[bx0,d-t,backZ]], inner);
             }
