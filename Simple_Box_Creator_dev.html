@@ -2149,10 +2149,14 @@
       // and the row Back stands on. Walked as one outline: along the near edge,
       // up the x = w side, back along the far edge, down the x = 0 side.
       //                                                         -- by Claude 11/2/2026
+      // With an end wall gone and no joints cut for it, the side walls run on
+      // over that end row too (see sy0 / sy1 in the shell), so they stand on its
+      // two ends as well.                                    -- by Claude 11/5/2026
       var bands = [];
-      if (!fc.front) { bands.push({ y0: 0, y1: t, L: 0, R: w }); }
+      var sideRunsF = !fc.front && !fc.tabs, sideRunsB = !fc.back && !fc.tabs;
+      if (!fc.front) { bands.push({ y0: 0, y1: t, L: (sideRunsF && fc.right) ? t : 0, R: (sideRunsF && fc.left) ? w - t : w }); }
       bands.push({ y0: t, y1: d - t, L: fc.right ? t : 0, R: fc.left ? w - t : w });
-      if (!fc.back) { bands.push({ y0: d - t, y1: d, L: 0, R: w }); }
+      if (!fc.back) { bands.push({ y0: d - t, y1: d, L: (sideRunsB && fc.right) ? t : 0, R: (sideRunsB && fc.left) ? w - t : w }); }
       // the exposed stack of bands, walked as one outline - see panelTop
       panelTop(bands, botT, sockW, sockD, sockNY, sockPX, sockBK, sockRT, floor);
       var k3, s3;
@@ -2278,9 +2282,19 @@
         // faces - on an inside face they are buried in it. With the panel not
         // being made but its joints still cut they hang free under all four walls,
         // and show on the inside faces too.                     -- by Claude 11/2/2026
+        // How far the side walls (Left / Right) run along the depth. MakeSideFace
+        // insets a side by the thickness at an end only when that end wall is
+        // being made or joints are being cut for it; otherwise nothing fills that
+        // strip, so the side runs right out to the end, square. The end walls and
+        // the panels are always full size.                    -- by Claude 11/5/2026
+        var sy0 = (fc.front || fc.tabs) ? t : 0;
+        var sy1 = (fc.back || fc.tabs) ? d - t : d;
+
         var botJoint = (bType === "Fingers") && fc.jointBottom && (zB > 0);
         var bjw = isoJointWidth("bottom"), bflare = isoDovetailFlare() * zB;
         var loW = botJoint ? { teeth: isoEdgeFingers(w, t, bjw), tip: 0, fl: bflare } : null;
+        // (a side's teeth keep the panel's spacing, d - 2t one thickness in, even
+        // where the side runs on to the end - MakeSideFace's lead_left/right)
         var loD = botJoint ? { teeth: isoEdgeFingers(d, t, bjw), tip: 0, fl: bflare } : null;
         var loInW = (botJoint && !fc.bottom) ? loW : null;
         var loInD = (botJoint && !fc.bottom) ? loD : null;
@@ -2302,9 +2316,11 @@
 
         // Corner tails standing in the open: a side wall keeps the tails that would
         // have gone into Front (or Back) when that wall is not being made but its
-        // joints are. Not with a sliding lid, whose side walls come in two blocks.
-        var patF = (!slide && !fc.front) ? isoCornerPattern(zB, zT, t) : null;
-        var patB = (!slide && !fc.back)  ? isoCornerPattern(zB, backZ, t) : null;
+        // joints are. (With a sliding lid too, now that each side wall is one
+        // outline: at the back the tails stop at the lowered Back's height and
+        // the margin above them is the step in that outline.) -- by Claude 11/5/2026
+        var patF = (!fc.front && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var patB = (!fc.back && fc.tabs)  ? isoCornerPattern(zB, backZ, t) : null;
         var tailEnd = function (pat, tip) {
           var r = [], k;
           for (k = 0; k < pat.segs.length; k++) { if (pat.segs[k][2]) { r.push([pat.segs[k][0], pat.segs[k][1]]); } }
@@ -2357,20 +2373,42 @@
           return (poly ? " " + face : "") + ((rimHidden || rimSeg) ? " pz" : "") + (endFace ? " ny" : "");
         };
 
+        // A side wall is one block its full height over its own span (sy0..sy1).
+        // With a sliding lid's lowered Back it also runs on over Back's top out
+        // to y = d (sideOver) - that part is a block of its own, but only its
+        // footprint: as a lower wall plus a block across the whole length on top,
+        // the join ran as a line across the inside face and the end grain. The
+        // outline of the visible face takes the step (stepOver), and the rim is
+        // laid as one piece over both.                        -- by Claude 11/5/2026
+        var sideOver = (backZ < zT - EPSB) && (sy1 < d);
+        // the back end of a side's outline: its corner tails (if any) and, over a
+        // lowered Back, the solid margin above them out to y = d
+        var backEnd = function (tails) {
+          if (!sideOver) { return tails; }
+          var segs = tails ? tails.segs.slice(0) : [];
+          segs.push([backZ, zT]);
+          return { segs: segs, tip: d, fl: tails ? tails.fl : 0 };
+        };
+        var sideRim = sideOver && !(rimHidden || topTeeth);
+        var sideBlocks = function (x0, x1, cPX, endFace) {
+          panel(x0, x1, sy0, sy1, zB, zT, cPX, front, top, omit("px", true, topTeeth || sideOver, endFace));
+          if (sideOver) { panel(x0, x1, sy1, d, backZ, zT, cPX, front, top, "px pz ny"); }
+          if (sideRim) { F([[x0,sy0,zT],[x1,sy0,zT],[x1,d,zT],[x0,d,zT]], top); }
+        };
+
         if (fc.right) {
-          var polyR = !!(loInD || hiInD || sF0 || eB0);
-          panel(0, t, t, d - t, zB, backZ, inner, front, top,
-                omit("px", polyR, topTeeth, fc.front || sF0));
-          if (topTeeth) { rimSegments("y", 0, t, t, d - t, zT, lidD, top, pinRight - DETAIL); }
+          sideBlocks(0, t, inner, fc.front || sF0);
+          if (topTeeth) { rimSegments("y", 0, t, sy0, sy1, zT, lidD, top, pinRight - DETAIL); }
           if (sF0) { tailBits(0, t, patF, t, 0); }
           if (eB0) { tailBits(0, t, patB, d - t, d); }
-          if (polyR) { wallPoly("y", t, t, d - t, zB, backZ, loInD, hiInD, sF0, eB0, inner, pinRight); }
-          panel(0, t, t, d, backZ, zT, inner, front, top, omit("", false, false, fc.front));
+          wallPoly("y", t, sy0, sy1, zB, zT, loInD, hiInD, sF0, backEnd(eB0), inner, pinRight);
         }
-        // Left's outer face as one polygon over the corners (see below): fullL when
-        // it runs the wall's full height at both ends, lY0 / lY1 how far it reaches.
-        var fullL = fc.left && (backZ >= zT - EPSB || (fc.front && fc.back));
-        var lY0 = (fullL && fc.front) ? 0 : t, lY1 = (fullL && fc.back) ? d : d - t;
+        // Left's outer face as one polygon over the corners (see below): lY0 / lY1
+        // how far it reaches - over a corner whose end wall is there (the pins are
+        // laid over it), otherwise as far as the wall itself goes (sy0 / sy1).
+        // (Only while Left is there at all: with it unchecked, Front's and Back's
+        // own end faces at x = w are what show.)              -- by Claude 11/5/2026
+        var lY0 = (fc.left && fc.front) ? 0 : sy0, lY1 = (fc.left && fc.back) ? d : sy1;
         if (fc.left) {
           // With Front and Back both there, Left's outer face is one piece of wood
           // running the whole depth (its tails fill the gaps between Front's / Back's
@@ -2387,19 +2425,20 @@
           // (and the same at the back with Front unchecked). So the polygon
           // reaches over every corner whose end wall is there, and that wall's
           // end face is left out.                            -- by Claude 11/4/2026
-          // (A sliding lid's lower Back keeps the old split: the wall's upper part
-          // there is a block of its own.)
-          var polyL = !!(loD || hiOutD || sFW || eBW) || lY0 < t || lY1 > d - t;
-          panel(w-t, w, t, d - t, zB, backZ, side, front, top,
-                omit("px", polyL, topTeeth, fc.front || sFW));
-          if (topTeeth) { rimSegments("y", w - t, w, t, d - t, zT, lidD, top, pinLeft - DETAIL); }
+          //
+          // And it is always the wall's full height. With a sliding lid the wall
+          // runs on over the lowered Back (whose pins, clipped to its height, are
+          // laid over it like any others); with Back unchecked but joints cut,
+          // the trimmed corner gets a solid margin out to the outer corner above
+          // the tails (MakeSideFace, LidTopShortfall) - a step in this outline.
+          // Drawn as a lower wall plus a block on top, the join ran as a line
+          // right across the face.                           -- by Claude 11/5/2026
+          var eL = (lY1 > d - t) ? null : backEnd(eBW);
+          sideBlocks(w - t, w, side, fc.front || sFW);
+          if (topTeeth) { rimSegments("y", w - t, w, sy0, sy1, zT, lidD, top, pinLeft - DETAIL); }
           if (sFW) { tailBits(w - t, w, patF, t, 0); }
           if (eBW) { tailBits(w - t, w, patB, d - t, d); }
-          if (polyL) {
-            wallPoly("y", w, lY0, lY1, zB, fullL ? zT : backZ, loD, hiOutD,
-                     lY0 < t ? null : sFW, lY1 > d - t ? null : eBW, side, pinLeft);
-          }
-          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front) + (fullL ? " px" : ""));
+          wallPoly("y", w, lY0, lY1, zB, zT, loD, hiOutD, lY0 < t ? null : sFW, eL, side, pinLeft);
         }
         // Front / Back's own ends where Left / Right are not being made but their
         // joints are: the sockets the side walls' tails would sit in are cut into
@@ -2474,7 +2513,9 @@
           // from their own blocks.       -- by Claude 10/31/2026, reworked 11/2/2026
           var gwid = Math.min(lid.gw > 0 ? lid.gw : t / 2, zT - lidZ0);
           if (gwid > 0) {
-            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol, depthAt(t, (t + d) / 2, (backZ + zT) / 2));
+            // (just after the face it is cut into, however far that is lifted)
+            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol,
+              Math.max(depthAt(t, (t + d) / 2, (backZ + zT) / 2), pinRight + DETAIL / 2));
           }
         }
         if (slide && fc.lid) {
@@ -2484,8 +2525,11 @@
           // Sorted as if still sitting at the middle of the box: pulled out, its centre
           // lies so far back that Right's inner face and rim, which really are behind
           // it, came out nearer the camera and painted over it.  -- by Claude 11/3/2026
-          layer = sl;
           var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
+          // ...and never before Right's inside face: with corner tails at the front
+          // that face is lifted to just past them (pinRight), further forward than
+          // the lid would otherwise sort, and it painted over it. -- by Claude 11/5/2026
+          layer = Math.max(sl, pinRight + DETAIL - (raw(lx0, ly1, lidZ0)));
           // The lid's outline in plan (anti-clockwise), with the grip tab exactly as
           // CreateFaces cuts it (AddLidGripTab), then its edges as side faces - only
           // those facing the viewer - and the top on them. Curved tab corners get
@@ -2556,7 +2600,9 @@
           layer = 0;
           // Left stands nearer the camera than the lid sliding in its groove, so its
           // rim goes back on top of the lid's edge.        -- by Claude 11/3/2026
-          if (fc.left) { F([[w-t,t,zT],[w,t,zT],[w,d,zT],[w-t,d,zT]], top, OUTER - 1); }
+          if (fc.left) { F([[w-t,sy0,zT],[w,sy0,zT],[w,d,zT],[w-t,d,zT]], top, OUTER - 1); }
+          // and so does Right's: the lid's edge runs under it in its groove
+          if (fc.right) { F([[0,sy0,zT],[t,sy0,zT],[t,d,zT],[0,d,zT]], top, OUTER - 1); }
         }
         // The rims, outer faces and end grain all came with the four wall blocks
         // above - nothing left to add here by hand. With a sliding lid Left and
@@ -2569,7 +2615,7 @@
 
       // Corner joints: the finger pattern up the corners  -- by Claude 10/31/2026
       if (open) { isoCornerFingers(F, w, d, t, zB, zT, zT, Math.min(backTop, zT), front, side, top, fc,
-        depthAt(w / 2, 0, (zB + zT) / 2), depthAt(w, d / 2, (zB + zT) / 2), !slide); }
+        depthAt(w / 2, 0, (zB + zT) / 2), depthAt(w, d / 2, (zB + zT) / 2), true); }
     }
 
     // Panel sockets follow MakeBottomFaceContour / MakeLid, which cut them on
