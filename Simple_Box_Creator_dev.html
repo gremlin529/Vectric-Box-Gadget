@@ -2834,31 +2834,74 @@
     var zf = isoZoomFix(view);
     var html = "";
     if (g_iso.mode === "vml") {
-      // v:shape over the whole view; its path is in a coordinate space 10x the
-      // pixels (coordsize), since VML paths take whole numbers only.
+      // v:shape over the whole view, its path in device pixels times 2.
+      //
+      // What VCarve's IE7 host does with VML, measured pixel by pixel
+      // (by Claude 11/4/2026):
+      //  * Each shape is placed relative to its own path's bounding box, with
+      //    limited precision, so two shapes with different bounds come out up to
+      //    a pixel apart. Every face had different bounds, which is why a finger's
+      //    top looked drawn separately from its sides, and why faces drifted off
+      //    their outlines towards the top left and top right of the box.
+      //  * With each path anchored to both corners of the view (a zero-size
+      //    piece at 0,0 and at the far corner) every shape shares one set of
+      //    bounds, and fills land exactly: an edge at x falls at x + 0.5.
+      //  * Strokes still don't. They sit about 0.8 px to one side of a fill
+      //    with the same coordinates, and smear across two pixels at any
+      //    fractional position.
+      //  * Overlapping pieces of one path are filled even-odd: the overlap is
+      //    left as a hole, whatever the winding.
+      // So the outlines aren't strokes at all. Each is a thin filled strip run
+      // through the same exact fill placement as the faces, centred on the
+      // face's edge, its ends squared off by half a line width so that corners
+      // close. Vertices are snapped to whole device pixels so that upright and
+      // flat lines are one crisp pixel wide (onto pixel boundaries instead for
+      // an even line width), and a face's strips are spread over as many shapes
+      // as it takes for no two in one shape to overlap.
+      var Wd = Math.round(g_iso.W * zf.vml), Hd = Math.round(g_iso.H * zf.vml);
+      var vsx = Wd / g_iso.W, vsy = Hd / g_iso.H;
+      var lw = Math.max(1, Math.round(zf.vml)), hw = lw / 2;
+      var voff = (lw % 2) ? 0 : 0.5;
+      var SX = function (v) { return Math.round(v * vsx - voff) + voff; };   // device px
+      var SY = function (v) { return Math.round(v * vsy - voff) + voff; };
+      var U = function (v) { return Math.round(v * 2); };                      // path units
+      var anchorA = "m 0,0 l 0,0 ", anchorB = "m " + (Wd * 2) + "," + (Hd * 2) + " l " + (Wd * 2) + "," + (Hd * 2) + " ";
+      var vbox = 'coordsize="' + (Wd * 2) + ',' + (Hd * 2) + '" style="position:absolute; left:0; top:0; width:' +
+                 Wd + 'px; height:' + Hd + 'px;"';
+      var vfill = function (p, col) {
+        return '<v:shape ' + vbox + ' path="' + anchorA + p + anchorB + 'e" filled="true" fillcolor="' + col + '" stroked="false"></v:shape>';
+      };
       for (i = 0; i < faces.length; i++) {
         var pts = faces[i][0], path = "";
         for (var k = 0; k < pts.length; k++) {
-          path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + Math.round(pts[k][0] * 10) + "," + Math.round(pts[k][1] * 10);
+          path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + U(SX(pts[k][0])) + "," + U(SY(pts[k][1]));
         }
-        path += " x e";
-        var vbox = 'coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" style="position:absolute; left:0; top:0; width:' +
-                   Math.round(g_iso.W * zf.vml) + 'px; height:' + Math.round(g_iso.H * zf.vml) + 'px;"';
-        // the fill is stroked in its own colour: VML puts a fill's edge and a line
-        // along it up to a pixel apart, which left a sliver of whatever was behind
-        // showing beside the outline
-        html += '<v:shape ' + vbox + ' path="' + path + '" filled="true" fillcolor="' + faces[i][1] +
-                '" stroked="true" strokecolor="' + faces[i][1] + '" strokeweight="' + (zf.vml) + 'px"></v:shape>';
-        // this face's own edges (see the edge ownership pass above), as open lines
-        var es = faces[i][4], epath = "";
+        html += vfill(path + " x ", faces[i][1]);
+        // this face's own edges (see the edge ownership pass above) as strips
+        var es = faces[i][4], groups = [];
         for (var ei = 0; ei < es.length; ei++) {
-          epath += "m " + Math.round(es[ei][0] * 10) + "," + Math.round(es[ei][1] * 10) +
-                   " l " + Math.round(es[ei][2] * 10) + "," + Math.round(es[ei][3] * 10) + " ";
+          var ax = SX(es[ei][0]), ay = SY(es[ei][1]), bx = SX(es[ei][2]), by = SY(es[ei][3]);
+          var dx = bx - ax, dy = by - ay, dl = Math.sqrt(dx * dx + dy * dy);
+          if (dl < 1e-6) { continue; }
+          dx = dx / dl * hw; dy = dy / dl * hw;
+          var q = [[ax - dx - dy, ay - dy + dx], [bx + dx - dy, by + dy + dx],
+                   [bx + dx + dy, by + dy - dx], [ax - dx + dy, ay - dy - dx]];
+          var bb = [Math.min(ax, bx) - lw, Math.min(ay, by) - lw, Math.max(ax, bx) + lw, Math.max(ay, by) + lw];
+          var sp = "m " + U(q[0][0]) + "," + U(q[0][1]) + " l " + U(q[1][0]) + "," + U(q[1][1]) + "," +
+                   U(q[2][0]) + "," + U(q[2][1]) + "," + U(q[3][0]) + "," + U(q[3][1]) + " x ";
+          // first shape none of whose strips this one could touch
+          for (var gi = 0; gi < groups.length; gi++) {
+            var g = groups[gi], clash = false;
+            for (var gj = 0; gj < g.bb.length && !clash; gj++) {
+              var o = g.bb[gj];
+              clash = bb[0] < o[2] && o[0] < bb[2] && bb[1] < o[3] && o[1] < bb[3];
+            }
+            if (!clash) { break; }
+          }
+          if (gi === groups.length) { groups.push({ bb: [], p: "" }); }
+          groups[gi].bb.push(bb); groups[gi].p += sp;
         }
-        if (epath) {
-          html += '<v:shape ' + vbox + ' path="' + epath + 'e" filled="false" stroked="true" strokecolor="' + line +
-                  '" strokeweight="' + (zf.vml) + 'px"></v:shape>';
-        }
+        for (gi = 0; gi < groups.length; gi++) { html += vfill(groups[gi].p, line); }
       }
     } else {
       html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
