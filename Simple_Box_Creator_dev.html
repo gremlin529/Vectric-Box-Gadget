@@ -2367,6 +2367,10 @@
           if (polyR) { wallPoly("y", t, t, d - t, zB, backZ, loInD, hiInD, sF0, eB0, inner, pinRight); }
           panel(0, t, t, d, backZ, zT, inner, front, top, omit("", false, false, fc.front));
         }
+        // Left's outer face as one polygon over the corners (see below): fullL when
+        // it runs the wall's full height at both ends, lY0 / lY1 how far it reaches.
+        var fullL = fc.left && (backZ >= zT - EPSB || (fc.front && fc.back));
+        var lY0 = (fullL && fc.front) ? 0 : t, lY1 = (fullL && fc.back) ? d : d - t;
         if (fc.left) {
           // With Front and Back both there, Left's outer face is one piece of wood
           // running the whole depth (its tails fill the gaps between Front's / Back's
@@ -2375,16 +2379,27 @@
           // seam got a line stroked down it, and the step where a sliding lid's lower
           // Back meets the full-height wall read as a line across the face.
           //                                                  -- by Claude 11/3/2026
-          var wholeL = fc.front && fc.back;
-          var polyL = !!(loD || hiOutD || sFW || eBW);
+          //
+          // The same holds at one end alone: with Back unchecked, Left still runs
+          // across Front's end, its tails between Front's pins. Drawn as the wall
+          // from y = t plus Front's end face as its own panel, the seam between
+          // them got a line stroked down it, cutting Left's tails off from Left
+          // (and the same at the back with Front unchecked). So the polygon
+          // reaches over every corner whose end wall is there, and that wall's
+          // end face is left out.                            -- by Claude 11/4/2026
+          // (A sliding lid's lower Back keeps the old split: the wall's upper part
+          // there is a block of its own.)
+          var polyL = !!(loD || hiOutD || sFW || eBW) || lY0 < t || lY1 > d - t;
           panel(w-t, w, t, d - t, zB, backZ, side, front, top,
-                omit("px", polyL || wholeL, topTeeth, fc.front || sFW));
+                omit("px", polyL, topTeeth, fc.front || sFW));
           if (topTeeth) { rimSegments("y", w - t, w, t, d - t, zT, lidD, top, pinLeft - DETAIL); }
           if (sFW) { tailBits(w - t, w, patF, t, 0); }
           if (eBW) { tailBits(w - t, w, patB, d - t, d); }
-          if (wholeL) { wallPoly("y", w, 0, d, zB, zT, loD, hiOutD, null, null, side, pinLeft); }
-          else if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
-          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front) + (wholeL ? " px" : ""));
+          if (polyL) {
+            wallPoly("y", w, lY0, lY1, zB, fullL ? zT : backZ, loD, hiOutD,
+                     lY0 < t ? null : sFW, lY1 > d - t ? null : eBW, side, pinLeft);
+          }
+          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front) + (fullL ? " px" : ""));
         }
         // Front / Back's own ends where Left / Right are not being made but their
         // joints are: the sockets the side walls' tails would sit in are cut into
@@ -2401,9 +2416,15 @@
           return { segs: r, tip: tip, fl: 0 };
         };
         // what shows inside a socket: its back wall (only at the x = w end, the
-        // other faces away) and the top of the pin below it
+        // other faces away) and the top of the pin below it.
+        // Front's face goes out last of all (outer plane), so these can sort just
+        // after its depth. Back's inside face does not: it is the face nearer the
+        // camera, the pins' -y sides standing in front of the socket behind, so
+        // there they go just BEFORE it - sorted after, the back wall of each
+        // socket was painted across the pin above it, and every pin read as two.
+        //                                                  -- by Claude 11/4/2026
         var notchBits = function (pat, yO, yI, zMax, xIn, xEnd, atW) {
-          var k, g, e = pat.e, zt, pn = (yO < yI) ? pinFront : pinBack;
+          var k, g, e = pat.e, zt, pn = (yO < yI) ? pinFront : pinBack - 2 * DETAIL;
           for (k = 0; k < pat.segs.length; k++) {
             g = pat.segs[k];
             if (!g[2] || g[0] >= zMax - EPSB) { continue; }
@@ -2421,14 +2442,14 @@
 
         if (fc.front) {
           var polyF = !!(loW || hiOutW || nF0 || nFW);
-          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + (((fc.left && fc.back) || nFW) ? " px" : ""));
+          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + ((lY0 < t || nFW) ? " px" : ""));
           if (topTeeth) { rimSegments("x", 0, t, 0, w, zT, lidW, top, pinFront - DETAIL); }
           if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, nF0, nFW, front, pinFront); }
           if (nF0) { notchBits(patFm, 0, t, zT, 0, t, false); }
           if (nFW) { notchBits(patFm, 0, t, zT, w - t, w, true); }
         }
         if (fc.back) {
-          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + (((fc.left && fc.front) || nBW) ? " px" : ""));
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((lY1 > d - t || nBW) ? " px" : ""));
           // Back's rim runs the full width even where its inside face is clipped
           if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
           if (nB0) { notchBits(patBm, d, d - t, backZ, 0, t, false); }
