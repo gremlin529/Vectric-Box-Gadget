@@ -2761,6 +2761,66 @@
       faces[i][0] = sp;
     }
 
+    // Which face strokes which edge. Every face used to stroke its whole outline,
+    // so an edge two faces share - a finger's top against its side, a finger's
+    // side against the wall it stands on - was drawn twice, once by each. On a
+    // canvas the two land on top of each other, but VML positions each shape on
+    // its own, and in VCarve's IE host at any display scaling above 100 % the two
+    // copies come out a pixel or so apart: the double lines along the fingers,
+    // and finger tops that look drawn separately from their sides.
+    //
+    // So each stretch of line is stroked once, by the LAST face painted along it
+    // (that face is on top there, so its outline is what shows). Faces are walked
+    // from last to first; each edge drops whatever part of it a later face's edge
+    // already covers along the same screen line, partial overlaps included. A
+    // face's fill is then drawn unstroked and its remaining edges as open lines.
+    //                                                        -- by Claude 11/4/2026
+    var lineBuckets = {};
+    var lineKey = function (ka, ko) { return ka + ":" + ko; };
+    for (i = faces.length - 1; i >= 0; i--) {
+      var fpts = faces[i][0], segs = [], mine = [];
+      for (j = 0; j < fpts.length; j++) {
+        var pa = fpts[j], pb = fpts[(j + 1) % fpts.length];
+        var ex = pb[0] - pa[0], ey = pb[1] - pa[1], el = Math.sqrt(ex * ex + ey * ey);
+        if (el < 0.05) { continue; }
+        ex /= el; ey /= el;
+        if (ex < -1e-9 || (Math.abs(ex) <= 1e-9 && ey < 0)) { ex = -ex; ey = -ey; }
+        var ka = Math.round(Math.atan2(ey, ex) * 2000);
+        var ko = Math.round((pa[0] * ey - pa[1] * ex) * 10);
+        var ta = pa[0] * ex + pa[1] * ey, tb = pb[0] * ex + pb[1] * ey;
+        var parts = [[Math.min(ta, tb), Math.max(ta, tb)]];
+        // a nearly identical line may have rounded into a neighbouring bucket
+        for (var da = -1; da <= 1; da++) {
+          for (var dO = -1; dO <= 1; dO++) {
+            var cov = lineBuckets[lineKey(ka + da, ko + dO)];
+            if (!cov) { continue; }
+            for (var ci = 0; ci < cov.length && parts.length; ci++) {
+              var c0 = cov[ci][0] - 0.05, c1 = cov[ci][1] + 0.05, np = [];
+              for (var pi = 0; pi < parts.length; pi++) {
+                var s0 = parts[pi][0], s1 = parts[pi][1];
+                if (c1 <= s0 || c0 >= s1) { np.push(parts[pi]); continue; }
+                if (c0 - s0 > 0.3) { np.push([s0, c0]); }
+                if (s1 - c1 > 0.3) { np.push([c1, s1]); }
+              }
+              parts = np;
+            }
+          }
+        }
+        mine.push([lineKey(ka, ko), Math.min(ta, tb), Math.max(ta, tb)]);
+        for (var qi = 0; qi < parts.length; qi++) {
+          var u0 = parts[qi][0] - ta, u1 = parts[qi][1] - ta;
+          segs.push([pa[0] + ex * u0, pa[1] + ey * u0, pa[0] + ex * u1, pa[1] + ey * u1]);
+        }
+      }
+      // registered only after the whole face is done, so a face never trims
+      // its own edges (a dovetail outline can double back along one line)
+      for (j = 0; j < mine.length; j++) {
+        if (!lineBuckets[mine[j][0]]) { lineBuckets[mine[j][0]] = []; }
+        lineBuckets[mine[j][0]].push([mine[j][1], mine[j][2]]);
+      }
+      faces[i][4] = segs;
+    }
+
     var q0 = Q(0,0,0), q1 = Q(w,0,0), q2 = Q(w,d,0), q4 = Q(0,0,h);
     var labels = [
       // width: under the front bottom edge (front face on the right)
@@ -2782,9 +2842,23 @@
           path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + Math.round(pts[k][0] * 10) + "," + Math.round(pts[k][1] * 10);
         }
         path += " x e";
-        html += '<v:shape coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" path="' + path +
-                '" filled="true" fillcolor="' + faces[i][1] + '" stroked="true" strokecolor="' + line +
-                '" strokeweight="' + (zf.vml) + 'px" style="position:absolute; left:0; top:0; width:' + Math.round(g_iso.W * zf.vml) + 'px; height:' + Math.round(g_iso.H * zf.vml) + 'px;"></v:shape>';
+        var vbox = 'coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" style="position:absolute; left:0; top:0; width:' +
+                   Math.round(g_iso.W * zf.vml) + 'px; height:' + Math.round(g_iso.H * zf.vml) + 'px;"';
+        // the fill is stroked in its own colour: VML puts a fill's edge and a line
+        // along it up to a pixel apart, which left a sliver of whatever was behind
+        // showing beside the outline
+        html += '<v:shape ' + vbox + ' path="' + path + '" filled="true" fillcolor="' + faces[i][1] +
+                '" stroked="true" strokecolor="' + faces[i][1] + '" strokeweight="' + (zf.vml) + 'px"></v:shape>';
+        // this face's own edges (see the edge ownership pass above), as open lines
+        var es = faces[i][4], epath = "";
+        for (var ei = 0; ei < es.length; ei++) {
+          epath += "m " + Math.round(es[ei][0] * 10) + "," + Math.round(es[ei][1] * 10) +
+                   " l " + Math.round(es[ei][2] * 10) + "," + Math.round(es[ei][3] * 10) + " ";
+        }
+        if (epath) {
+          html += '<v:shape ' + vbox + ' path="' + epath + 'e" filled="false" stroked="true" strokecolor="' + line +
+                  '" strokeweight="' + (zf.vml) + 'px"></v:shape>';
+        }
       }
     } else {
       html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
@@ -2807,7 +2881,16 @@
         var fp = faces[i][0];
         cx.beginPath(); cx.moveTo(fp[0][0], fp[0][1]);
         for (var m = 1; m < fp.length; m++) { cx.lineTo(fp[m][0], fp[m][1]); }
-        cx.closePath(); cx.fillStyle = faces[i][1]; cx.fill(); cx.stroke();
+        // the fill's own colour round its edge closes the antialiasing seam
+        // between two faces (the outline is now drawn separately, see above)
+        cx.closePath(); cx.fillStyle = faces[i][1]; cx.fill();
+        cx.strokeStyle = faces[i][1]; cx.stroke(); cx.strokeStyle = line;
+        var cs = faces[i][4];
+        if (cs.length) {
+          cx.beginPath();
+          for (var cn = 0; cn < cs.length; cn++) { cx.moveTo(cs[cn][0], cs[cn][1]); cx.lineTo(cs[cn][2], cs[cn][3]); }
+          cx.stroke();
+        }
       }
     }
   }
