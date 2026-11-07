@@ -14,7 +14,7 @@ body {
 }
 
 #page-wrapper {
-  width: 800px;
+  width: 1180px;
   margin: 0 auto;
   padding: 10px;
 }
@@ -63,26 +63,36 @@ body {
 /* ── Header banner ────────────────────────────────────────────────── */
 .header-image {
   float: left;
-  width: 170px;
+  width: 66%;
   background-color: #f2f4f8;
-  border-right: 1px solid #d0d4de;
+  border-left: 1px solid #d0d4de;   /* ISO view now sits on the right -- by Claude 11/3/2026 */
   padding: 10px;
   text-align: center;
 }
 .header-image img {
-  max-width: 170px;
+  max-width: 780px;
   height: auto;
 }
 .header-text {
   float: left;
-  width: 558px;
-  padding: 10px 14px;
+  width: 27%;
+  padding: 10px 20px;
 }
 .header-text p {
   font-size: 18px;
   color: #6b7280;
   line-height: 1.6;
   margin-bottom: 5px;
+}
+/* Tight line box + no bottom margin so the gap above the External Box
+   Dimensions header is set only by that header's margin-top -- by Claude 11/3/2026 */
+.header-text p.release-link-row {
+  line-height: 1.2;
+  margin-bottom: 0;
+}
+.header-text a.release-link {
+  font-size: 20px;
+  font-weight: bold;
 }
 .header-text p:last-child {
   margin-bottom: 0;
@@ -93,21 +103,32 @@ body {
   font-weight: bold;
 }
 
-/* ── Geometry columns ─────────────────────────────────────────────── */
+/* ── Main two-column workspace ────────────────────────────────────── */
+.left-column {
+  float: left;
+  width: 300px;
+  margin-right: 14px;
+}
+.right-column {
+  float: left;
+  width: 866px;
+}
+
+/* ── Geometry panels, stacked in the left column ──────────────────── */
 .has-tip {
     position: relative;
 }
 
 /* Hidden tooltip box */
 .geometry-column {
-  float: left;
-  width: 245px;
-  margin-right: 20px;
+  float: none;
+  width: auto;
+  margin-right: 0;
   margin-bottom: 10px;
 }
 .geometry-column-last {
-  float: left;
-  width: 245px;
+  float: none;
+  width: auto;
   margin-bottom: 10px;
 }
 
@@ -202,16 +223,19 @@ body {
   padding: 8px 10px;
   margin-bottom: 10px;
 }
+/* Widths fill the ~822px inside of the tool bar (right-column 866 minus card
+   and tool-bar border/padding) so long tool names run nearly up to the
+   No toolpath checkbox instead of wrapping early -- by Claude 11/3/2026 */
 .tool-bar-left {
   float: left;
-  width: 490px;
+  width: 650px;
   /* Matches tool-bar-right's line-height so both floated columns render
      the same height and their vertical-align:middle content lines up. */
   line-height: 36px;
 }
 .tool-bar-right {
   float: left;
-  width: 225px;
+  width: 170px;
   line-height: 36px;
   font-size: 15px;
   color: #6b7280;
@@ -262,15 +286,42 @@ input.ToolPicker:hover {
   font-size: 15px;
 }
 
-/* ── Joint type / Lid type side-by-side panels ────────────────────── */
+/* ── Joint type / Lid type panels ─────────────────────────────────── */
 .type-column {
+  float: none;
+  width: auto;
+  margin-right: 0;
+  margin-bottom: 10px;
+}
+.type-column-wide {
+  width: auto;
+}
+.type-column-wide .type-dropdown-content {
+  zoom: 1;
+}
+.type-column-wide .type-dropdown-content:after {
+  content: ".";
+  display: block;
+  height: 0;
+  clear: both;
+  visibility: hidden;
+}
+.type-column-wide .type-dropdown-content select {
   float: left;
   width: 260px;
-  margin-right: 10px;
+}
+.type-column-wide .type-dropdown-preview {
+  float: left;
+  margin-top: 0;
+  margin-left: 14px;
+  min-height: 0;
+}
+.type-column-wide .type-dropdown-preview img {
+  height: 28px;
 }
 .type-column-last {
-  float: left;
-  width: 260px;
+  float: none;
+  width: auto;
 }
 .type-panel {
   background-color: #ffffff;
@@ -348,17 +399,46 @@ input.ToolPicker:hover {
   background-color: #ffffff;
   border: 1px solid #c0c4d0;
   padding: 10px 12px;
+  white-space: nowrap;
 }
-.footer-ok-button {
+/* Footer inner width = 1180 - 2*12 padding - 2 border = 1154px.
+   Columns: actions 270 + options 774 + cancel 110 = 1154. */
+.footer-actions {
   float: left;
-  width: 155px;
-  padding-top: 8px;
-  text-align: center;
+  width: 270px;
+  height: 30px;
+  line-height: 30px;
+  text-align: left;
+}
+.footer-actions button {
+  vertical-align: middle;
+  margin-right: 8px;
 }
 .footer-options {
   float: left;
-  padding-top: 4px;
-  width: 390px;
+  width: 774px;
+  height: 30px;
+}
+/* fixed width so margin auto centres the floated cells in IE7 */
+.footer-options-group {
+  width: 456px;
+  margin: 0 auto;
+}
+.footer-option-cell {
+  float: left;
+  height: 30px;
+  line-height: 30px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+#LabelFacesCell { width: 136px; }
+#DarkModeCell   { width: 130px; }
+#ZoomLevelCell  { width: 190px; }
+.footer-option-cell input {
+  vertical-align: middle;
+}
+.footer-option-cell label {
+  vertical-align: middle;
 }
 .footer-options-col {
   float: left;
@@ -367,7 +447,7 @@ input.ToolPicker:hover {
 .footer-option-item {
   font-size: 15px;
   color: #374151;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 .footer-option-item input {
   margin-right: 4px;
@@ -376,14 +456,26 @@ input.ToolPicker:hover {
   font-family: Tahoma, Arial, sans-serif;
   font-size: 15px;
   width: 75px;
-  vertical-align: baseline;
+  vertical-align: middle;
 }
 .footer-cancel-button {
   float: right;
-  width: 155px;
-  padding-top: 8px;
-  text-align: center;
+  width: 110px;
+  height: 30px;
+  line-height: 30px;
+  text-align: right;
 }
+
+/* Fixed size footer buttons. overflow:visible stops IE7 adding padding
+   proportional to the caption width, which made the buttons overhang. */
+.footer-bar button {
+  width: 84px;
+  height: 30px;
+  padding: 0;
+  overflow: visible;
+  line-height: normal;
+}
+.footer-actions #ButtonImport { margin-right: 0; }
 
 /* ── OK / Cancel buttons ──────────────────────────────────────────── */
 #ButtonOK {
@@ -391,22 +483,34 @@ input.ToolPicker:hover {
   color: #ffffff;
   border: 1px solid #166032;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
-  padding: 7px 28px;
   cursor: pointer;
 }
 #ButtonOK:hover {
   background-color: #176a35;
+}
+#ButtonExport,
+#ButtonImport {
+  background-color: #f2f4f8;
+  color: #374151;
+  border: 1px solid #c0c4d0;
+  font-family: Tahoma, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+#ButtonExport:hover,
+#ButtonImport:hover {
+  background-color: #e2e5ee;
 }
 #ButtonCancel {
   background-color: #f2f4f8;
   color: #6b7280;
   border: 1px solid #c0c4d0;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
-  padding: 7px 20px;
   cursor: pointer;
 }
 #ButtonCancel:hover {
@@ -438,7 +542,7 @@ body.dark-mode .sub-panel-title {
 }
 body.dark-mode .header-image {
   background-color: #2a2f3b;
-  border-right-color: #383d4a;
+  border-left-color: #383d4a;
 }
 body.dark-mode .header-text p {
   color: #8a92a8;
@@ -535,6 +639,16 @@ body.dark-mode #ButtonCancel {
   background-color: #2a2f3b;
   color: #8a92a8;
   border-color: #383d4a;
+}
+body.dark-mode #ButtonExport,
+body.dark-mode #ButtonImport {
+  background-color: #2a2f3b;
+  color: #d4d8e8;
+  border-color: #4a5060;
+}
+body.dark-mode #ButtonExport:hover,
+body.dark-mode #ButtonImport:hover {
+  background-color: #383f4d;
 }
 body.dark-mode #ButtonCancel:hover {
   background-color: #333947;
