@@ -29,55 +29,73 @@
 <div id="page-wrapper">
 
   <!-- ── Header: diagram + description ──────────────────────────────── -->
+  <!-- Dimensions / joint type on the left, ISO view on the right -- by Claude 11/3/2026 -->
   <div class="card clearfix">
-    <!-- the live view takes about 2/3 of the header width; the text column gives
-         up the same width -- by Claude 10/31/2026 -->
-    <div class="header-image" style="width: 490px;">
+    <div class="header-text">
+      <p class="release-link-row"><a class="release-link" href="https://github.com/gremlin529/Vectric-Box-Gadget/releases" target="_blank">Simple Box Creator</a></p>
+      <!-- Box dimensions moved here from Geometry Options to tighten the dialog -- by Claude 11/3/2026 -->
+      <div class="section-header" style="margin-top: 6px;">External Box Dimensions</div>
+      <div class="sub-panel">
+        <div class="field-row" title="Side to side width of the box outside">
+          <label for="WidthField">Width</label>
+          <input type="number" class="calcfield" step="any" id="WidthField" placeholder="Width of Box" onchange="onGeometryFieldChanged()"/>
+        </div>
+        <div class="field-row" title="Front to back depth of the box outside">
+          <label for="DepthField">Depth</label>
+          <input type="number" class="calcfield" step="any" id="DepthField" placeholder="Depth of Box" onchange="onGeometryFieldChanged()"/>
+        </div>
+        <div class="field-row" style="margin-bottom: 0;" title="Top to bottom height of the box outside">
+          <label for="HeightField">Height</label>
+          <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
+        </div>
+      </div>
+      <!-- Joint type moved up here under the box dimensions (Lid / Bottom type
+           live in the right column) -- by Claude 11/3/2026 -->
+      <div class="type-panel" style="margin-top: 10px;">
+        <div class="type-panel-header">Joint Type</div>
+        <div class="type-option clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/tabs.png" alt="Finger joint preview" />
+          </div>
+        </div>
+        <div class="type-option-last clearfix">
+          <div class="type-option-radio">
+            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" onclick="onJointTypeChanged()" />Dovetail</label>
+          </div>
+          <div class="type-option-preview">
+            <img src="Images/dovetails.png" alt="Dovetail joint preview" />
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="header-image">
       <!-- Live isometric view of the box (Width / Depth / Height as entered). Drawn
            with VML in VCarve's IE7 dialog, with canvas in other browsers; the
            picture stays as the fallback if neither works. -- by Claude 10/31/2026 -->
-      <div id="BoxIsoView" style="position: relative; width: 490px; height: 300px; display: none;"></div>
+      <div id="BoxIsoView" style="position: relative; width: 780px; height: 300px; display: none;"></div>
       <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
-    </div>
-    <div class="header-text" style="width: 238px;">
-      <p>This gadget creates a box of the specified external dimensions.</p>
-      <p>There are several layers created depending on the options selected. Please hover over any option to see a description.</p>
-      <p><a href="https://github.com/gremlin529/Vectric-Box-Gadget/releases" target="_blank">Simple Box Creator Releases</a></p>
     </div>
   </div>
 
+  <div class="workspace clearfix">
+    <div class="left-column">
   <!-- ── Geometry Options ────────────────────────────────────────────── -->
   <div class="section-header">Geometry Options</div>
   <div class="card">
     <div class="card-body clearfix">
 
-      <!-- Box dimensions -->
+      <!-- Joint widths (Dovetail Angle lives here now that the box dimensions
+           moved to the header -- by Claude 11/3/2026) -->
       <div class="geometry-column">
         <div class="sub-panel">
-          <div class="sub-panel-title">Box Dimensions</div>
-          <div class="field-row" title="Side to side width of the box outside">
-            <label for="WidthField">Width</label>
-            <input type="number" class="calcfield" step="any" id="WidthField" placeholder="Width of Box" onchange="onGeometryFieldChanged()"/>
-          </div>
-          <div class="field-row" title="Front to back depth of the box outside">
-            <label for="DepthField">Depth</label>
-            <input type="number" class="calcfield" step="any" id="DepthField" placeholder="Depth of Box" onchange="onGeometryFieldChanged()"/>
-          </div>
-          <div class="field-row" title="Top to bottom height of the box outside">
-            <label for="HeightField">Height</label>
-            <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
-          </div>
+          <div class="sub-panel-title">Joint Widths</div>
           <div class="field-row" id="showHideDovetailAngle" style="display: none" title="Angle of the dovetail joint, between 45 and 85 degrees">
             <label for="DovetailAngleField">Dovetail Angle</label>
             <input type="number" class="calcfield" step="any" id="DovetailAngleField" placeholder="Dovetail Angle" onchange="onGeometryFieldChanged()"/>
           </div>
-        </div>
-      </div>
-
-      <!-- Joint widths -->
-      <div class="geometry-column">
-        <div class="sub-panel">
-          <div class="sub-panel-title">Joint Widths</div>
           <div class="checkbox-row" title="When checked, shows all joint width options">
             <input type="checkbox" class="LuaButton" id="AllJointWidths" onclick="onShowAllWidthsChanged(this)" />
             <label for="AllJointWidths">Show all joint widths</label>
@@ -137,68 +155,74 @@
     </div>
   </div>
 
-  <!-- ── Joint type + Lid type + Bottom type ───────────────────────── -->
-  <div class="clearfix" style="margin-bottom:10px;">
+    </div>
+    <div class="right-column">
+  <!-- ── Faces to machine ─────────────────────────────────────────────── -->
+  <div class="section-header">Faces To Machine</div>
+  <div class="card">
+    <div class="card-body clearfix">
+      <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
+      <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
+      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
+      <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
+        <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
+    </div>
+  </div>
 
-    <div class="type-column">
-      <div class="type-panel">
-        <div class="type-panel-header">Joint Type</div>
-        <div class="type-option clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/tabs.png" alt="Finger joint preview" />
-          </div>
+  <!-- ── Tools ─────────────────────────────────────────────────────────── -->
+  <div class="section-header">Tools</div>
+  <div class="card">
+    <div class="card-body clearfix">
+
+      <div class="tool-bar clearfix">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Cutting" title="The tool used for cutting out the box and fluting the dovetails" />
+          <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
         </div>
-        <div class="type-option-last clearfix">
-          <div class="type-option-radio">
-            <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio2" onclick="onJointTypeChanged()" />Dovetail</label>
-          </div>
-          <div class="type-option-preview">
-            <img src="Images/dovetails.png" alt="Dovetail joint preview" />
-          </div>
+        <div class="tool-bar-right">
+          <label class="no-toolpath-label">
+            <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" title="Only create the vectors"/>
+            <label title="Only create the vectors">No toolpath</label>
+          </label>
+        </div>
+      </div>
+
+      <!-- Roundover tool picker (box joints without dogbones only) -->
+      <div class="tool-bar clearfix" id="showHideRoundoverTool" style="display: none; margin-bottom: 0;">
+        <div class="tool-bar-left">
+          <input type="button" class="ToolPicker" name="RoundoverToolChooseButton" id="RoundoverToolChooseButton" value="Roundover" title="The tool used for rounding over the finger edges. It is recommended to use a tool with a radius half the diameter of the cutting bit."/>
+          <span id="RoundoverToolNameField">&#8212; No Tool Selected &#8212;</span>
+        </div>
+        <div class="tool-bar-right">
+          <label for="RoundoverCutDepthField" class="cut-depth-label">Cut Depth</label>
+          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input calcfield" placeholder="Cut Depth"/>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Lid type: its Open Chamfer / Grooved options open right below ── -->
+  <div class="type-column type-column-wide">
+    <div class="type-panel">
+      <div class="type-panel-header">Lid Type</div>
+      <div class="type-dropdown-content">
+        <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" title="&#10;Grooved: a sliding lid - a groove is cut into Left, Right and Front near the top edge and the Back is shortened to the underside of the lid, so the lid slides in from the back. A grip tab can stick out past the Back.">
+          <option value="Inset">Inset</option>
+          <option value="Fingers">Fingers</option>
+          <option value="Flat">Flat</option>
+          <option value="None">None</option>
+          <option value="OpenChamfer">Open Chamfer</option>
+          <option value="Grooved">Grooved</option>
+        </select>
+        <div class="type-dropdown-preview">
+          <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
         </div>
       </div>
     </div>
-
-    <div class="type-column">
-      <div class="type-panel">
-        <div class="type-panel-header">Lid Type</div>
-        <div class="type-dropdown-content">
-          <select id="LidTypeSelect" onchange="onLidTypeChanged(this)" title="&#10;Grooved: a sliding lid - a groove is cut into Left, Right and Front near the top edge and the Back is shortened to the underside of the lid, so the lid slides in from the back. A grip tab can stick out past the Back.">
-            <option value="Inset">Inset</option>
-            <option value="Fingers">Fingers</option>
-            <option value="Flat">Flat</option>
-            <option value="None">None</option>
-            <option value="OpenChamfer">Open Chamfer</option>
-            <option value="Grooved">Grooved</option>
-          </select>
-          <div class="type-dropdown-preview">
-            <img id="LidTypeImage" src="Images/InsetLid.png" alt="Lid type preview" />
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="type-column-last">
-      <div class="type-panel">
-        <div class="type-panel-header">Bottom Type</div>
-        <div class="type-dropdown-content">
-          <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" title="&#10;Grooved: a dado groove is cut into Left, Right and Front near the bottom edge so a flat bottom panel can be slid in from the open Back before it is glued on." style="font-family: Tahoma, Arial, sans-serif; font-size: 15px; width: 100%;">
-            <option value="Inset">Inset</option>
-            <option value="Fingers">Fingers</option>
-            <option value="Flat">Flat</option>
-            <option value="None">None</option>
-            <option value="Grooved">Grooved</option>
-          </select>
-          <div class="type-dropdown-preview">
-            <img id="BottomTypeImage" src="Images/InsetBottom.png" alt="Bottom type preview" />
-          </div>
-        </div>
-      </div>
-    </div>
-
   </div>
 
   <!-- ── Open Chamfer Options (Side Overhang) ──────────────────────
@@ -411,12 +435,31 @@
     </div>
   </div>
 
+  <!-- ── Bottom type: its Grooved options open right below ──────────── -->
+  <div class="type-column type-column-wide">
+    <div class="type-panel">
+      <div class="type-panel-header">Bottom Type</div>
+      <div class="type-dropdown-content">
+        <select id="BottomTypeSelect" onchange="onBottomTypeChanged(this)" title="&#10;Grooved: a dado groove is cut into Left, Right and Front near the bottom edge so a flat bottom panel can be slid in from the open Back before it is glued on." style="font-family: Tahoma, Arial, sans-serif; font-size: 15px;">
+          <option value="Inset">Inset</option>
+          <option value="Fingers">Fingers</option>
+          <option value="Flat">Flat</option>
+          <option value="None">None</option>
+          <option value="Grooved">Grooved</option>
+        </select>
+        <div class="type-dropdown-preview">
+          <img id="BottomTypeImage" src="Images/InsetBottom.png" alt="Bottom type preview" />
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- ── Grooved Bottom Options ───────────────────────────────────
        Only shown when Bottom Type = Grooved. -- by Claude 9/26/2026 -->
   <div class="section-header" id="showHideGrooveSectionHeader" style="display: none;">Grooved Bottom Options</div>
   <div class="card" id="showHideGrooveOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine below to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Slide-in bottom: grooved into Left, Right &amp; Front (with Dovetail joints, Front's groove has to be cut from its other side - tick "Reverse Front for groove on own sheet" to get it on a sheet of its own, otherwise it is skipped). The Back is shortened to the top of the groove, so the panel can always slide in/out there, even after glue-up. Uncheck "Bottom" under Faces To Machine above to keep the groove but skip cutting the panel itself (e.g. to slide in your own material).</div>
 
       <!-- Bottom panel fields (left) and groove fields (right) in the same grey-blue sub-panel /
            field-row style as Box Dimensions, with Detail A (GroovedOverhangSketch_174.png, 174x182) in between. Plain 3-column table, no
@@ -480,66 +523,26 @@
     </div>
   </div>
 
-  <!-- ── Tools ─────────────────────────────────────────────────────────── -->
-  <div class="section-header">Tools</div>
-  <div class="card">
-    <div class="card-body clearfix">
-
-      <div class="tool-bar clearfix">
-        <div class="tool-bar-left">
-          <input type="button" class="ToolPicker" name="ToolChooseButton" id="ToolChooseButton" value="Cutting" title="The tool used for cutting out the box and fluting the dovetails" />
-          <span id="ToolNameField">&#8212; No Tool Selected &#8212;</span>
-        </div>
-        <div class="tool-bar-right">
-          <label class="no-toolpath-label">
-            <input type="checkbox" class="LuaButton" name="NoToolpath" id="NoToolpath" value="" title="Only create the vectors"/>
-            <label title="Only create the vectors">No toolpath</label>
-          </label>
-        </div>
-      </div>
-
-      <!-- Roundover tool picker (box joints without dogbones only) -->
-      <div class="tool-bar clearfix" id="showHideRoundoverTool" style="display: none; margin-bottom: 0;">
-        <div class="tool-bar-left">
-          <input type="button" class="ToolPicker" name="RoundoverToolChooseButton" id="RoundoverToolChooseButton" value="Roundover" title="The tool used for rounding over the finger edges. It is recommended to use a tool with a radius half the diameter of the cutting bit."/>
-          <span id="RoundoverToolNameField">&#8212; No Tool Selected &#8212;</span>
-        </div>
-        <div class="tool-bar-right">
-          <label for="RoundoverCutDepthField" class="cut-depth-label">Cut Depth</label>
-          <input title="Depth of cut for rounding over the finger edges (check with bit manufacturer but should be less than or equal to the roundover radius)" type="number" step="any" id="RoundoverCutDepthField" class="cut-depth-input calcfield" placeholder="Cut Depth"/>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ── Faces to machine ─────────────────────────────────────────────── -->
-  <div class="section-header">Faces To Machine</div>
-  <div class="card">
-    <div class="card-body clearfix">
-      <div class="face-checkbox" id="MakeLidCheckItem" title="Note this stops the lid from being created, but the dimensions of the rest of the box will be the same. If you want it to be lidless box select none for lid type"><label><input type="checkbox" name="faces" id="MakeLid" class="LuaButton"/>Lid</label></div>
-      <div class="face-checkbox" id="MakeBottomCheckItem" title="Note this stops the bottom from being created, but the dimensions of the rest of the box will be the same. If you want it to be bottomless box select none for bottom type"><label><input type="checkbox" name="faces" id="MakeBottom" value="" class="LuaButton" />Bottom</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide1"  value=""  class="LuaButton" />Left</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
-      <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
-      <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
-        <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
     </div>
   </div>
 
   <!-- ── Footer: OK / options / Cancel ──────────────────────────────── -->
   <div class="footer-bar clearfix">
-    <div class="footer-ok-button">
+    <div class="footer-actions">
       <button type="button" id="ButtonOK">OK</button>
+      <button type="button" id="ButtonExport" class="LuaButton">Export</button>
+      <button type="button" id="ButtonImport" class="LuaButton">Import</button>
     </div>
     <div class="footer-options">
-      <div class="clearfix" style="margin-bottom: 4px;">
-        <div class="footer-option-item" style="float: left; line-height: 26px;">
-          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable dark mode</label>
+      <div class="footer-options-group clearfix">
+        <div class="footer-option-item footer-option-cell" id="LabelFacesCell">
+          <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
         </div>
-        <div class="footer-option-item" style="float: right;">
-          <label for="ZoomLevel" style="margin-right: 6px; vertical-align: baseline;">Zoom Level</label>
+        <div class="footer-option-item footer-option-cell" id="DarkModeCell">
+          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Dark mode</label>
+        </div>
+        <div class="footer-option-item footer-option-cell" id="ZoomLevelCell">
+          <label for="ZoomLevel" style="margin-right: 6px;">Zoom Level</label>
           <select id="ZoomLevel" onchange="onZoomLevelChanged(this)">
             <option value="Auto">Auto</option>
             <option value="100%">100%</option>
@@ -552,9 +555,6 @@
           </select>
         </div>
       </div>
-      <div class="footer-option-item">
-        <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
-      </div>
     </div>
     <div class="footer-cancel-button">
       <button type="button" id="ButtonCancel">Cancel</button>
@@ -566,6 +566,7 @@
   <!-- which then marks the field invalid and shows the message as a tooltip -->
   <fieldset id="HiddenFields" style="display:none;">
     <input type="checkbox" id="DimensionsChanged" value="" class="LuaButton"/>
+    <input type="text" id="SettingsImportToken" value="" />
     <input type="text" id="InvalidWidth" value=""/>
     <input type="text" id="InvalidDepth" value=""/>
     <input type="text" id="InvalidHeight" value=""/>
@@ -1451,7 +1452,7 @@
   // canvas and no SVG but does have VML, so VML is used there; any other
   // browser gets canvas. If neither works the old picture stays.
   // Plain ES3, no textContent.                               -- by Claude 10/31/2026
-  var g_iso = { mode: "", key: "", W: 490, H: 300 };
+  var g_iso = { mode: "", key: "", W: 780, H: 300 };
 
   function isoInit() {
     var view = document.getElementById("BoxIsoView");
@@ -1804,21 +1805,24 @@
     if (!view) { return; }
     if (!(w > 0 && d > 0 && h > 0)) { view.innerHTML = ""; return; }
 
-    var line = dark ? "#c9d3e6" : "#1f2a3a";
-    var top = dark ? "#4a5a75" : "#dfe8f5";
-    var front = dark ? "#3a4860" : "#c4d3ea";
-    var side = dark ? "#2e3a4e" : "#a9bedd";
-    var inner = dark ? "#252e3d" : "#8ea6cc";
+    // The box itself keeps the same colours in dark mode (the dark variants made
+    // it too murky); only the dimension labels, which sit on the dialog's
+    // background, switch to a light colour.           -- by Claude 11/3/2026
+    var line = "#1f2a3a";
+    var top = "#dfe8f5";
+    var front = "#c4d3ea";
+    var side = "#a9bedd";
+    var inner = "#8ea6cc";
     // the floor inside is the bottom panel: brown like the panel itself, a little
     // darker as it lies in the box's shadow            -- by Claude 11/1/2026
-    var floor = dark ? "#6b5a3e" : "#e6cfa6";
+    var floor = "#e6cfa6";
     var text = dark ? "#e3e8f2" : "#1f3b63";
-    var lidTop = dark ? "#7a6748" : "#f3e2c4";
-    var lidFront = dark ? "#655539" : "#e3c99c";
-    var lidSide = dark ? "#54462f" : "#d2b07a";
-    var holeCol = dark ? "#1d2430" : "#5d6f8c";
+    var lidTop = "#f3e2c4";
+    var lidFront = "#e3c99c";
+    var lidSide = "#d2b07a";
+    var holeCol = "#5d6f8c";
     // inside an empty socket cut into a panel: the panel's own wood, in shadow
-    var sockCol = dark ? "#3f3423" : "#b8955e";
+    var sockCol = "#b8955e";
 
     // Faces are collected in box coordinates (x = width, y = depth, z = height),
     // then sorted back to front and projected together.
@@ -2148,10 +2152,14 @@
       // and the row Back stands on. Walked as one outline: along the near edge,
       // up the x = w side, back along the far edge, down the x = 0 side.
       //                                                         -- by Claude 11/2/2026
+      // With an end wall gone and no joints cut for it, the side walls run on
+      // over that end row too (see sy0 / sy1 in the shell), so they stand on its
+      // two ends as well.                                    -- by Claude 11/5/2026
       var bands = [];
-      if (!fc.front) { bands.push({ y0: 0, y1: t, L: 0, R: w }); }
+      var sideRunsF = !fc.front && !fc.tabs, sideRunsB = !fc.back && !fc.tabs;
+      if (!fc.front) { bands.push({ y0: 0, y1: t, L: (sideRunsF && fc.right) ? t : 0, R: (sideRunsF && fc.left) ? w - t : w }); }
       bands.push({ y0: t, y1: d - t, L: fc.right ? t : 0, R: fc.left ? w - t : w });
-      if (!fc.back) { bands.push({ y0: d - t, y1: d, L: 0, R: w }); }
+      if (!fc.back) { bands.push({ y0: d - t, y1: d, L: (sideRunsB && fc.right) ? t : 0, R: (sideRunsB && fc.left) ? w - t : w }); }
       // the exposed stack of bands, walked as one outline - see panelTop
       panelTop(bands, botT, sockW, sockD, sockNY, sockPX, sockBK, sockRT, floor);
       var k3, s3;
@@ -2277,9 +2285,19 @@
         // faces - on an inside face they are buried in it. With the panel not
         // being made but its joints still cut they hang free under all four walls,
         // and show on the inside faces too.                     -- by Claude 11/2/2026
+        // How far the side walls (Left / Right) run along the depth. MakeSideFace
+        // insets a side by the thickness at an end only when that end wall is
+        // being made or joints are being cut for it; otherwise nothing fills that
+        // strip, so the side runs right out to the end, square. The end walls and
+        // the panels are always full size.                    -- by Claude 11/5/2026
+        var sy0 = (fc.front || fc.tabs) ? t : 0;
+        var sy1 = (fc.back || fc.tabs) ? d - t : d;
+
         var botJoint = (bType === "Fingers") && fc.jointBottom && (zB > 0);
         var bjw = isoJointWidth("bottom"), bflare = isoDovetailFlare() * zB;
         var loW = botJoint ? { teeth: isoEdgeFingers(w, t, bjw), tip: 0, fl: bflare } : null;
+        // (a side's teeth keep the panel's spacing, d - 2t one thickness in, even
+        // where the side runs on to the end - MakeSideFace's lead_left/right)
         var loD = botJoint ? { teeth: isoEdgeFingers(d, t, bjw), tip: 0, fl: bflare } : null;
         var loInW = (botJoint && !fc.bottom) ? loW : null;
         var loInD = (botJoint && !fc.bottom) ? loD : null;
@@ -2301,9 +2319,11 @@
 
         // Corner tails standing in the open: a side wall keeps the tails that would
         // have gone into Front (or Back) when that wall is not being made but its
-        // joints are. Not with a sliding lid, whose side walls come in two blocks.
-        var patF = (!slide && !fc.front) ? isoCornerPattern(zB, zT, t) : null;
-        var patB = (!slide && !fc.back)  ? isoCornerPattern(zB, backZ, t) : null;
+        // joints are. (With a sliding lid too, now that each side wall is one
+        // outline: at the back the tails stop at the lowered Back's height and
+        // the margin above them is the step in that outline.) -- by Claude 11/5/2026
+        var patF = (!fc.front && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var patB = (!fc.back && fc.tabs)  ? isoCornerPattern(zB, backZ, t) : null;
         var tailEnd = function (pat, tip) {
           var r = [], k;
           for (k = 0; k < pat.segs.length; k++) { if (pat.segs[k][2]) { r.push([pat.segs[k][0], pat.segs[k][1]]); } }
@@ -2356,41 +2376,131 @@
           return (poly ? " " + face : "") + ((rimHidden || rimSeg) ? " pz" : "") + (endFace ? " ny" : "");
         };
 
+        // A side wall is one block its full height over its own span (sy0..sy1).
+        // With a sliding lid's lowered Back it also runs on over Back's top out
+        // to y = d (sideOver) - that part is a block of its own, but only its
+        // footprint: as a lower wall plus a block across the whole length on top,
+        // the join ran as a line across the inside face and the end grain. The
+        // outline of the visible face takes the step (stepOver), and the rim is
+        // laid as one piece over both.                        -- by Claude 11/5/2026
+        var sideOver = (backZ < zT - EPSB) && (sy1 < d);
+        // the back end of a side's outline: its corner tails (if any) and, over a
+        // lowered Back, the solid margin above them out to y = d
+        var backEnd = function (tails) {
+          if (!sideOver) { return tails; }
+          var segs = tails ? tails.segs.slice(0) : [];
+          segs.push([backZ, zT]);
+          return { segs: segs, tip: d, fl: tails ? tails.fl : 0 };
+        };
+        var sideRim = sideOver && !(rimHidden || topTeeth);
+        var sideBlocks = function (x0, x1, cPX, endFace) {
+          panel(x0, x1, sy0, sy1, zB, zT, cPX, front, top, omit("px", true, topTeeth || sideOver, endFace));
+          if (sideOver) { panel(x0, x1, sy1, d, backZ, zT, cPX, front, top, "px pz ny"); }
+          if (sideRim) { F([[x0,sy0,zT],[x1,sy0,zT],[x1,d,zT],[x0,d,zT]], top); }
+        };
+
         if (fc.right) {
-          var polyR = !!(loInD || hiInD || sF0 || eB0);
-          panel(0, t, t, d - t, zB, backZ, inner, front, top,
-                omit("px", polyR, topTeeth, fc.front || sF0));
-          if (topTeeth) { rimSegments("y", 0, t, t, d - t, zT, lidD, top, pinRight - DETAIL); }
+          sideBlocks(0, t, inner, fc.front || sF0);
+          if (topTeeth) { rimSegments("y", 0, t, sy0, sy1, zT, lidD, top, pinRight - DETAIL); }
           if (sF0) { tailBits(0, t, patF, t, 0); }
           if (eB0) { tailBits(0, t, patB, d - t, d); }
-          if (polyR) { wallPoly("y", t, t, d - t, zB, backZ, loInD, hiInD, sF0, eB0, inner, pinRight); }
-          panel(0, t, t, d, backZ, zT, inner, front, top, omit("", false, false, fc.front));
+          wallPoly("y", t, sy0, sy1, zB, zT, loInD, hiInD, sF0, backEnd(eB0), inner, pinRight);
         }
+        // Left's outer face as one polygon over the corners (see below): lY0 / lY1
+        // how far it reaches - over a corner whose end wall is there (the pins are
+        // laid over it), otherwise as far as the wall itself goes (sy0 / sy1).
+        // (Only while Left is there at all: with it unchecked, Front's and Back's
+        // own end faces at x = w are what show.)              -- by Claude 11/5/2026
+        var lY0 = (fc.left && fc.front) ? 0 : sy0, lY1 = (fc.left && fc.back) ? d : sy1;
         if (fc.left) {
-          var polyL = !!(loD || hiOutD || sFW || eBW);
-          panel(w-t, w, t, d - t, zB, backZ, side, front, top,
-                omit("px", polyL, topTeeth, fc.front || sFW));
-          if (topTeeth) { rimSegments("y", w - t, w, t, d - t, zT, lidD, top, pinLeft - DETAIL); }
+          // With Front and Back both there, Left's outer face is one piece of wood
+          // running the whole depth (its tails fill the gaps between Front's / Back's
+          // pins), so it goes out as ONE polygon with those pins laid over it. Drawn
+          // as the wall between the corners plus a strip under each neighbour, every
+          // seam got a line stroked down it, and the step where a sliding lid's lower
+          // Back meets the full-height wall read as a line across the face.
+          //                                                  -- by Claude 11/3/2026
+          //
+          // The same holds at one end alone: with Back unchecked, Left still runs
+          // across Front's end, its tails between Front's pins. Drawn as the wall
+          // from y = t plus Front's end face as its own panel, the seam between
+          // them got a line stroked down it, cutting Left's tails off from Left
+          // (and the same at the back with Front unchecked). So the polygon
+          // reaches over every corner whose end wall is there, and that wall's
+          // end face is left out.                            -- by Claude 11/4/2026
+          //
+          // And it is always the wall's full height. With a sliding lid the wall
+          // runs on over the lowered Back (whose pins, clipped to its height, are
+          // laid over it like any others); with Back unchecked but joints cut,
+          // the trimmed corner gets a solid margin out to the outer corner above
+          // the tails (MakeSideFace, LidTopShortfall) - a step in this outline.
+          // Drawn as a lower wall plus a block on top, the join ran as a line
+          // right across the face.                           -- by Claude 11/5/2026
+          var eL = (lY1 > d - t) ? null : backEnd(eBW);
+          sideBlocks(w - t, w, side, fc.front || sFW);
+          if (topTeeth) { rimSegments("y", w - t, w, sy0, sy1, zT, lidD, top, pinLeft - DETAIL); }
           if (sFW) { tailBits(w - t, w, patF, t, 0); }
           if (eBW) { tailBits(w - t, w, patB, d - t, d); }
-          if (polyL) { wallPoly("y", w, t, d - t, zB, backZ, loD, hiOutD, sFW, eBW, side, pinLeft); }
-          panel(w-t, w, t, d, backZ, zT, side, front, top, omit("", false, false, fc.front));
+          wallPoly("y", w, lY0, lY1, zB, zT, loD, hiOutD, lY0 < t ? null : sFW, eL, side, pinLeft);
         }
+        // Front / Back's own ends where Left / Right are not being made but their
+        // joints are: the sockets the side walls' tails would sit in are cut into
+        // the end of the panel, leaving its pins standing. The tails flare along
+        // the panel's thickness, so on the face itself a socket is a plain
+        // rectangle (widened by the flare on the outer face, not on Back's inner
+        // one).                                                 -- by Claude 11/3/2026
+        var notchEnd = function (pat, flare, zMax, tip) {
+          var r = [], k, g;
+          for (k = 0; k < pat.segs.length; k++) {
+            g = pat.segs[k];
+            if (g[2] && g[0] < zMax - EPSB) { r.push([g[0] - flare, Math.min(g[1] + flare, zMax)]); }
+          }
+          return { segs: r, tip: tip, fl: 0 };
+        };
+        // what shows inside a socket: its back wall (only at the x = w end, the
+        // other faces away) and the top of the pin below it.
+        // Front's face goes out last of all (outer plane), so these can sort just
+        // after its depth. Back's inside face does not: it is the face nearer the
+        // camera, the pins' -y sides standing in front of the socket behind, so
+        // there they go just BEFORE it - sorted after, the back wall of each
+        // socket was painted across the pin above it, and every pin read as two.
+        //                                                  -- by Claude 11/4/2026
+        var notchBits = function (pat, yO, yI, zMax, xIn, xEnd, atW) {
+          var k, g, e = pat.e, zt, pn = (yO < yI) ? pinFront : pinBack - 2 * DETAIL;
+          for (k = 0; k < pat.segs.length; k++) {
+            g = pat.segs[k];
+            if (!g[2] || g[0] >= zMax - EPSB) { continue; }
+            zt = Math.min(g[1], zMax);
+            F([[xIn,yO,g[0]-e],[xEnd,yO,g[0]-e],[xEnd,yI,g[0]],[xIn,yI,g[0]]], top, pn + DETAIL);
+            if (atW) { F([[xIn,yO,g[0]-e],[xIn,yI,g[0]],[xIn,yI,zt],[xIn,yO,Math.min(g[1]+e, zMax)]], side, pn + DETAIL); }
+          }
+        };
+        var patFm = (fc.front && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var patBm = (fc.back  && fc.tabs) ? isoCornerPattern(zB, zT, t) : null;
+        var nF0 = (patFm && !fc.right) ? notchEnd(patFm, patFm.e, zT, t) : null;
+        var nFW = (patFm && !fc.left)  ? notchEnd(patFm, patFm.e, zT, w - t) : null;
+        var nB0 = (patBm && !fc.right) ? notchEnd(patBm, 0, backZ, t) : null;
+        var nBW = (patBm && !fc.left)  ? notchEnd(patBm, 0, backZ, w - t) : null;
+
         if (fc.front) {
-          var polyF = !!(loW || hiOutW);
-          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false));
+          var polyF = !!(loW || hiOutW || nF0 || nFW);
+          panel(0, w, 0, t, zB, zT, side, front, top, omit("ny", polyF, topTeeth, false) + ((lY0 < t || nFW) ? " px" : ""));
           if (topTeeth) { rimSegments("x", 0, t, 0, w, zT, lidW, top, pinFront - DETAIL); }
-          if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, null, null, front, pinFront); }
+          if (polyF) { wallPoly("x", 0, 0, w, zB, zT, loW, hiOutW, nF0, nFW, front, pinFront); }
+          if (nF0) { notchBits(patFm, 0, t, zT, 0, t, false); }
+          if (nFW) { notchBits(patFm, 0, t, zT, w - t, w, true); }
         }
         if (fc.back) {
-          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true));
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((lY1 > d - t || nBW) ? " px" : ""));
           // Back's rim runs the full width even where its inside face is clipped
           if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
+          if (nB0) { notchBits(patBm, d, d - t, backZ, 0, t, false); }
+          if (nBW) { notchBits(patBm, d, d - t, backZ, w - t, w, true); }
           // Back's inside face, across only the span Left / Right are not standing
           // in front of - they are nearer the camera over their own footprints.
           if (bx1 - bx0 > EPSB) {
-            if (loInW || hiInW) {
-              wallPoly("x", d - t, bx0, bx1, zB, backZ, loInW, hiInW, null, null, inner, pinBack);
+            if (loInW || hiInW || nB0 || nBW) {
+              wallPoly("x", d - t, bx0, bx1, zB, backZ, loInW, hiInW, nB0, nBW, inner, pinBack);
             } else {
               F([[bx0,d-t,zB],[bx1,d-t,zB],[bx1,d-t,backZ],[bx0,d-t,backZ]], inner);
             }
@@ -2406,14 +2516,23 @@
           // from their own blocks.       -- by Claude 10/31/2026, reworked 11/2/2026
           var gwid = Math.min(lid.gw > 0 ? lid.gw : t / 2, zT - lidZ0);
           if (gwid > 0) {
-            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol, depthAt(t, (t + d) / 2, (backZ + zT) / 2));
+            // (just after the face it is cut into, however far that is lifted)
+            F([[t,t,lidZ0],[t,d,lidZ0],[t,d,lidZ0+gwid],[t,t,lidZ0+gwid]], holeCol,
+              Math.max(depthAt(t, (t + d) / 2, (backZ + zT) / 2), pinRight + DETAIL / 2));
           }
         }
         if (slide && fc.lid) {
           // the lid, pulled out by half the depth
           var g = Math.min(lid.gd > 0 ? lid.gd : t / 3, t);
           var sl = d / 2;   // pulled out halfway, so the groove shows in front of it
+          // Sorted as if still sitting at the middle of the box: pulled out, its centre
+          // lies so far back that Right's inner face and rim, which really are behind
+          // it, came out nearer the camera and painted over it.  -- by Claude 11/3/2026
           var lx0 = t - g, lx1 = w - t + g, ly0 = t - g + sl, ly1 = d + sl, lz1 = lidZ0 + lidT;
+          // ...and never before Right's inside face: with corner tails at the front
+          // that face is lifted to just past them (pinRight), further forward than
+          // the lid would otherwise sort, and it painted over it. -- by Claude 11/5/2026
+          layer = Math.max(sl, pinRight + DETAIL - (raw(lx0, ly1, lidZ0)));
           // The lid's outline in plan (anti-clockwise), with the grip tab exactly as
           // CreateFaces cuts it (AddLidGripTab), then its edges as side faces - only
           // those facing the viewer - and the top on them. Curved tab corners get
@@ -2481,6 +2600,12 @@
             // on its own centre it would sort under the lid and never show
             F(hp, holeCol, depthAt(cxm, (ly0 + ly1) / 2, lz1));
           }
+          layer = 0;
+          // Left stands nearer the camera than the lid sliding in its groove, so its
+          // rim goes back on top of the lid's edge.        -- by Claude 11/3/2026
+          if (fc.left) { F([[w-t,sy0,zT],[w,sy0,zT],[w,d,zT],[w-t,d,zT]], top, OUTER - 1); }
+          // and so does Right's: the lid's edge runs under it in its groove
+          if (fc.right) { F([[0,sy0,zT],[t,sy0,zT],[t,d,zT],[0,d,zT]], top, OUTER - 1); }
         }
         // The rims, outer faces and end grain all came with the four wall blocks
         // above - nothing left to add here by hand. With a sliding lid Left and
@@ -2493,7 +2618,7 @@
 
       // Corner joints: the finger pattern up the corners  -- by Claude 10/31/2026
       if (open) { isoCornerFingers(F, w, d, t, zB, zT, zT, Math.min(backTop, zT), front, side, top, fc,
-        depthAt(w / 2, 0, (zB + zT) / 2), depthAt(w, d / 2, (zB + zT) / 2), !slide); }
+        depthAt(w / 2, 0, (zB + zT) / 2), depthAt(w, d / 2, (zB + zT) / 2), true); }
     }
 
     // Panel sockets follow MakeBottomFaceContour / MakeLid, which cut them on
@@ -2572,7 +2697,12 @@
       layer = LIDS;
       var gap = Math.max(h * 0.3, 2 * t), zL = zT + gap;
       if (lid.type === "Inset") {
+        // The plug is under the plate, so it goes just behind it: sorted on its own
+        // centre its +x / -y faces came out in front of the plate's top and showed
+        // as a step along two edges.                       -- by Claude 11/3/2026
+        layer = LIDS - 1000;
         block(t, w - t, t, d - t, zL, zL + t / 2, lidTop, lidFront, lidSide);
+        layer = LIDS;
         block(0, w, 0, d, zL + t / 2, zL + t, lidTop, lidFront, lidSide);
       } else {
         block(0, w, 0, d, zL, zL + t, lidTop, lidFront, lidSide);
@@ -2701,6 +2831,66 @@
       faces[i][0] = sp;
     }
 
+    // Which face strokes which edge. Every face used to stroke its whole outline,
+    // so an edge two faces share - a finger's top against its side, a finger's
+    // side against the wall it stands on - was drawn twice, once by each. On a
+    // canvas the two land on top of each other, but VML positions each shape on
+    // its own, and in VCarve's IE host at any display scaling above 100 % the two
+    // copies come out a pixel or so apart: the double lines along the fingers,
+    // and finger tops that look drawn separately from their sides.
+    //
+    // So each stretch of line is stroked once, by the LAST face painted along it
+    // (that face is on top there, so its outline is what shows). Faces are walked
+    // from last to first; each edge drops whatever part of it a later face's edge
+    // already covers along the same screen line, partial overlaps included. A
+    // face's fill is then drawn unstroked and its remaining edges as open lines.
+    //                                                        -- by Claude 11/4/2026
+    var lineBuckets = {};
+    var lineKey = function (ka, ko) { return ka + ":" + ko; };
+    for (i = faces.length - 1; i >= 0; i--) {
+      var fpts = faces[i][0], segs = [], mine = [];
+      for (j = 0; j < fpts.length; j++) {
+        var pa = fpts[j], pb = fpts[(j + 1) % fpts.length];
+        var ex = pb[0] - pa[0], ey = pb[1] - pa[1], el = Math.sqrt(ex * ex + ey * ey);
+        if (el < 0.05) { continue; }
+        ex /= el; ey /= el;
+        if (ex < -1e-9 || (Math.abs(ex) <= 1e-9 && ey < 0)) { ex = -ex; ey = -ey; }
+        var ka = Math.round(Math.atan2(ey, ex) * 2000);
+        var ko = Math.round((pa[0] * ey - pa[1] * ex) * 10);
+        var ta = pa[0] * ex + pa[1] * ey, tb = pb[0] * ex + pb[1] * ey;
+        var parts = [[Math.min(ta, tb), Math.max(ta, tb)]];
+        // a nearly identical line may have rounded into a neighbouring bucket
+        for (var da = -1; da <= 1; da++) {
+          for (var dO = -1; dO <= 1; dO++) {
+            var cov = lineBuckets[lineKey(ka + da, ko + dO)];
+            if (!cov) { continue; }
+            for (var ci = 0; ci < cov.length && parts.length; ci++) {
+              var c0 = cov[ci][0] - 0.05, c1 = cov[ci][1] + 0.05, np = [];
+              for (var pi = 0; pi < parts.length; pi++) {
+                var s0 = parts[pi][0], s1 = parts[pi][1];
+                if (c1 <= s0 || c0 >= s1) { np.push(parts[pi]); continue; }
+                if (c0 - s0 > 0.3) { np.push([s0, c0]); }
+                if (s1 - c1 > 0.3) { np.push([c1, s1]); }
+              }
+              parts = np;
+            }
+          }
+        }
+        mine.push([lineKey(ka, ko), Math.min(ta, tb), Math.max(ta, tb)]);
+        for (var qi = 0; qi < parts.length; qi++) {
+          var u0 = parts[qi][0] - ta, u1 = parts[qi][1] - ta;
+          segs.push([pa[0] + ex * u0, pa[1] + ey * u0, pa[0] + ex * u1, pa[1] + ey * u1]);
+        }
+      }
+      // registered only after the whole face is done, so a face never trims
+      // its own edges (a dovetail outline can double back along one line)
+      for (j = 0; j < mine.length; j++) {
+        if (!lineBuckets[mine[j][0]]) { lineBuckets[mine[j][0]] = []; }
+        lineBuckets[mine[j][0]].push([mine[j][1], mine[j][2]]);
+      }
+      faces[i][4] = segs;
+    }
+
     var q0 = Q(0,0,0), q1 = Q(w,0,0), q2 = Q(w,d,0), q4 = Q(0,0,h);
     var labels = [
       // width: under the front bottom edge (front face on the right)
@@ -2714,17 +2904,74 @@
     var zf = isoZoomFix(view);
     var html = "";
     if (g_iso.mode === "vml") {
-      // v:shape over the whole view; its path is in a coordinate space 10x the
-      // pixels (coordsize), since VML paths take whole numbers only.
+      // v:shape over the whole view, its path in device pixels times 2.
+      //
+      // What VCarve's IE7 host does with VML, measured pixel by pixel
+      // (by Claude 11/4/2026):
+      //  * Each shape is placed relative to its own path's bounding box, with
+      //    limited precision, so two shapes with different bounds come out up to
+      //    a pixel apart. Every face had different bounds, which is why a finger's
+      //    top looked drawn separately from its sides, and why faces drifted off
+      //    their outlines towards the top left and top right of the box.
+      //  * With each path anchored to both corners of the view (a zero-size
+      //    piece at 0,0 and at the far corner) every shape shares one set of
+      //    bounds, and fills land exactly: an edge at x falls at x + 0.5.
+      //  * Strokes still don't. They sit about 0.8 px to one side of a fill
+      //    with the same coordinates, and smear across two pixels at any
+      //    fractional position.
+      //  * Overlapping pieces of one path are filled even-odd: the overlap is
+      //    left as a hole, whatever the winding.
+      // So the outlines aren't strokes at all. Each is a thin filled strip run
+      // through the same exact fill placement as the faces, centred on the
+      // face's edge, its ends squared off by half a line width so that corners
+      // close. Vertices are snapped to whole device pixels so that upright and
+      // flat lines are one crisp pixel wide (onto pixel boundaries instead for
+      // an even line width), and a face's strips are spread over as many shapes
+      // as it takes for no two in one shape to overlap.
+      var Wd = Math.round(g_iso.W * zf.vml), Hd = Math.round(g_iso.H * zf.vml);
+      var vsx = Wd / g_iso.W, vsy = Hd / g_iso.H;
+      var lw = Math.max(1, Math.round(zf.vml)), hw = lw / 2;
+      var voff = (lw % 2) ? 0 : 0.5;
+      var SX = function (v) { return Math.round(v * vsx - voff) + voff; };   // device px
+      var SY = function (v) { return Math.round(v * vsy - voff) + voff; };
+      var U = function (v) { return Math.round(v * 2); };                      // path units
+      var anchorA = "m 0,0 l 0,0 ", anchorB = "m " + (Wd * 2) + "," + (Hd * 2) + " l " + (Wd * 2) + "," + (Hd * 2) + " ";
+      var vbox = 'coordsize="' + (Wd * 2) + ',' + (Hd * 2) + '" style="position:absolute; left:0; top:0; width:' +
+                 Wd + 'px; height:' + Hd + 'px;"';
+      var vfill = function (p, col) {
+        return '<v:shape ' + vbox + ' path="' + anchorA + p + anchorB + 'e" filled="true" fillcolor="' + col + '" stroked="false"></v:shape>';
+      };
       for (i = 0; i < faces.length; i++) {
         var pts = faces[i][0], path = "";
         for (var k = 0; k < pts.length; k++) {
-          path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + Math.round(pts[k][0] * 10) + "," + Math.round(pts[k][1] * 10);
+          path += (k === 0 ? "m " : (k === 1 ? " l " : ",")) + U(SX(pts[k][0])) + "," + U(SY(pts[k][1]));
         }
-        path += " x e";
-        html += '<v:shape coordsize="' + (g_iso.W * 10) + ',' + (g_iso.H * 10) + '" path="' + path +
-                '" filled="true" fillcolor="' + faces[i][1] + '" stroked="true" strokecolor="' + line +
-                '" strokeweight="' + (zf.vml) + 'px" style="position:absolute; left:0; top:0; width:' + Math.round(g_iso.W * zf.vml) + 'px; height:' + Math.round(g_iso.H * zf.vml) + 'px;"></v:shape>';
+        html += vfill(path + " x ", faces[i][1]);
+        // this face's own edges (see the edge ownership pass above) as strips
+        var es = faces[i][4], groups = [];
+        for (var ei = 0; ei < es.length; ei++) {
+          var ax = SX(es[ei][0]), ay = SY(es[ei][1]), bx = SX(es[ei][2]), by = SY(es[ei][3]);
+          var dx = bx - ax, dy = by - ay, dl = Math.sqrt(dx * dx + dy * dy);
+          if (dl < 1e-6) { continue; }
+          dx = dx / dl * hw; dy = dy / dl * hw;
+          var q = [[ax - dx - dy, ay - dy + dx], [bx + dx - dy, by + dy + dx],
+                   [bx + dx + dy, by + dy - dx], [ax - dx + dy, ay - dy - dx]];
+          var bb = [Math.min(ax, bx) - lw, Math.min(ay, by) - lw, Math.max(ax, bx) + lw, Math.max(ay, by) + lw];
+          var sp = "m " + U(q[0][0]) + "," + U(q[0][1]) + " l " + U(q[1][0]) + "," + U(q[1][1]) + "," +
+                   U(q[2][0]) + "," + U(q[2][1]) + "," + U(q[3][0]) + "," + U(q[3][1]) + " x ";
+          // first shape none of whose strips this one could touch
+          for (var gi = 0; gi < groups.length; gi++) {
+            var g = groups[gi], clash = false;
+            for (var gj = 0; gj < g.bb.length && !clash; gj++) {
+              var o = g.bb[gj];
+              clash = bb[0] < o[2] && o[0] < bb[2] && bb[1] < o[3] && o[1] < bb[3];
+            }
+            if (!clash) { break; }
+          }
+          if (gi === groups.length) { groups.push({ bb: [], p: "" }); }
+          groups[gi].bb.push(bb); groups[gi].p += sp;
+        }
+        for (gi = 0; gi < groups.length; gi++) { html += vfill(groups[gi].p, line); }
       }
     } else {
       html += '<canvas id="BoxIsoCanvas" width="' + g_iso.W + '" height="' + g_iso.H + '" style="position:absolute; left:0; top:0;"></canvas>';
@@ -2747,7 +2994,16 @@
         var fp = faces[i][0];
         cx.beginPath(); cx.moveTo(fp[0][0], fp[0][1]);
         for (var m = 1; m < fp.length; m++) { cx.lineTo(fp[m][0], fp[m][1]); }
-        cx.closePath(); cx.fillStyle = faces[i][1]; cx.fill(); cx.stroke();
+        // the fill's own colour round its edge closes the antialiasing seam
+        // between two faces (the outline is now drawn separately, see above)
+        cx.closePath(); cx.fillStyle = faces[i][1]; cx.fill();
+        cx.strokeStyle = faces[i][1]; cx.stroke(); cx.strokeStyle = line;
+        var cs = faces[i][4];
+        if (cs.length) {
+          cx.beginPath();
+          for (var cn = 0; cn < cs.length; cn++) { cx.moveTo(cs[cn][0], cs[cn][1]); cx.lineTo(cs[cn][2], cs[cn][3]); }
+          cx.stroke();
+        }
       }
     }
   }
@@ -2825,6 +3081,35 @@
     var val = select.options[select.selectedIndex].value;
     document.body.style.zoom = (val === "Auto") ? dpiToZoom() : val;
   }
+
+  // Lua updates imported settings through HTML_Dialog's Update* methods. Watch
+  // this hidden token so the dependent panels and previews refresh afterwards.
+  var lastSettingsImportToken = "";
+  setInterval(function() {
+    var tokenField = document.getElementById("SettingsImportToken");
+    var token = tokenField ? tokenField.value : "";
+    if (!token || token === lastSettingsImportToken) { return; }
+    lastSettingsImportToken = token;
+
+    var lidSelect = document.getElementById("LidTypeSelect");
+    var bottomSelect = document.getElementById("BottomTypeSelect");
+    var allWidths = document.getElementById("AllJointWidths");
+    var zoomSelect = document.getElementById("ZoomLevel");
+    var darkMode = document.getElementById("DarkMode");
+    onJointTypeChanged();
+    if (allWidths) { onShowAllWidthsChanged(allWidths); }
+    if (lidSelect) { onLidTypeChanged(lidSelect); }
+    if (bottomSelect) { onBottomTypeChanged(bottomSelect); }
+    onGrooveOffsetRefChanged();
+    onLidGrooveOffsetRefChanged();
+    onLidGripTypeChanged();
+    onSideOverhangFieldsChanged();
+    updateBottomRabbetInfo();
+    updateLidRabbetInfo();
+    if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
+    if (darkMode) { onDarkModeChanged(darkMode); }
+    onGeometryFieldChanged();
+  }, 100);
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
   setTimeout(function() {
