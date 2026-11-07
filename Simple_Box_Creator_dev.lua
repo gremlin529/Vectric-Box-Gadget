@@ -81,7 +81,7 @@ local documentOptionFields = {
   "lidHoleThrough", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius",
   "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
   "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath",
-  "create_dogbones", "useSingleSheet", "roundover_cut_depth",
+  "create_dogbones", "useSingleSheet", "roundover_cut_depth", "dark_mode",
   "create_tabs_for_missing_faces"
 }
 
@@ -162,6 +162,10 @@ function main(script_path)
     DisplayMessageBox("No job loaded.")
     return false
   end
+
+  -- Sample code to iterate through document variables
+  -- and see all that exist
+  local doc_vars = job.DocumentVariables
 
   -- Remember which sheet was active when the gadget started, so all of the
   -- gadget's sheets get named after it (this exact name for the first sheet,
