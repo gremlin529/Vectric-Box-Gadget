@@ -68,6 +68,63 @@ G_doveTailAngleDegrees = 60
 
 local libraryModule
 
+-- Document variables are numeric only. Keep the option names and any
+-- string-to-number mappings together so the document can restore the dialog.
+local documentOptionFields = {
+  "width", "height", "depth", "InMM",
+  "useAllJointWidths", "sideOrAllTabWidth", "bottomTabWidth", "lidTabWidth",
+  "allowance", "partSpacing", "clampingMargin", "dovetailJoint", "dovetailAngleDegrees",
+  "bottomGrooveWidth", "bottomGrooveOffsetInput", "bottomGrooveDepth", "bottomFrontGrooveFlip",
+  "bottomThickness", "bottomGrooveClearance", "bottomRabbetDepthCorrection",
+  "lidThickness", "lidGrooveWidth", "lidGrooveDepth", "lidGrooveClearance",
+  "lidRabbetDepthCorrection", "lidFrontGrooveFlip", "lidHoleSize", "lidHoleLength",
+  "lidHoleThrough", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius",
+  "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
+  "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath",
+  "create_dogbones", "useSingleSheet", "roundover_cut_depth",
+  "create_tabs_for_missing_faces"
+}
+
+local documentEnumFields = {}
+
+local function SaveOptionsToDocumentVariables(doc_vars, options)
+  for _, name in ipairs(documentOptionFields) do
+    local value = options[name]
+    if type(value) == "boolean" then value = value and 1 or 0 end
+    if type(value) == "number" then AddDocumentVariable(doc_vars, "SimpleBoxCreator_" .. name, value) end
+  end
+  for name, mapping in pairs(documentEnumFields) do
+    local value = mapping[options[name]]
+    if value then AddDocumentVariable(doc_vars, "SimpleBoxCreator_" .. name, value) end
+  end
+  for _, name in ipairs({ "lid", "bottom", "side1", "side2", "end1", "end2" }) do
+    AddDocumentVariable(doc_vars, "SimpleBoxCreator_face_" .. name, options.facesToMake[name] and 1 or 0)
+  end
+  AddDocumentVariable(doc_vars, "SimpleBoxCreatorBox", 1)
+end
+
+local function LoadOptionsFromDocumentVariables(doc_vars, options)
+  if GetDocumentVariable(doc_vars, "SimpleBoxCreatorBox") ~= 1 then return false end
+  for _, name in ipairs(documentOptionFields) do
+    local value = GetDocumentVariable(doc_vars, "SimpleBoxCreator_" .. name)
+    if value ~= nil then
+      if type(options[name]) == "boolean" then value = value ~= 0 end
+      options[name] = value
+    end
+  end
+  for name, mapping in pairs(documentEnumFields) do
+    local saved = GetDocumentVariable(doc_vars, "SimpleBoxCreator_" .. name)
+    if saved ~= nil then
+      for value, code in pairs(mapping) do if code == saved then options[name] = value; break end end
+    end
+  end
+  for _, name in ipairs({ "lid", "bottom", "side1", "side2", "end1", "end2" }) do
+    local value = GetDocumentVariable(doc_vars, "SimpleBoxCreator_face_" .. name)
+    if value ~= nil then options.facesToMake[name] = value ~= 0 end
+  end
+  return true
+end
+
 -- MotazA 16/9/2020 check if job Exists 
 ---
 --- Main Function for Gadget 
@@ -80,6 +137,23 @@ function main(script_path)
   libraryModule = assert(loadfile(script_path .. "\\SheetArrangement.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\DisplayDialog.xlua"))(libraryModule)
+
+  -- FaceJointType is provided by the loaded gadget modules, so build mappings
+  -- that reference it only after those modules have initialized.
+  documentEnumFields = {
+    lidType = { [FaceJointType.Inset] = 1, [FaceJointType.Fingers] = 2, [FaceJointType.None] = 3,
+      [FaceJointType.OpenChamfer] = 4, [FaceJointType.Grooved] = 5 },
+    bottomType = { [FaceJointType.Fingers] = 1, [FaceJointType.Flat] = 2,
+      [FaceJointType.None] = 3, [FaceJointType.Grooved] = 4 },
+    bottomGrooveOffsetRef = { Groove = 1, Bottom = 2 },
+    lidGrooveOffsetRef = { Groove = 1, Lid = 2 },
+    lidGripType = { None = 1, ["Finger Hole"] = 2, ["Grab Handle"] = 3, ["Indented Handle"] = 4 },
+    lidHoleShape = { Round = 1, Rectangle = 2 },
+    lidGripShape = { Square = 1, Rounded = 2, Arc = 3 },
+    partLayout = { Auto = 1, Normal = 2, Rotated = 3 },
+    ZoomLevel = { Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
+      ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 }
+  }
 
   local job = VectricJob()
   local mtl_block = MaterialBlock()
@@ -203,6 +277,9 @@ function main(script_path)
   lidDoveTail.depth = options.thickness
 
   LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDoveTail)
+  -- A box marker means this document owns its settings; they take precedence
+  -- over the machine-wide registry defaults.
+  LoadOptionsFromDocumentVariables(doc_vars, options)
 
   -- Registry may have loaded a saved dovetail angle, so refresh the angle
   -- used by each dovetail table (min_width/max_width are refreshed later,
@@ -362,6 +439,7 @@ function main(script_path)
   SetSheet(job, base_sheet_name)
 
   SaveDefaultsToRegistry(options, false)
+  SaveOptionsToDocumentVariables(doc_vars, options)
   job:Refresh2DView()
   return true
 
