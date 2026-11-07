@@ -990,11 +990,44 @@
     // field that never got a blur of its own. Only rewrites field values - fires
     // no events - so it cannot re-enter here.      -- by Claude 11/1/2026
     calcEvaluateAllFields();
-    // Refresh the preview from real control changes; its key check avoids
-    // redrawing when the visible geometry did not change.
-    if (g_iso && g_iso.mode) { isoUpdate(); }
     var dimensionsChanged = document.getElementById("DimensionsChanged");
     if (dimensionsChanged) { dimensionsChanged.click(); }
+    // Preview redraw + the flags Lua just wrote, after the control has painted.
+    scheduleUiRefresh();
+  }
+
+  // Runs the preview redraw and the invalid/warning flag refresh once, on the
+  // next tick, instead of waiting for the 1s polls. Deferred so a clicked
+  // checkbox repaints straight away rather than after the (VML) redraw, and
+  // coalesced so several triggers in one event cost one redraw.
+  //                                                   -- by Claude 11/7/2026
+  var g_uiRefreshPending = false;
+  function scheduleUiRefresh() {
+    if (g_uiRefreshPending) { return; }
+    g_uiRefreshPending = true;
+    setTimeout(function () {
+      g_uiRefreshPending = false;
+      if (g_iso && g_iso.mode) { isoUpdate(); }
+      pollInvalidFieldFlags();
+      updateLidTabLabels();
+    }, 0);
+  }
+
+  // Checkboxes such as Faces to Machine have no handler of their own (their
+  // LuaButton class already tells Lua), so the preview used to wait for the
+  // poll. One delegated listener catches every checkbox / radio click,
+  // including clicks on their labels. attachEvent for IE7.
+  function onDocumentClickForRefresh(e) {
+    var ev = e || window.event;
+    var el = ev ? (ev.target || ev.srcElement) : null;
+    if (el && el.tagName === "INPUT" && (el.type === "checkbox" || el.type === "radio")) {
+      scheduleUiRefresh();
+    }
+  }
+  if (document.addEventListener) {
+    document.addEventListener("click", onDocumentClickForRefresh, false);
+  } else if (document.attachEvent) {
+    document.attachEvent("onclick", onDocumentClickForRefresh);
   }
 
   // ===========================================================================
@@ -1519,8 +1552,8 @@
   // Which panels are actually being machined ("Faces to Machine"), plus whether
   // joints are still cut towards the ones that aren't. The checkboxes all carry
   // class="LuaButton" so Lua already hears about them; the view picks them up
-  // through isoUpdate's 300ms poll, same as every other control here, so they
-  // need no callback of their own.
+  // straight away through the delegated click listener (scheduleUiRefresh),
+  // with isoUpdate's 1s poll as a fallback, so they need no callback of their own.
   //
   // Panel names follow the dialog's labels, not the field ids: Side1 is Left,
   // Side2 is Right, End1 is Front, End2 is Back.             -- by Claude 11/2/2026
