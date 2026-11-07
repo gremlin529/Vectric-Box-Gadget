@@ -990,6 +990,9 @@
     // field that never got a blur of its own. Only rewrites field values - fires
     // no events - so it cannot re-enter here.      -- by Claude 11/1/2026
     calcEvaluateAllFields();
+    // Refresh the preview from real control changes; its key check avoids
+    // redrawing when the visible geometry did not change.
+    if (g_iso && g_iso.mode) { isoUpdate(); }
     var dimensionsChanged = document.getElementById("DimensionsChanged");
     if (dimensionsChanged) { dimensionsChanged.click(); }
   }
@@ -1277,7 +1280,11 @@
   function calcEvaluateAllFields() {
     var inputs = document.getElementsByTagName("input");
     for (var i = 0; i < inputs.length; i++) {
-      if (calcIsField(inputs[i])) { calcEvaluateField(inputs[i]); }
+      if (calcIsField(inputs[i])) {
+        var value = calcTrim(inputs[i].value);
+        var plainValue = calcTrim(value.replace(/=+$/, ""));
+        if (value !== "" && !g_calcPlainNumber.test(plainValue)) { calcEvaluateField(inputs[i]); }
+      }
     }
   }
 
@@ -1443,8 +1450,8 @@
       }
     }
   }
-  setInterval(pollInvalidFieldFlags, 300);
-  setInterval(updateLidTabLabels, 300);   // red tab label when a field on it is invalid -- by Claude 10/27/2026
+  setInterval(pollInvalidFieldFlags, 1000);
+  setInterval(updateLidTabLabels, 1000);   // red tab label when a field on it is invalid -- by Claude 10/27/2026
 
   // ── Live isometric box view ───────────────────────────────────────────
   // Draws the box with the Width / Depth / Height entered, to scale, with the
@@ -1476,7 +1483,7 @@
     view.style.display = "block";
     if (img) { img.style.display = "none"; }
     isoUpdate();
-    setInterval(isoUpdate, 300);
+    setInterval(isoUpdate, 1000);
   }
 
   function isoNum(id) {
@@ -3026,7 +3033,7 @@
       onGeometryFieldChanged();
     }
   }
-  setInterval(pollToolNameChanged, 300);
+  setInterval(pollToolNameChanged, 1000);
 
   // Shows or hides the Bottom and Lid joint width fields. Whether Bottom/Lid
   // share the Side field or get their own changes which fields validation
