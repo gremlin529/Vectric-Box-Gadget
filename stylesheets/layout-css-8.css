@@ -399,26 +399,41 @@ input.ToolPicker:hover {
   background-color: #ffffff;
   border: 1px solid #c0c4d0;
   padding: 10px 12px;
+  white-space: nowrap;
 }
-.footer-ok-button {
+/* Footer inner width = 1180 - 2*12 padding - 2 border = 1154px.
+   Columns: actions 270 + options 774 + cancel 110 = 1154. */
+.footer-actions {
   float: left;
-  width: 155px;
-  padding-top: 8px;
-  text-align: center;
+  width: 270px;
+  height: 30px;
+  line-height: 30px;
+  text-align: left;
+}
+.footer-actions button {
+  vertical-align: middle;
+  margin-right: 8px;
 }
 .footer-options {
   float: left;
-  padding-top: 13px;
-  width: 620px;
+  width: 774px;
+  height: 30px;
+}
+/* fixed width so margin auto centres the floated cells in IE7 */
+.footer-options-group {
+  width: 456px;
+  margin: 0 auto;
 }
 .footer-option-cell {
   float: left;
-  width: 206px;
-  height: 26px;
-  line-height: 26px;
+  height: 30px;
+  line-height: 30px;
   margin-bottom: 0;
   white-space: nowrap;
 }
+#LabelFacesCell { width: 136px; }
+#DarkModeCell   { width: 130px; }
+#ZoomLevelCell  { width: 190px; }
 .footer-option-cell input {
   vertical-align: middle;
 }
@@ -432,7 +447,7 @@ input.ToolPicker:hover {
 .footer-option-item {
   font-size: 15px;
   color: #374151;
-  margin-bottom: 4px;
+  margin-bottom: 0;
 }
 .footer-option-item input {
   margin-right: 4px;
@@ -445,10 +460,22 @@ input.ToolPicker:hover {
 }
 .footer-cancel-button {
   float: right;
-  width: 155px;
-  padding-top: 8px;
-  text-align: center;
+  width: 110px;
+  height: 30px;
+  line-height: 30px;
+  text-align: right;
 }
+
+/* Fixed size footer buttons. overflow:visible stops IE7 adding padding
+   proportional to the caption width, which made the buttons overhang. */
+.footer-bar button {
+  width: 84px;
+  height: 30px;
+  padding: 0;
+  overflow: visible;
+  line-height: normal;
+}
+.footer-actions #ButtonImport { margin-right: 0; }
 
 /* ── OK / Cancel buttons ──────────────────────────────────────────── */
 #ButtonOK {
@@ -456,22 +483,34 @@ input.ToolPicker:hover {
   color: #ffffff;
   border: 1px solid #166032;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
-  padding: 7px 28px;
   cursor: pointer;
 }
 #ButtonOK:hover {
   background-color: #176a35;
+}
+#ButtonExport,
+#ButtonImport {
+  background-color: #f2f4f8;
+  color: #374151;
+  border: 1px solid #c0c4d0;
+  font-family: Tahoma, Arial, sans-serif;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+}
+#ButtonExport:hover,
+#ButtonImport:hover {
+  background-color: #e2e5ee;
 }
 #ButtonCancel {
   background-color: #f2f4f8;
   color: #6b7280;
   border: 1px solid #c0c4d0;
   font-family: Tahoma, Arial, sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: bold;
-  padding: 7px 20px;
   cursor: pointer;
 }
 #ButtonCancel:hover {
@@ -600,6 +639,16 @@ body.dark-mode #ButtonCancel {
   background-color: #2a2f3b;
   color: #8a92a8;
   border-color: #383d4a;
+}
+body.dark-mode #ButtonExport,
+body.dark-mode #ButtonImport {
+  background-color: #2a2f3b;
+  color: #d4d8e8;
+  border-color: #4a5060;
+}
+body.dark-mode #ButtonExport:hover,
+body.dark-mode #ButtonImport:hover {
+  background-color: #383f4d;
 }
 body.dark-mode #ButtonCancel:hover {
   background-color: #333947;

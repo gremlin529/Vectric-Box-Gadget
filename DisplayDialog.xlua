@@ -12,6 +12,7 @@ local G_decimalPlaces = 3  --- Number of decimal places to show in the UI for jo
 -- they can't close over DisplayDialog()'s local "options" - this lets them
 -- reach the same live options table instead.
 local G_dialogOptions
+local G_settingsImportCounter = 0
 
 -- Validates the box width/depth/height against the minimum required by the
 -- material thickness (each must exceed twice the thickness, since the box
@@ -1265,6 +1266,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   -- or for us to set things in the dialog that lua doesn't
   -- otherwise allow
   dialog:AddCheckBox("DimensionsChanged", false)
+  dialog:AddTextField("SettingsImportToken", "")
   dialog:AddTextField("InvalidWidth", "")
   dialog:AddTextField("InvalidDepth", "")
   dialog:AddTextField("InvalidHeight", "")
@@ -1977,6 +1979,216 @@ end
 --- By putting this function in the script we don't need to create
 --- individual functions unless we need specific handling
 function OnLuaButton_XXXX()
+  return true
+end
+
+-- Export the settings currently visible in the dialog using the same numeric
+-- document-variable format used by the SampleBox.DocVars example.
+function OnLuaButton_ButtonExport(dialog)
+  if not G_dialogOptions then
+    return true
+  end
+
+  ReadOptionsFromDialog(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail)
+
+  local file_dialog = FileDialog()
+  local filter = "Simple Box settings (*.SimpleBox)|*.SimpleBox||"
+  if not file_dialog:FileSave("SimpleBox", "*.SimpleBox", filter) then
+    return true
+  end
+
+  local values = {}
+  local function add_value(name, value)
+    if type(value) == "boolean" then value = value and 1 or 0 end
+    if type(value) == "number" then
+      values[#values + 1] = "SimpleBoxCreator_" .. name .. "=" .. tostring(value)
+    end
+  end
+
+  local numeric_fields = {
+    "width", "height", "depth", "InMM", "useAllJointWidths", "sideOrAllTabWidth",
+    "bottomTabWidth", "lidTabWidth", "allowance", "partSpacing", "clampingMargin",
+    "dovetailJoint", "dovetailAngleDegrees", "bottomGrooveWidth", "bottomGrooveOffsetInput",
+    "bottomGrooveDepth", "bottomFrontGrooveFlip", "bottomThickness", "bottomGrooveClearance",
+    "bottomRabbetDepthCorrection", "lidThickness", "lidGrooveWidth", "lidGrooveDepth",
+    "lidGrooveClearance", "lidRabbetDepthCorrection", "lidFrontGrooveFlip", "lidHoleSize",
+    "lidHoleLength", "lidHoleThrough", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius",
+    "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
+    "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath", "create_dogbones",
+    "useSingleSheet", "roundover_cut_depth", "create_tabs_for_missing_faces"
+  }
+  for _, name in ipairs(numeric_fields) do
+    add_value(name, G_dialogOptions[name])
+  end
+
+  local enum_fields = {
+    lidType = { [FaceJointType.Inset] = 1, [FaceJointType.Fingers] = 2, [FaceJointType.None] = 3,
+      [FaceJointType.OpenChamfer] = 4, [FaceJointType.Grooved] = 5, [FaceJointType.Flat] = 6 },
+    bottomType = { [FaceJointType.Fingers] = 1, [FaceJointType.Flat] = 2,
+      [FaceJointType.None] = 3, [FaceJointType.Grooved] = 4 },
+    bottomGrooveOffsetRef = { Groove = 1, Bottom = 2 },
+    lidGrooveOffsetRef = { Groove = 1, Lid = 2 },
+    lidGripType = { None = 1, ["Finger Hole"] = 2, ["Grab Handle"] = 3, ["Indented Handle"] = 4 },
+    lidHoleShape = { Round = 1, Rectangle = 2 },
+    lidGripShape = { Square = 1, Rounded = 2, Arc = 3 },
+    partLayout = { Auto = 1, Normal = 2, Rotated = 3 },
+    ZoomLevel = { Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
+      ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 }
+  }
+  for name, mapping in pairs(enum_fields) do
+    local code = mapping[G_dialogOptions[name]]
+    if code then add_value(name, code) end
+  end
+  for _, name in ipairs({ "lid", "bottom", "side1", "side2", "end1", "end2" }) do
+    add_value("face_" .. name, G_dialogOptions.facesToMake[name])
+  end
+  values[#values + 1] = "SimpleBoxCreatorBox=1"
+
+  local output, err = io.open(file_dialog.PathName, "w")
+  if not output then
+    DisplayMessageBox("Unable to write settings file: " .. tostring(err))
+    return true
+  end
+  output:write("[DocumentVariables]\r\nVersion=1\r\n[Variables]\r\n")
+  for _, line in ipairs(values) do
+    output:write(line, "\r\n")
+  end
+  output:close()
+  DisplayMessageBox("Settings exported successfully.")
+  return true
+end
+
+-- Import a previously exported .SimpleBox settings file into the live dialog.
+function OnLuaButton_ButtonImport(dialog)
+  local file_dialog = FileDialog()
+  local filter = "Simple Box settings (*.SimpleBox)|*.SimpleBox||"
+  if not file_dialog:FileOpen("SimpleBox", "*.SimpleBox", filter) then
+    return true
+  end
+
+  local input, err = io.open(file_dialog.PathName, "r")
+  if not input then
+    DisplayMessageBox("Unable to read settings file: " .. tostring(err))
+    return true
+  end
+
+  local values = {}
+  local in_variables = false
+  for line in input:lines() do
+    line = line:gsub("\r$", "")
+    if line == "[Variables]" then
+      in_variables = true
+    elseif line:sub(1, 1) == "[" then
+      in_variables = false
+    elseif in_variables then
+      local name, raw_value = line:match("^([^=]+)=(.*)$")
+      if name and name:sub(1, 17) == "SimpleBoxCreator_" then
+        local value = tonumber(raw_value)
+        if value ~= nil then values[name:sub(18)] = value end
+      end
+    end
+  end
+  input:close()
+
+  if next(values) == nil then
+    DisplayMessageBox("The selected file does not contain Simple Box settings.")
+    return true
+  end
+
+  -- Convert imported dimensions into the current job's units. Angles and flags
+  -- stay unchanged. InMM in the dialog continues to reflect the current job.
+  local imported_in_mm = G_dialogOptions.InMM
+  if values.InMM ~= nil then imported_in_mm = values.InMM ~= 0 end
+  if imported_in_mm ~= G_dialogOptions.InMM then
+    local factor = G_dialogOptions.InMM and 25.4 or (1 / 25.4)
+    for _, name in ipairs({
+      "width", "height", "depth", "sideOrAllTabWidth", "bottomTabWidth", "lidTabWidth",
+      "allowance", "partSpacing", "clampingMargin", "roundover_cut_depth",
+      "bottomGrooveOffsetInput", "bottomGrooveDepth", "bottomGrooveWidth", "bottomGrooveClearance",
+      "bottomRabbetDepthCorrection", "bottomThickness", "lidThickness", "lidGrooveWidth",
+      "lidGrooveDepth", "lidGrooveClearance", "lidRabbetDepthCorrection", "lidHoleSize",
+      "lidHoleLength", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius", "lidGripOverhang",
+      "lidGripWidth", "lidGripRadius", "end1Height", "end2Height"
+    }) do
+      if values[name] ~= nil then values[name] = values[name] * factor end
+    end
+  end
+
+  local double_fields = {
+    width = "WidthField", depth = "DepthField", height = "HeightField",
+    sideOrAllTabWidth = "SideTabWidthField", bottomTabWidth = "BottomTabWidthField",
+    lidTabWidth = "TopTabWidthField", allowance = "AllowanceField", partSpacing = "PartSpacingField",
+    clampingMargin = "ClampingMargin", dovetailAngleDegrees = "DovetailAngleField",
+    bottomGrooveOffsetInput = "BottomGrooveOffsetField", bottomGrooveDepth = "BottomGrooveDepthField",
+    bottomGrooveWidth = "BottomGrooveWidthField", bottomThickness = "BottomThicknessField",
+    bottomGrooveClearance = "BottomGrooveClearanceField", bottomRabbetDepthCorrection = "BottomRabbetCorrectionField",
+    lidThickness = "LidThicknessField", lidRabbetDepthCorrection = "LidRabbetCorrectionField",
+    lidGrooveClearance = "LidGrooveClearanceField", lidGrooveWidth = "LidGrooveWidthField",
+    lidGrooveDepth = "LidGrooveDepthField", lidGrooveOffsetInput = "LidGrooveOffsetField",
+    lidHoleSize = "LidHoleSizeField", lidHoleLength = "LidHoleLengthField",
+    lidHoleDepth = "LidHoleDepthField", lidHoleDistance = "LidHoleDistanceField",
+    lidHoleRadius = "LidHoleRadiusField", lidGripOverhang = "LidGripOverhangField",
+    lidGripWidth = "LidGripWidthField", lidGripRadius = "LidGripRadiusField",
+    end1Height = "End1HeightField", end2Height = "End2HeightField",
+    end1ChamferAngle = "End1ChamferAngleField", end2ChamferAngle = "End2ChamferAngleField",
+    roundover_cut_depth = "RoundoverCutDepthField"
+  }
+  for name, field_id in pairs(double_fields) do
+    if values[name] ~= nil then dialog:UpdateDoubleField(field_id, values[name]) end
+  end
+
+  local checkbox_fields = {
+    useAllJointWidths = "AllJointWidths", bottomFrontGrooveFlip = "BottomFrontGrooveFlip",
+    lidFrontGrooveFlip = "LidFrontGrooveFlip", lidHoleThrough = "LidHoleThrough",
+    label_faces = "LabelFaces", no_toolpath = "NoToolpath", create_dogbones = "CreateDogbones",
+    useSingleSheet = "UseSingleSheet", create_tabs_for_missing_faces = "CreateTabsForMissingFaces",
+    face_lid = "MakeLid", face_bottom = "MakeBottom", face_side1 = "MakeSide1",
+    face_side2 = "MakeSide2", face_end1 = "MakeEnd1", face_end2 = "MakeEnd2"
+  }
+  for name, field_id in pairs(checkbox_fields) do
+    if values[name] ~= nil then dialog:UpdateCheckBox(field_id, values[name] ~= 0) end
+  end
+  if values.dovetailJoint ~= nil then
+    dialog:UpdateRadioIndex("TabTypeRadio", values.dovetailJoint ~= 0 and 2 or 1)
+  end
+
+  local function update_enum(field_name, field_id, code_to_value, convert_value)
+    local code = values[field_name]
+    if code == nil then return end
+    local value = code_to_value[code]
+    if value ~= nil then dialog:UpdateDropDownListValue(field_id, convert_value and convert_value(value) or value) end
+  end
+  local function invert(mapping)
+    local inverse = {}
+    for value, code in pairs(mapping) do inverse[code] = value end
+    return inverse
+  end
+  local lid_type_codes = {
+    [1] = FaceJointType.Inset, [2] = FaceJointType.Fingers, [3] = FaceJointType.None,
+    [4] = FaceJointType.OpenChamfer, [5] = FaceJointType.Grooved, [6] = FaceJointType.Flat
+  }
+  local bottom_type_codes = {
+    [1] = FaceJointType.Fingers, [2] = FaceJointType.Flat, [3] = FaceJointType.None,
+    [4] = FaceJointType.Grooved
+  }
+  update_enum("lidType", "LidTypeSelect", lid_type_codes, function(value)
+    local label = FaceJointTypeToString(value)
+    return label == "OpenChamfer" and "Open Chamfer" or label
+  end)
+  update_enum("bottomType", "BottomTypeSelect", bottom_type_codes, FaceJointTypeToString)
+  update_enum("bottomGrooveOffsetRef", "BottomGrooveOffsetRef", invert({ Groove = 1, Bottom = 2 }))
+  update_enum("lidGrooveOffsetRef", "LidGrooveOffsetRef", invert({ Groove = 1, Lid = 2 }))
+  update_enum("lidGripType", "LidGripType", invert({ None = 1, ["Finger Hole"] = 2, ["Grab Handle"] = 3, ["Indented Handle"] = 4 }))
+  update_enum("lidHoleShape", "LidHoleShape", invert({ Round = 1, Rectangle = 2 }))
+  update_enum("lidGripShape", "LidGripShape", invert({ Square = 1, Rounded = 2, Arc = 3 }))
+  update_enum("partLayout", "PartLayoutSelect", invert({ Auto = 1, Normal = 2, Rotated = 3 }))
+  update_enum("ZoomLevel", "ZoomLevel", invert({ Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
+    ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 }))
+
+  ReadOptionsFromDialog(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail)
+  OnLuaButton_DimensionsChanged(dialog)
+  G_settingsImportCounter = G_settingsImportCounter + 1
+  dialog:UpdateTextField("SettingsImportToken", tostring(G_settingsImportCounter))
   return true
 end
 

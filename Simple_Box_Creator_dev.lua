@@ -81,7 +81,7 @@ local documentOptionFields = {
   "lidHoleThrough", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius",
   "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
   "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath",
-  "create_dogbones", "useSingleSheet", "roundover_cut_depth", "dark_mode",
+  "create_dogbones", "useSingleSheet", "roundover_cut_depth",
   "create_tabs_for_missing_faces"
 }
 
@@ -142,7 +142,7 @@ function main(script_path)
   -- that reference it only after those modules have initialized.
   documentEnumFields = {
     lidType = { [FaceJointType.Inset] = 1, [FaceJointType.Fingers] = 2, [FaceJointType.None] = 3,
-      [FaceJointType.OpenChamfer] = 4, [FaceJointType.Grooved] = 5 },
+      [FaceJointType.OpenChamfer] = 4, [FaceJointType.Grooved] = 5, [FaceJointType.Flat] = 6 },
     bottomType = { [FaceJointType.Fingers] = 1, [FaceJointType.Flat] = 2,
       [FaceJointType.None] = 3, [FaceJointType.Grooved] = 4 },
     bottomGrooveOffsetRef = { Groove = 1, Bottom = 2 },

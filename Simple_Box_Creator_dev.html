@@ -528,18 +528,20 @@
 
   <!-- ── Footer: OK / options / Cancel ──────────────────────────────── -->
   <div class="footer-bar clearfix">
-    <div class="footer-ok-button">
+    <div class="footer-actions">
       <button type="button" id="ButtonOK">OK</button>
+      <button type="button" id="ButtonExport" class="LuaButton">Export</button>
+      <button type="button" id="ButtonImport" class="LuaButton">Import</button>
     </div>
     <div class="footer-options">
-      <div class="clearfix">
-        <div class="footer-option-item footer-option-cell">
+      <div class="footer-options-group clearfix">
+        <div class="footer-option-item footer-option-cell" id="LabelFacesCell">
           <label><input type="checkbox" class="LuaButton" id="LabelFaces" />Label faces</label>
         </div>
-        <div class="footer-option-item footer-option-cell">
-          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Enable dark mode</label>
+        <div class="footer-option-item footer-option-cell" id="DarkModeCell">
+          <label><input type="checkbox" class="LuaButton" id="DarkMode" onclick="onDarkModeChanged(this)" />Dark mode</label>
         </div>
-        <div class="footer-option-item footer-option-cell">
+        <div class="footer-option-item footer-option-cell" id="ZoomLevelCell">
           <label for="ZoomLevel" style="margin-right: 6px;">Zoom Level</label>
           <select id="ZoomLevel" onchange="onZoomLevelChanged(this)">
             <option value="Auto">Auto</option>
@@ -564,6 +566,7 @@
   <!-- which then marks the field invalid and shows the message as a tooltip -->
   <fieldset id="HiddenFields" style="display:none;">
     <input type="checkbox" id="DimensionsChanged" value="" class="LuaButton"/>
+    <input type="text" id="SettingsImportToken" value="" />
     <input type="text" id="InvalidWidth" value=""/>
     <input type="text" id="InvalidDepth" value=""/>
     <input type="text" id="InvalidHeight" value=""/>
@@ -3078,6 +3081,35 @@
     var val = select.options[select.selectedIndex].value;
     document.body.style.zoom = (val === "Auto") ? dpiToZoom() : val;
   }
+
+  // Lua updates imported settings through HTML_Dialog's Update* methods. Watch
+  // this hidden token so the dependent panels and previews refresh afterwards.
+  var lastSettingsImportToken = "";
+  setInterval(function() {
+    var tokenField = document.getElementById("SettingsImportToken");
+    var token = tokenField ? tokenField.value : "";
+    if (!token || token === lastSettingsImportToken) { return; }
+    lastSettingsImportToken = token;
+
+    var lidSelect = document.getElementById("LidTypeSelect");
+    var bottomSelect = document.getElementById("BottomTypeSelect");
+    var allWidths = document.getElementById("AllJointWidths");
+    var zoomSelect = document.getElementById("ZoomLevel");
+    var darkMode = document.getElementById("DarkMode");
+    onJointTypeChanged();
+    if (allWidths) { onShowAllWidthsChanged(allWidths); }
+    if (lidSelect) { onLidTypeChanged(lidSelect); }
+    if (bottomSelect) { onBottomTypeChanged(bottomSelect); }
+    onGrooveOffsetRefChanged();
+    onLidGrooveOffsetRefChanged();
+    onLidGripTypeChanged();
+    onSideOverhangFieldsChanged();
+    updateBottomRabbetInfo();
+    updateLidRabbetInfo();
+    if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
+    if (darkMode) { onDarkModeChanged(darkMode); }
+    onGeometryFieldChanged();
+  }, 100);
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
   setTimeout(function() {
