@@ -14,6 +14,27 @@ local G_decimalPlaces = 3  --- Number of decimal places to show in the UI for jo
 local G_dialogOptions
 local G_settingsImportCounter = 0
 
+-- Resolve the selected tool once per validation pass. The allowance-adjusted
+-- diameter is shared by joint, groove, and finger-hole fit checks.
+local function GetValidationToolDiameters(options)
+  if options._validationToolAllowance == options.allowance and options._validationToolDiameter then
+    return options._validationToolDiameter, options._validationEffectiveToolDiameter
+  end
+  local material = MaterialBlock()
+  local diameter = 0.25
+  if Tool_ok(options.tool) then
+    diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, material)
+  end
+  local effective = diameter
+  if options.allowance > 0 then
+    effective = effective - 2 * options.allowance
+  end
+  options._validationToolDiameter = diameter
+  options._validationEffectiveToolDiameter = effective
+  options._validationToolAllowance = options.allowance
+  return diameter, effective
+end
+
 -- Validates the box width/depth/height against the minimum required by the
 -- material thickness (each must exceed twice the thickness, since the box
 -- wall is cut from it on both sides).
@@ -473,7 +494,7 @@ end
 -- hidden field.
 --
 -- Returns true if every joint currently being cut is valid.
-local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail, report_as_dialog)
+local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail, report_as_dialog, tool_diameter, effective_diameter)
   local double_thickness = options.thickness * 2
   local inner_width = options.width - double_thickness
   local inner_depth = options.depth - double_thickness
@@ -591,15 +612,10 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   end
 
   -- Check if tool will fit
-  local mtl_block = MaterialBlock()
-  local converted_tool_diameter = 0.25
-  if Tool_ok(options.tool) then
-    converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
-  end
-
-  local effectiveDia = converted_tool_diameter
-  if options.allowance > 0 then
-    effectiveDia = effectiveDia - 2 * options.allowance
+  local converted_tool_diameter = tool_diameter
+  local effectiveDia = effective_diameter
+  if converted_tool_diameter == nil or effectiveDia == nil then
+    converted_tool_diameter, effectiveDia = GetValidationToolDiameters(options)
   end
 
   local can_check_tool_fit = effectiveDia > 0
@@ -741,7 +757,7 @@ end
 |  Rabbet check added by gremlin/Claude 10/9/2026, turned into the groove check by Claude 10/9/2026
 |
 ]]
-local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog)
+local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog, effective_diameter)
   local message = ""
 
   local groove_width = options.bottomGrooveWidth or 0
@@ -753,14 +769,10 @@ local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog)
 
   if cutting_groove then
     -- Same effective-diameter convention as ValidateJointWidths above.
-    local mtl_block = MaterialBlock()
-    local converted_tool_diameter = 0.25
-    if Tool_ok(options.tool) then
-      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
-    end
-    local effectiveDia = converted_tool_diameter
-    if options.allowance > 0 then
-      effectiveDia = effectiveDia - 2 * options.allowance
+    local effectiveDia = effective_diameter
+    if effectiveDia == nil then
+      local _
+      _, effectiveDia = GetValidationToolDiameters(options)
     end
 
     -- effectiveDia <= 0 is an allowance-vs-tool problem, which ValidateJointWidths
@@ -857,7 +869,7 @@ function LidGrooveFarEdgeFromInput(options)
 end
 
 -- Same as ValidateBottomGrooveToolFit, for the lid groove.  -- by Claude 10/25/2026
-local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
+local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog, effective_diameter)
   local message = ""
   local groove_width = options.lidGrooveWidth or 0
   local cutting_groove = (options.lidType == FaceJointType.Grooved)
@@ -865,14 +877,10 @@ local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog)
     and (groove_width > 0.0001)
 
   if cutting_groove then
-    local mtl_block = MaterialBlock()
-    local converted_tool_diameter = 0.25
-    if Tool_ok(options.tool) then
-      converted_tool_diameter = ConvertUnitsFrom(options.tool.ToolDia, options.tool, mtl_block)
-    end
-    local effectiveDia = converted_tool_diameter
-    if options.allowance > 0 then
-      effectiveDia = effectiveDia - 2 * options.allowance
+    local effectiveDia = effective_diameter
+    if effectiveDia == nil then
+      local _
+      _, effectiveDia = GetValidationToolDiameters(options)
     end
     if (effectiveDia > 0) and (effectiveDia > groove_width + 0.0001) then
       message = string.format(
@@ -941,6 +949,73 @@ local function ValidateGrooveDepths(dialog, options, report_as_dialog)
   dialog:UpdateTextField("InvalidBottomGrooveDepth", bottom_message)
   dialog:UpdateTextField("InvalidLidGrooveDepth", lid_message)
   return bottom_message == "" and lid_message == ""
+end
+
+-- Live counterparts for the remaining grooved-panel constraints. Each message
+-- is attached to the input that can fix it, so the OK validator does not reveal
+-- a new error only after the user submits the dialog.
+local function ValidateGroovedPanelDimensionsLive(dialog, options)
+  local bottom_offset, bottom_thickness, bottom_clearance = "", "", ""
+  local lid_offset, lid_thickness, lid_clearance = "", "", ""
+
+  if options.bottomType == FaceJointType.Grooved then
+    if not IsNonNeg(options.bottomGrooveOffsetInput) then
+      bottom_offset = "Groove offset must be 0 or greater."
+    elseif IsNonNeg(options.bottomGrooveWidth) and options.bottomGrooveWidth > 0
+        and options.bottomGrooveOffset < options.bottomGrooveWidth - 0.0001 then
+      bottom_offset = "The groove would reach below the bottom edge of the walls - increase the groove offset."
+    elseif IsNonNeg(options.bottomGrooveOffset) and IsNonNeg(options.height) then
+      local top_reserved = (options.lidType == FaceJointType.Grooved)
+        and (options.lidGrooveOffset or 0) or ThicknessForFaceType(options.lidType, options.thickness)
+      if options.bottomGrooveOffset + top_reserved >= options.height then
+        bottom_offset = string.format("The groove offset is too large for the box height %.2f (the Back would have no height left).", options.height)
+      end
+    end
+    if not (options.bottomThickness and options.bottomThickness > 0) then
+      bottom_thickness = "Bottom thickness must be greater than 0."
+    elseif options.bottomThickness > options.thickness + 0.0001 then
+      bottom_thickness = string.format("Bottom thickness %.2f cannot be more than the material thickness %.2f.", options.bottomThickness, options.thickness)
+    elseif BottomPanelUndersideHeight(options) < -0.0001 then
+      bottom_thickness = string.format("The bottom panel would reach %.2f below the bottom edge of the walls - increase the groove offset.", -BottomPanelUndersideHeight(options))
+    end
+    if not IsNonNeg(options.bottomGrooveClearance) then
+      bottom_clearance = "Bottom groove clearance (Luft) must be 0 or greater."
+    elseif IsNonNeg(options.bottomGrooveDepth) and options.bottomGrooveClearance >= options.bottomGrooveDepth then
+      bottom_clearance = string.format("Bottom groove clearance %.2f must be less than the groove depth %.2f.", options.bottomGrooveClearance, options.bottomGrooveDepth)
+    end
+  end
+
+  if options.lidType == FaceJointType.Grooved then
+    if not IsNonNeg(options.lidGrooveOffsetInput) then
+      lid_offset = "Lid groove offset must be 0 or greater."
+    elseif IsNonNeg(options.lidGrooveWidth) and options.lidGrooveWidth > 0
+        and options.lidGrooveOffset < options.lidGrooveWidth - 0.0001 then
+      lid_offset = "The lid groove would reach above the top edge of the walls - increase the lid groove offset."
+    elseif IsNonNeg(options.lidGrooveOffset) and IsNonNeg(options.height) then
+      local bottom_reserved = (options.bottomType == FaceJointType.Grooved)
+        and (options.bottomGrooveOffset or 0) or ThicknessForFaceType(options.bottomType, options.thickness)
+      if options.lidGrooveOffset + bottom_reserved >= options.height - 0.0001 then
+        lid_offset = string.format("The lid groove offset is too large for the box height %.2f (the Back would have no height left below the lid).", options.height)
+      end
+    end
+    if not (options.lidThickness and options.lidThickness > 0) then
+      lid_thickness = "Lid thickness must be greater than 0."
+    elseif options.lidThickness > options.thickness + 0.0001 then
+      lid_thickness = string.format("Lid thickness %.2f cannot be more than the material thickness %.2f.", options.lidThickness, options.thickness)
+    end
+    if not IsNonNeg(options.lidGrooveClearance) then
+      lid_clearance = "Lid clearance must be 0 or greater."
+    elseif IsNonNeg(options.lidGrooveDepth) and options.lidGrooveClearance >= options.lidGrooveDepth then
+      lid_clearance = string.format("Lid clearance %.2f must be less than the lid groove depth %.2f.", options.lidGrooveClearance, options.lidGrooveDepth)
+    end
+  end
+
+  dialog:UpdateTextField("InvalidBottomGrooveOffset", bottom_offset)
+  dialog:UpdateTextField("InvalidBottomThickness", bottom_thickness)
+  dialog:UpdateTextField("InvalidBottomGrooveClearance", bottom_clearance)
+  dialog:UpdateTextField("InvalidLidGrooveOffset", lid_offset)
+  dialog:UpdateTextField("InvalidLidThickness", lid_thickness)
+  dialog:UpdateTextField("InvalidLidGrooveClearance", lid_clearance)
 end
 
 -- Thin wall strip outside a groove: below the bottom groove (to the walls' bottom
@@ -1044,7 +1119,7 @@ end
 --    before the Front's inside face
 --  * corner radius (rectangle only): 0 up to half the shorter side
 --                                                    -- by Claude 10/26/2026, 10/27/2026
-local function ValidateLidFingerHole(dialog, options, report_as_dialog)
+local function ValidateLidFingerHole(dialog, options, report_as_dialog, effective_diameter)
   local size_message, length_message, dist_message, radius_message, depth_message = "", "", "", "", ""
   if (options.lidType == FaceJointType.Grooved) and LidGripHasHole(options) then
     local rect = (options.lidHoleShape == "Rectangle")
@@ -1062,15 +1137,10 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog)
     local fmt = "%." .. G_decimalPlaces .. "f"
     local size_name = rect and "Hole width" or "Hole size"
 
-    local effectiveDia = 0
-    if not options.no_toolpath then
-      effectiveDia = 0.25
-      if Tool_ok(options.tool) then
-        effectiveDia = ConvertUnitsFrom(options.tool.ToolDia, options.tool, MaterialBlock())
-      end
-      if options.allowance > 0 then
-        effectiveDia = effectiveDia - 2*options.allowance
-      end
+    local effectiveDia = options.no_toolpath and 0 or effective_diameter
+    if effectiveDia == nil then
+      local _
+      _, effectiveDia = GetValidationToolDiameters(options)
     end
 
     if not IsNonNeg(size) or size <= 0.0001 then
@@ -1155,7 +1225,7 @@ end
 
 -- All the Grooved lid checks for the OK button. Returns false after showing
 -- the first problem found.                                    -- by Claude 10/25/2026
-local function ValidateGroovedLidOptions(dialog, options)
+local function ValidateGroovedLidOptions(dialog, options, effective_diameter)
   if (options.lidType ~= FaceJointType.Grooved) then
     return true
   end
@@ -1215,10 +1285,10 @@ local function ValidateGroovedLidOptions(dialog, options)
       return fail("Grip corner radius must be 0 or greater.")
     end
   end
-  if not ValidateLidFingerHole(dialog, options, true) then
+  if not ValidateLidFingerHole(dialog, options, true, effective_diameter) then
     return false
   end
-  return ValidateLidGrooveToolFit(dialog, options, true)
+  return ValidateLidGrooveToolFit(dialog, options, true, effective_diameter)
 end
 
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
@@ -1280,7 +1350,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("InvalidEnd1ChamferAngle", "")
   dialog:AddTextField("InvalidEnd2ChamferAngle", "")
   dialog:AddTextField("InvalidBottomGrooveWidth", "")  -- Added by Claude 10/9/2026
+  dialog:AddTextField("InvalidBottomGrooveOffset", "")
+  dialog:AddTextField("InvalidBottomThickness", "")
+  dialog:AddTextField("InvalidBottomGrooveClearance", "")
   dialog:AddTextField("InvalidLidGrooveWidth", "")     -- Added by Claude 10/25/2026
+  dialog:AddTextField("InvalidLidGrooveOffset", "")
+  dialog:AddTextField("InvalidLidThickness", "")
+  dialog:AddTextField("InvalidLidGrooveClearance", "")
   dialog:AddTextField("InvalidLidGripWidth", "")       -- Added by Claude 10/26/2026
   dialog:AddTextField("InvalidBottomGrooveDepth", "")  -- Added by Claude 10/28/2026
   dialog:AddTextField("InvalidLidGrooveDepth", "")     -- Added by Claude 10/28/2026
@@ -1415,6 +1491,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   local validator = function(dialog)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
     ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail)
+    local tool_diameter, effective_diameter = GetValidationToolDiameters(options)
 
     if not ValidateBoxDimensions(dialog, options, true) then
       return false
@@ -1485,13 +1562,13 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       end
       -- The groove in the walls is a closed slot as wide as the groove width,
       -- so the bit has to fit in there.  -- by Claude 10/9/2026
-      if not ValidateBottomGrooveToolFit(dialog, options, true) then
+      if not ValidateBottomGrooveToolFit(dialog, options, true, effective_diameter) then
         return false
       end
     end
 
     -- Grooved (sliding) lid -- by Claude 10/25/2026
-    if not ValidateGroovedLidOptions(dialog, options) then
+    if not ValidateGroovedLidOptions(dialog, options, effective_diameter) then
       return false
     end
 
@@ -1538,7 +1615,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
-    if not ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail, true) then
+    if not ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail, lidDoveTail, true, tool_diameter, effective_diameter) then
       return false
     end
 
@@ -1723,6 +1800,9 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
 
   -- Get from tool picker
   options.tool = dialog:GetTool("ToolChooseButton")
+  -- Cache the converted diameter for this read; all validators in this pass
+  -- use the same allowance-adjusted value.
+  options._validationToolAllowance = nil
 
   -- Roundover tool + cut depth
   options.roundover_tool = dialog:GetTool("RoundoverToolChooseButton")
@@ -1735,6 +1815,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   if Tool_ok(options.tool) then
     local mtl_block = MaterialBlock()
     local raw_dia   = ConvertUnitsFrom(options.tool.ToolDia or 0, options.tool, mtl_block)
+    options._validationToolDiameter = raw_dia
 
     -- Apply Allowance the same way as in your validator
     local effective_dia = raw_dia
@@ -1744,6 +1825,8 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
         effective_dia = 0
       end
     end
+    options._validationEffectiveToolDiameter = effective_dia
+    options._validationToolAllowance = options.allowance
 
     -- This is the "calculated minimum" joint width for this tool
     local calculated_min = effective_dia
@@ -1762,6 +1845,10 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
         end
       end
     end
+  else
+    options._validationToolDiameter = 0.25
+    options._validationEffectiveToolDiameter = 0.25 - ((options.allowance and options.allowance > 0) and 2 * options.allowance or 0)
+    options._validationToolAllowance = options.allowance
   end
   ------------------------------------------------------------------
 
@@ -2230,17 +2317,19 @@ function OnLuaButton_DimensionsChanged(dialog)
   end
 
   ReadOptionsFromDialog(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail)
+  local tool_diameter, effective_diameter = GetValidationToolDiameters(G_dialogOptions)
 
   ValidateBoxDimensions(dialog, G_dialogOptions, false)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)
-  ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false)
+  ValidateJointWidths(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail, false, tool_diameter, effective_diameter)
   ValidateOpenChamferOptions(dialog, G_dialogOptions, false)
-  ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false)
-  ValidateLidGrooveToolFit(dialog, G_dialogOptions, false)   -- by Claude 10/25/2026
+  ValidateBottomGrooveToolFit(dialog, G_dialogOptions, false, effective_diameter)
+  ValidateLidGrooveToolFit(dialog, G_dialogOptions, false, effective_diameter)   -- by Claude 10/25/2026
+  ValidateGroovedPanelDimensionsLive(dialog, G_dialogOptions)
   ValidateLidGripWidth(dialog, G_dialogOptions, false)       -- by Claude 10/26/2026
   ValidateGrooveDepths(dialog, G_dialogOptions, false)       -- by Claude 10/28/2026
   UpdateGrooveStripWarnings(dialog, G_dialogOptions)         -- by Claude 10/28/2026
-  ValidateLidFingerHole(dialog, G_dialogOptions, false)      -- by Claude 10/26/2026
+  ValidateLidFingerHole(dialog, G_dialogOptions, false, effective_diameter)      -- by Claude 10/26/2026
 
   return true
 end

@@ -481,7 +481,7 @@
               </div>
               <div class="field-row" style="margin-bottom: 0;" title="Clearance subtracted from how far the panel reaches into each of the 3 grooves (Left, Right, Front), for an easier slide fit.">
                 <label for="BottomGrooveClearanceField" style="color: #1155A2;">Bottom Clearance</label>
-                <input type="number" class="calcfield" step="any" id="BottomGrooveClearanceField" placeholder="Clearance"/>
+                <input type="number" class="calcfield" step="any" id="BottomGrooveClearanceField" placeholder="Clearance" onchange="onGeometryFieldChanged()"/>
               </div>
             </div>
           </td>
@@ -580,7 +580,13 @@
     <input type="text" id="InvalidLidJointWidth" value=""/>
     <input type="text" id="InvalidBottomJointWidth" value=""/>
     <input type="text" id="InvalidBottomGrooveWidth" value=""/>
+    <input type="text" id="InvalidBottomGrooveOffset" value=""/>
+    <input type="text" id="InvalidBottomThickness" value=""/>
+    <input type="text" id="InvalidBottomGrooveClearance" value=""/>
     <input type="text" id="InvalidLidGrooveWidth" value=""/>
+    <input type="text" id="InvalidLidGrooveOffset" value=""/>
+    <input type="text" id="InvalidLidThickness" value=""/>
+    <input type="text" id="InvalidLidGrooveClearance" value=""/>
     <input type="text" id="InvalidLidGripWidth" value=""/>
     <input type="text" id="InvalidBottomGrooveDepth" value=""/>
     <input type="text" id="InvalidLidGrooveDepth" value=""/>
@@ -1387,7 +1393,13 @@
     "InvalidEnd1ChamferAngle": "End1ChamferAngleField",
     "InvalidEnd2ChamferAngle": "End2ChamferAngleField",
     "InvalidBottomGrooveWidth": "BottomGrooveWidthField",
+    "InvalidBottomGrooveOffset": "BottomGrooveOffsetField",
+    "InvalidBottomThickness": "BottomThicknessField",
+    "InvalidBottomGrooveClearance": "BottomGrooveClearanceField",
     "InvalidLidGrooveWidth":    "LidGrooveWidthField",
+    "InvalidLidGrooveOffset":   "LidGrooveOffsetField",
+    "InvalidLidThickness":      "LidThicknessField",
+    "InvalidLidGrooveClearance": "LidGrooveClearanceField",
     "InvalidLidGripWidth":      "LidGripWidthField",
     "InvalidBottomGrooveDepth": "BottomGrooveDepthField",
     "InvalidLidGrooveDepth":    "LidGrooveDepthField",
