@@ -1984,7 +1984,7 @@ end
 
 -- Export the settings currently visible in the dialog using the same numeric
 -- document-variable format used by the SampleBox.DocVars example.
-function OnLuaButton_ButtonExport(dialog)
+function OnLuaButton_ExportSettings(dialog)
   if not G_dialogOptions then
     return true
   end
@@ -2044,6 +2044,25 @@ function OnLuaButton_ButtonExport(dialog)
   end
   values[#values + 1] = "SimpleBoxCreatorBox=1"
 
+  -- Debugging info only: Import reads just the [Variables] section, so nothing
+  -- in [Debug] is ever loaded back. Material and tool diameter are in job units.
+  -- Guarded so a failure reading these can't stop the settings being saved.
+  local debug_values = {}
+  pcall(function()
+    local job = VectricJob()
+    local mtl_block = MaterialBlock()
+    debug_values[#debug_values + 1] = "MaterialWidth=" .. tostring(job.XLength)
+    debug_values[#debug_values + 1] = "MaterialHeight=" .. tostring(job.YLength)
+    debug_values[#debug_values + 1] = "MaterialThickness=" .. tostring(mtl_block.Thickness)
+    local tool = G_dialogOptions.tool
+    if tool and tool.Name then
+      debug_values[#debug_values + 1] = "ToolName=" .. tostring(tool.Name)
+    end
+    if Tool_ok(tool) then
+      debug_values[#debug_values + 1] = "ToolDiameter=" .. tostring(ConvertUnitsFrom(tool.ToolDia, tool, mtl_block))
+    end
+  end)
+
   local output, err = io.open(file_dialog.PathName, "w")
   if not output then
     DisplayMessageBox("Unable to write settings file: " .. tostring(err))
@@ -2053,13 +2072,17 @@ function OnLuaButton_ButtonExport(dialog)
   for _, line in ipairs(values) do
     output:write(line, "\r\n")
   end
+  output:write("[Debug]\r\n")
+  for _, line in ipairs(debug_values) do
+    output:write(line, "\r\n")
+  end
   output:close()
   DisplayMessageBox("Settings exported successfully.")
   return true
 end
 
 -- Import a previously exported .SimpleBox settings file into the live dialog.
-function OnLuaButton_ButtonImport(dialog)
+function OnLuaButton_ImportSettings(dialog)
   local file_dialog = FileDialog()
   local filter = "Simple Box settings (*.SimpleBox)|*.SimpleBox||"
   if not file_dialog:FileOpen("SimpleBox", "*.SimpleBox", filter) then

@@ -410,7 +410,8 @@ input.ToolPicker:hover {
   line-height: 30px;
   text-align: left;
 }
-.footer-actions button {
+.footer-actions button,
+.footer-actions input {
   vertical-align: middle;
   margin-right: 8px;
 }
@@ -468,14 +469,15 @@ input.ToolPicker:hover {
 
 /* Fixed size footer buttons. overflow:visible stops IE7 adding padding
    proportional to the caption width, which made the buttons overhang. */
-.footer-bar button {
+.footer-bar button,
+.footer-actions input {
   width: 84px;
   height: 30px;
   padding: 0;
   overflow: visible;
   line-height: normal;
 }
-.footer-actions #ButtonImport { margin-right: 0; }
+.footer-actions #ImportSettings { margin-right: 0; }
 
 /* ── OK / Cancel buttons ──────────────────────────────────────────── */
 #ButtonOK {
@@ -490,8 +492,8 @@ input.ToolPicker:hover {
 #ButtonOK:hover {
   background-color: #176a35;
 }
-#ButtonExport,
-#ButtonImport {
+#ExportSettings,
+#ImportSettings {
   background-color: #f2f4f8;
   color: #374151;
   border: 1px solid #c0c4d0;
@@ -500,8 +502,8 @@ input.ToolPicker:hover {
   font-weight: bold;
   cursor: pointer;
 }
-#ButtonExport:hover,
-#ButtonImport:hover {
+#ExportSettings:hover,
+#ImportSettings:hover {
   background-color: #e2e5ee;
 }
 #ButtonCancel {
@@ -640,14 +642,14 @@ body.dark-mode #ButtonCancel {
   color: #8a92a8;
   border-color: #383d4a;
 }
-body.dark-mode #ButtonExport,
-body.dark-mode #ButtonImport {
+body.dark-mode #ExportSettings,
+body.dark-mode #ImportSettings {
   background-color: #2a2f3b;
   color: #d4d8e8;
   border-color: #4a5060;
 }
-body.dark-mode #ButtonExport:hover,
-body.dark-mode #ButtonImport:hover {
+body.dark-mode #ExportSettings:hover,
+body.dark-mode #ImportSettings:hover {
   background-color: #383f4d;
 }
 body.dark-mode #ButtonCancel:hover {
