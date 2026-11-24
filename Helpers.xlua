@@ -681,3 +681,44 @@ function CreateCutoutToolpath(tool, job, thickness, tab_length, layer_name, exac
     DisplayMessageBox("Error creating cutout toolpath.")
   end
 end
+
+-- this would add a series of document variables with a common prefix and indexed keys
+function AddDocumentVariables(JobVariables, Prefix, Values)
+  for k, v in ipairs(Values) do
+    JobVariables:SetDocumentVariable(Prefix .. tostring(k), v)
+  end
+end
+
+-- this adds a single document variable
+-- document variables can only be doubles, no strings or integers
+function AddDocumentVariable(JobVariables, Name, Value)
+  JobVariables:SetDocumentVariable(Name, Value)
+end
+
+-- Retrieve a Named Document Variable
+function GetDocumentVariable(JobVariables, Name)
+  if (JobVariables:DocumentVariableExists(Name)) then
+    -- The Vectric API requires a numeric fallback even when the variable
+    -- exists. Its return value is the number itself, not a wrapper object.
+    return JobVariables:GetDocumentVariable(Name, 0.0)
+  end
+  return nil
+end
+
+-- retrieve a series of document variables with a common prefix and indexed keys
+-- return the count and the values as a table
+function GetDocumentVariables(JobVariables, Prefix)
+  local values = {}
+  local count = 1
+  while true do
+    local name = Prefix .. tostring(count)
+    if JobVariables:DocumentVariableExists(name) then
+      values[count] = JobVariables:GetDocumentVariable(name, 0)
+    else
+      break
+    end
+    count = count + 1
+  end
+  
+  return count - 1, values
+end

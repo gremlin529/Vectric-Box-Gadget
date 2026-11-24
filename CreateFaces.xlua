@@ -1150,16 +1150,27 @@ end
     end
 
     -- Gremlin added bottom and top dovetails separate from side
-    local num_flaps_bottom = math.floor((0.5*inner_depth) / bottomdovetail.min_width )
-    local num_flaps_top = math.floor((0.5*inner_depth) / topdovetail.min_width )
+    -- The bottom / lid fingers are spaced over the SAME span the bottom panel and
+    -- the lid space their sockets over (MakeBottom / MakeLid: depth - 2*thickness,
+    -- starting one thickness in), not over this wall's own inner_depth. The two
+    -- only differ when an end face is missing with no tabs for it - the wall then
+    -- runs out to the end (left_inset/right_inset = 0) - and spaced over the
+    -- longer span the fingers no longer lined up with the panel's sockets.
+    -- lead_left / lead_right are how far this wall runs past that span at each
+    -- end, drawn as part of the first / last gap.                 -- by Claude 11/5/2026
+    local finger_depth = depth - 2*thickness
+    local lead_left = thickness - left_inset
+    local lead_right = thickness - right_inset
+    local num_flaps_bottom = math.floor((0.5*finger_depth) / bottomdovetail.min_width )
+    local num_flaps_top = math.floor((0.5*finger_depth) / topdovetail.min_width )
     -- corner_height_left/corner_height_right can now differ (independent
     -- End1Height/End2Height), so each corner gets its own finger pitch.
     -- by Claude 9/20/2026
     local num_flaps_side_left = math.floor((0.5*corner_height_left) / sidedovetail.min_width)
     local num_flaps_side_right = math.floor((0.5*corner_height_right) / sidedovetail.min_width)
 
-    local tab_space_bottom = (inner_depth - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
-    local tab_space_top = (inner_depth - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)
+    local tab_space_bottom = (finger_depth - num_flaps_bottom*bottomdovetail.min_width)/ (num_flaps_bottom + 1)
+    local tab_space_top = (finger_depth - num_flaps_top*topdovetail.min_width)/ (num_flaps_top + 1)
     local tab_space_side_left = (corner_height_left - num_flaps_side_left*sidedovetail.min_width)/ (num_flaps_side_left + 1)
     local tab_space_side_right = (corner_height_right - num_flaps_side_right*sidedovetail.min_width)/ (num_flaps_side_right + 1)
 
@@ -1216,7 +1227,8 @@ end
       contour:LineTo(inner_brc)
     else
       -- in this case the bottom edge has tabs and starts at thickness, thickness
-      LineToVector(contour, tab_space_bottom*unit_x)
+      -- (plus the lead-in where the wall runs past the panel's socket span)
+      LineToVector(contour, (lead_left + tab_space_bottom)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, bottomdovetail, unit_x, -unit_y, contour,  num_flaps_bottom, tab_space_bottom)
@@ -1355,8 +1367,9 @@ end
         contour:LineTo(inner_tlc)
       end
     else
-      -- this is for a tabbed/dovetailed lid
-      LineToVector(contour, -tab_space_top*unit_x)
+      -- this is for a tabbed/dovetailed lid (lead-in as on the bottom edge;
+      -- this edge runs from the right end)
+      LineToVector(contour, -(lead_right + tab_space_top)*unit_x)
       AddMiddleOfLastSpanToList(contour, tablist)
       if (dovetailJoint) then
         AddMaleDoveTailsAlongLine(thickness, topdovetail, -unit_x, unit_y, contour, num_flaps_top, tab_space_top)
