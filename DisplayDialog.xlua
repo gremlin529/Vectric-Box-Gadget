@@ -1292,6 +1292,94 @@ local function ValidateGroovedLidOptions(dialog, options, effective_diameter)
 end
 
 -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
+--[[  -------------- ValidateDividers --------------------------------------------------
+|
+|  Dividers (see the Dividers section in CreateFaces.xlua): every space in use
+|  must be more than 0, and the dividers must still fit in the inside depth
+|  with room to spare behind the last one. The divider also needs enough
+|  height for at least one finger into each side, and the slots (one material
+|  thickness wide) need a tool that fits.
+|
+|  Space problems go to InvalidDividerSpace<k> (red field); the rest to
+|  InvalidDividers, shown in red under the spacing fields. report_as_dialog
+|  as for the other validators.                              -- by Claude 11/26/2026
+|
+]]
+local function ValidateDividers(dialog, options, report_as_dialog, effective_diameter)
+  local messages = {}
+  local general = ""
+  local inset_message = ""   -- Top inset -- by Claude 11/26/2026
+  local n = DividerCount(options)
+  local fmt = "%." .. G_decimalPlaces .. "f"
+
+  if n > 0 then
+    local inset = options.dividerInset or 0
+    if inset < 0 then
+      inset_message = "Top inset must be 0 or more."
+    else
+      -- how tall the dividers would be with no inset at all
+      local saved = options.dividerInset
+      options.dividerInset = 0
+      local full = DividerJoints(options, options.facesToMake)
+      options.dividerInset = saved
+      local full_height = full.z_top - full.z_bot
+      if inset >= full_height - 0.0001 then
+        inset_message = string.format("Top inset " .. fmt .. " leaves nothing of the dividers - they are only " .. fmt .. " tall without it.", inset, full_height)
+      end
+    end
+
+    for k = 1, n do
+      local space = options["dividerSpace" .. k]
+      if not space or space <= 0.0001 then
+        messages[k] = string.format("Space %d must be greater than 0.", k)
+      end
+    end
+    local last = DividerLastSpace(options)
+    if last <= 0.0001 then
+      local inside = options.depth - 2*options.thickness
+      local used = inside - last
+      messages[n] = messages[n] or string.format("The dividers don't fit: the spaces plus %d divider(s) of " .. fmt .. " come to " .. fmt .. ", but the inside depth is only " .. fmt .. ".", n, options.thickness, used, inside)
+      general = messages[n]
+    end
+
+    local j = DividerJoints(options, options.facesToMake)
+    local fw = DividerFingerWidths(options)
+    local divider_height = j.z_top - j.z_bot
+    if general == "" and inset_message == "" and (j.side1 or j.side2) and divider_height <= (fw.side or 0) + 0.0001 then
+      general = string.format("The dividers are only " .. fmt .. " tall inside the box - too short for a side joint of " .. fmt .. ". Use a smaller side joint width or a taller box.", divider_height, fw.side or 0)
+    end
+    if general == "" and not options.no_toolpath and effective_diameter
+        and effective_diameter > 0 and options.thickness <= effective_diameter + 0.0001 then
+      general = string.format("The divider slots are only " .. fmt .. " wide (the material thickness), the tool does not fit in them (" .. fmt .. "). Use a smaller tool.", options.thickness, effective_diameter)
+    end
+  end
+
+  if report_as_dialog then
+    for k = 1, n do
+      if messages[k] then
+        DisplayMessageBox(messages[k])
+        return false
+      end
+    end
+    if inset_message ~= "" then
+      DisplayMessageBox(inset_message)
+      return false
+    end
+    if general ~= "" then
+      DisplayMessageBox(general)
+      return false
+    end
+    return true
+  end
+
+  for k = 1, G_maxDividers do
+    dialog:UpdateTextField("InvalidDividerSpace" .. k, messages[k] or "")
+  end
+  dialog:UpdateTextField("InvalidDividers", general)
+  dialog:UpdateTextField("InvalidDividerInset", inset_message)
+  return general == "" and inset_message == "" and next(messages) == nil
+end
+
 function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDoveTail)
   G_dialogOptions = options
   G_dialogSideDoveTail = sideDoveTail
@@ -1330,6 +1418,18 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddCheckBox("MakeEnd1", options.facesToMake.end1)
   dialog:AddCheckBox("MakeEnd2", options.facesToMake.end2)
   dialog:AddCheckBox("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
+
+  -- Dividers: checkbox under Faces To Machine, count + spaces in Divider Options.
+  -- The count dropdown's option texts are "1".."10".         -- by Claude 11/26/2026
+  dialog:AddCheckBox("MakeDividers", options.makeDividers)
+  dialog:AddDropDownList("DividerCountSelect", tostring(math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))))
+  for k = 1, G_maxDividers do
+    dialog:AddDoubleField("DividerSpace" .. k .. "Field", options["dividerSpace" .. k] or 0)
+    dialog:AddTextField("InvalidDividerSpace" .. k, "")
+  end
+  dialog:AddTextField("InvalidDividers", "")
+  dialog:AddDoubleField("DividerInsetField", options.dividerInset or 0)   -- Top inset -- by Claude 11/26/2026
+  dialog:AddTextField("InvalidDividerInset", "")
 
   -- Fields that are hidden in the HTML but still read by Lua
   -- these are used to communicate back to us when things happen
@@ -1572,6 +1672,11 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
       return false
     end
 
+    -- Dividers -- by Claude 11/26/2026
+    if not ValidateDividers(dialog, options, true, effective_diameter) then
+      return false
+    end
+
     -- Tool must be chosen and valid (only when creating toolpaths)
     if not options.no_toolpath then
       if not Tool_ok(options.tool) then
@@ -1688,6 +1793,14 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.facesToMake.end1     = dialog:GetCheckBox("MakeEnd1")
   options.facesToMake.end2     = dialog:GetCheckBox("MakeEnd2")
   options.create_tabs_for_missing_faces = dialog:GetCheckBox("CreateTabsForMissingFaces")
+
+  -- Dividers -- by Claude 11/26/2026
+  options.makeDividers = dialog:GetCheckBox("MakeDividers")
+  options.dividerCount = tonumber(dialog:GetDropDownListValue("DividerCountSelect")) or 1
+  options.dividerInset = dialog:GetDoubleField("DividerInsetField") or 0
+  for k = 1, G_maxDividers do
+    options["dividerSpace" .. k] = dialog:GetDoubleField("DividerSpace" .. k .. "Field") or 0
+  end
 
   options.dovetailAngleDegrees = dialog:GetDoubleField("DovetailAngleField")
   sideDoveTail.angle = math.rad(options.dovetailAngleDegrees)
@@ -1951,6 +2064,14 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetBool("MakeEnd2", options.facesToMake.end2)
   registry:SetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
 
+  -- Dividers -- by Claude 11/26/2026
+  registry:SetBool("MakeDividers", options.makeDividers)
+  registry:SetDouble("DividerCount", options.dividerCount or 1)
+  registry:SetDouble("DividerInset", options.dividerInset or 0)
+  for k = 1, G_maxDividers do
+    registry:SetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
+  end
+
 end
 
 -- Gremlin added bottomDoveTail separation from side which is just dovetail
@@ -2061,6 +2182,14 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.facesToMake.end2 = registry:GetBool("MakeEnd2", options.facesToMake.end2)
   options.create_tabs_for_missing_faces = registry:GetBool("CreateTabsForMissingFaces", options.create_tabs_for_missing_faces)
 
+  -- Dividers -- by Claude 11/26/2026
+  options.makeDividers = registry:GetBool("MakeDividers", options.makeDividers)
+  options.dividerCount = registry:GetDouble("DividerCount", options.dividerCount)
+  options.dividerInset = registry:GetDouble("DividerInset", options.dividerInset or 0)
+  for k = 1, G_maxDividers do
+    options["dividerSpace" .. k] = registry:GetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
+  end
+
 end
 
 --- By putting this function in the script we don't need to create
@@ -2102,8 +2231,12 @@ function OnLuaButton_ExportSettings(dialog)
     "lidHoleLength", "lidHoleThrough", "lidHoleDepth", "lidHoleDistance", "lidHoleRadius",
     "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
     "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath", "create_dogbones",
-    "useSingleSheet", "roundover_cut_depth", "create_tabs_for_missing_faces"
+    "useSingleSheet", "roundover_cut_depth", "create_tabs_for_missing_faces",
+    "makeDividers", "dividerCount", "dividerInset"   -- by Claude 11/26/2026
   }
+  for k = 1, G_maxDividers do
+    numeric_fields[#numeric_fields + 1] = "dividerSpace" .. k
+  end
   for _, name in ipairs(numeric_fields) do
     add_value(name, G_dialogOptions[name])
   end
@@ -2222,6 +2355,11 @@ function OnLuaButton_ImportSettings(dialog)
     }) do
       if values[name] ~= nil then values[name] = values[name] * factor end
     end
+    for k = 1, G_maxDividers do   -- by Claude 11/26/2026
+      local name = "dividerSpace" .. k
+      if values[name] ~= nil then values[name] = values[name] * factor end
+    end
+    if values.dividerInset ~= nil then values.dividerInset = values.dividerInset * factor end
   end
 
   local double_fields = {
@@ -2243,8 +2381,16 @@ function OnLuaButton_ImportSettings(dialog)
     end1ChamferAngle = "End1ChamferAngleField", end2ChamferAngle = "End2ChamferAngleField",
     roundover_cut_depth = "RoundoverCutDepthField"
   }
+  for k = 1, G_maxDividers do   -- by Claude 11/26/2026
+    double_fields["dividerSpace" .. k] = "DividerSpace" .. k .. "Field"
+  end
+  double_fields.dividerInset = "DividerInsetField"
   for name, field_id in pairs(double_fields) do
     if values[name] ~= nil then dialog:UpdateDoubleField(field_id, values[name]) end
+  end
+  if values.dividerCount ~= nil then   -- by Claude 11/26/2026
+    local count = math.max(1, math.min(math.floor(values.dividerCount + 0.5), G_maxDividers))
+    dialog:UpdateDropDownListValue("DividerCountSelect", tostring(count))
   end
 
   local checkbox_fields = {
@@ -2253,7 +2399,8 @@ function OnLuaButton_ImportSettings(dialog)
     label_faces = "LabelFaces", no_toolpath = "NoToolpath", create_dogbones = "CreateDogbones",
     useSingleSheet = "UseSingleSheet", create_tabs_for_missing_faces = "CreateTabsForMissingFaces",
     face_lid = "MakeLid", face_bottom = "MakeBottom", face_side1 = "MakeSide1",
-    face_side2 = "MakeSide2", face_end1 = "MakeEnd1", face_end2 = "MakeEnd2"
+    face_side2 = "MakeSide2", face_end1 = "MakeEnd1", face_end2 = "MakeEnd2",
+    makeDividers = "MakeDividers"   -- by Claude 11/26/2026
   }
   for name, field_id in pairs(checkbox_fields) do
     if values[name] ~= nil then dialog:UpdateCheckBox(field_id, values[name] ~= 0) end
@@ -2330,6 +2477,7 @@ function OnLuaButton_DimensionsChanged(dialog)
   ValidateGrooveDepths(dialog, G_dialogOptions, false)       -- by Claude 10/28/2026
   UpdateGrooveStripWarnings(dialog, G_dialogOptions)         -- by Claude 10/28/2026
   ValidateLidFingerHole(dialog, G_dialogOptions, false, effective_diameter)      -- by Claude 10/26/2026
+  ValidateDividers(dialog, G_dialogOptions, false, effective_diameter)           -- by Claude 11/26/2026
 
   return true
 end

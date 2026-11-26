@@ -23,9 +23,31 @@
     body.dark-mode .lid-tab { background-color: #2a2f3b; color: #b0b8cc; border-color: #383d4a; }
     body.dark-mode .lid-tab-active { background-color: #3a6ab0; color: #ffffff; border-color: #3a6ab0; }
     body.dark-mode .lid-tab-warn { color: #ff7b7b; }
+    /* Divider Options: count + Space Evenly on one row, the Space fields floated three
+       to a row. Floats and fixed widths only (IE7, Zoom Level). -- by Claude 11/26/2026 */
+    /* count / Space Evenly / Top inset all inline on one field-row, vertical-align
+       middle like the other field-row controls (no floats) -- by Claude 11/26/2026 */
+    .divider-count-row { margin-bottom: 10px; }
+    .field-row select#DividerCountSelect { width: 70px; }
+    .field-row input.divider-even-button { width: auto; margin-left: 18px; padding: 2px 8px;
+                           background-color: #dce8ff; color: #2255aa; border: 1px solid #2255aa;
+                           font-family: Tahoma, Arial, sans-serif; font-size: 15px; font-weight: bold;
+                           cursor: pointer; overflow: visible; vertical-align: middle; }
+    .field-row label.divider-inset-label { margin-left: 24px; width: 80px; }
+    .divider-space { float: left; width: 262px; }
+    .divider-info { clear: both; font-size: 13px; min-height: 16px; }
+    .divider-info-error { color: #cc3333; font-weight: bold; }
+    body.dark-mode .field-row input.divider-even-button { background-color: #1a3a6b; color: #90bcf0; border-color: #3a6ab0; }
+    body.dark-mode .divider-info-error { color: #ff7b7b; }
   </style>
 </head>
-<body>
+<!-- Hidden until the startup code has applied the Zoom Level (and dark mode), so
+     the dialog never shows at 100% first and then jumps. The script right below
+     shows it anyway after 3 s, in case startup ever fails.   -- by Claude 11/26/2026 -->
+<body style="visibility: hidden;">
+<script type="text/javascript">
+  setTimeout(function () { document.body.style.visibility = "visible"; }, 3000);
+</script>
 <div id="page-wrapper">
 
   <!-- ── Header: diagram + description ──────────────────────────────── -->
@@ -167,6 +189,8 @@
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeSide2"  value=""  class="LuaButton" />Right</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd1"   value=""  class="LuaButton" />Front</label></div>
       <div class="face-checkbox"><label><input type="checkbox" name="faces" id="MakeEnd2"   value=""  class="LuaButton" />Back</label></div>
+      <!-- Dividers across the width; their options open above Lid Type -- by Claude 11/26/2026 -->
+      <div class="face-checkbox" title="Dividers across the width of the box (parallel to Front and Back), finger jointed into Left and Right, and into the bottom and lid when those are Fingers, Flat or Inset. Set the number and spacing under Divider Options."><label><input type="checkbox" name="faces" id="MakeDividers" value="" class="LuaButton" onclick="onMakeDividersChanged()" />Dividers</label></div>
       <div class="face-checkbox" title="If unchecked then fingers to connect to faces which are not created will not be created">
         <label><input type="checkbox" name="faces" id="CreateTabsForMissingFaces" value="" class="LuaButton" />Create joints to un-checked faces</label></div>
     </div>
@@ -202,6 +226,54 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- ── Divider Options ──────────────────────────────────────────
+       Only shown when "Dividers" is ticked under Faces To Machine. One Space field
+       per divider (the rest stay hidden), floated three to a row so it stays short
+       and scales with the Zoom Level. Option texts of the count dropdown are read
+       back by Lua, keep them plain numbers.                   -- by Claude 11/26/2026 -->
+  <div class="section-header" id="showHideDividerSectionHeader" style="display: none;">Divider Options</div>
+  <div class="card" id="showHideDividerOptions" style="display: none;">
+    <div class="card-body clearfix">
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed. Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
+      <div class="sub-panel clearfix">
+        <!-- One field-row, everything inline and vertical-align: middle, so the
+             button and the Top inset field sit on the dropdown's line (the floated
+             button sat higher than the dropdown).                -- by Claude 11/26/2026 -->
+        <div class="field-row divider-count-row">
+            <label for="DividerCountSelect" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Dividers</label>
+            <select id="DividerCountSelect" onchange="onDividerCountChanged()" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+              <option value="9">9</option>
+              <option value="10">10</option>
+            </select>
+            <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
+            <label for="DividerInsetField" class="divider-inset-label" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid.">Top inset</label>
+            <input type="number" class="calcfield" step="any" id="DividerInsetField" placeholder="Inset" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid." onchange="onDividerFieldChanged()"/>
+        </div>
+        <div class="divider-space-grid clearfix">
+          <div class="divider-space" id="DividerSpaceRow1"><div class="field-row" title="Clear gap from Front's inside face to divider 1"><label for="DividerSpace1Field">Space 1</label><input type="number" class="calcfield" step="any" id="DividerSpace1Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow2"><div class="field-row" title="Clear gap from divider 1 to divider 2"><label for="DividerSpace2Field">Space 2</label><input type="number" class="calcfield" step="any" id="DividerSpace2Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow3"><div class="field-row" title="Clear gap from divider 2 to divider 3"><label for="DividerSpace3Field">Space 3</label><input type="number" class="calcfield" step="any" id="DividerSpace3Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow4"><div class="field-row" title="Clear gap from divider 3 to divider 4"><label for="DividerSpace4Field">Space 4</label><input type="number" class="calcfield" step="any" id="DividerSpace4Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow5"><div class="field-row" title="Clear gap from divider 4 to divider 5"><label for="DividerSpace5Field">Space 5</label><input type="number" class="calcfield" step="any" id="DividerSpace5Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow6"><div class="field-row" title="Clear gap from divider 5 to divider 6"><label for="DividerSpace6Field">Space 6</label><input type="number" class="calcfield" step="any" id="DividerSpace6Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow7"><div class="field-row" title="Clear gap from divider 6 to divider 7"><label for="DividerSpace7Field">Space 7</label><input type="number" class="calcfield" step="any" id="DividerSpace7Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow8"><div class="field-row" title="Clear gap from divider 7 to divider 8"><label for="DividerSpace8Field">Space 8</label><input type="number" class="calcfield" step="any" id="DividerSpace8Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow9"><div class="field-row" title="Clear gap from divider 8 to divider 9"><label for="DividerSpace9Field">Space 9</label><input type="number" class="calcfield" step="any" id="DividerSpace9Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <div class="divider-space" id="DividerSpaceRow10"><div class="field-row" title="Clear gap from divider 9 to divider 10"><label for="DividerSpace10Field">Space 10</label><input type="number" class="calcfield" step="any" id="DividerSpace10Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+        </div>
+        <div class="divider-info" id="DividerInfoText"></div>
+      </div>
     </div>
   </div>
 
@@ -601,6 +673,19 @@
     <input type="text" id="InvalidLidHoleLength" value=""/>
     <input type="text" id="InvalidLidHoleRadius" value=""/>
     <input type="text" id="InvalidLidHoleDepth" value=""/>
+    <!-- Dividers: per-space errors, plus one for the rest (shown under the spaces) -- by Claude 11/26/2026 -->
+    <input type="text" id="InvalidDividers" value=""/>
+    <input type="text" id="InvalidDividerInset" value=""/>
+    <input type="text" id="InvalidDividerSpace1" value=""/>
+    <input type="text" id="InvalidDividerSpace2" value=""/>
+    <input type="text" id="InvalidDividerSpace3" value=""/>
+    <input type="text" id="InvalidDividerSpace4" value=""/>
+    <input type="text" id="InvalidDividerSpace5" value=""/>
+    <input type="text" id="InvalidDividerSpace6" value=""/>
+    <input type="text" id="InvalidDividerSpace7" value=""/>
+    <input type="text" id="InvalidDividerSpace8" value=""/>
+    <input type="text" id="InvalidDividerSpace9" value=""/>
+    <input type="text" id="InvalidDividerSpace10" value=""/>
     <!-- Material size, filled by Lua when the dialog opens. These feed the -->
     <!-- field calculator's W/X, H/Y and T/Z variables, and MaterialInMM tells -->
     <!-- it which unit ' (feet) and " (inches) have to land in. -->
@@ -985,11 +1070,118 @@
     onGeometryFieldChanged();
   }
 
+  // ── Dividers ──────────────────────────────────────────────────────────
+  // "Dividers" under Faces To Machine opens Divider Options above Lid Type: a
+  // count, one Space field per divider (clear gap in front of it) and a live
+  // reading of what is left behind the last one. Lua does the real checks
+  // (ValidateDividers) and writes InvalidDividers / InvalidDividerSpace<k>.
+  // ES3 and innerHTML only (IE7).                            -- by Claude 11/26/2026
+  var MAX_DIVIDERS = 10;
+
+  function dividerCount() {
+    var n = parseInt(selectedValue("DividerCountSelect", "1"), 10);
+    if (!isFinite(n) || n < 1) { n = 1; }
+    return Math.min(n, MAX_DIVIDERS);
+  }
+
+  // Inside depth (Front inside face to Back inside face) and the material
+  // thickness, or null if either can't be read yet.
+  function dividerDepthAndThickness() {
+    var depthEl = document.getElementById("DepthField");
+    var depth = depthEl ? parseFloat(depthEl.value) : NaN;
+    var t = calcHiddenNumber("MaterialThickness");
+    if (!isFinite(depth) || t === null) { return null; }
+    return { inside: depth - 2 * t, t: t };
+  }
+
+  function updateDividerSection() {
+    var cb = document.getElementById("MakeDividers");
+    var on = !!(cb && cb.checked);
+    setSectionVisible("showHideDividerSectionHeader", "showHideDividerOptions", on);
+    var n = dividerCount();
+    for (var k = 1; k <= MAX_DIVIDERS; k++) {
+      var row = document.getElementById("DividerSpaceRow" + k);
+      if (row) { row.style.display = (k <= n) ? "" : "none"; }
+    }
+    updateDividerInfo();
+  }
+
+  function updateDividerInfo() {
+    var out = document.getElementById("DividerInfoText");
+    if (!out) { return; }
+    var errEl = document.getElementById("InvalidDividers");
+    var err = errEl ? errEl.value : "";
+    var text = "";
+    var bad = false;
+    var dt = dividerDepthAndThickness();
+    if (err) {
+      text = err;
+      bad = true;
+    } else if (dt) {
+      var n = dividerCount();
+      var used = 0;
+      for (var k = 1; k <= n; k++) {
+        var el = document.getElementById("DividerSpace" + k + "Field");
+        var s = el ? parseFloat(el.value) : NaN;
+        if (!isFinite(s)) { used = NaN; break; }
+        used += s + dt.t;
+      }
+      if (isFinite(used)) {
+        var last = dt.inside - used;
+        bad = last <= 0.0001;
+        text = "Space behind divider " + n + " (to the Back's inside face): " + calcFormat(Math.round(last * 1000) / 1000);
+        if (bad) { text += " - the dividers don't fit, make the spaces smaller."; }
+      }
+    }
+    if (out.innerHTML !== text) { out.innerHTML = text; }
+    var cls = bad ? "divider-info divider-info-error" : "divider-info";
+    if (out.className !== cls) { out.className = cls; }
+  }
+
+  // Every space the same size, so all compartments (including the one behind
+  // the last divider) come out equal, rounded to 3 places.
+  function dividerSpaceEvenly() {
+    var dt = dividerDepthAndThickness();
+    if (!dt) { return; }
+    var n = dividerCount();
+    var even = (dt.inside - n * dt.t) / (n + 1);
+    if (even < 0) { even = 0; }
+    var text = calcFormat(Math.floor(even * 1000) / 1000);
+    for (var k = 1; k <= MAX_DIVIDERS; k++) {
+      var el = document.getElementById("DividerSpace" + k + "Field");
+      if (el) { el.value = text; }
+    }
+    updateDividerInfo();
+    onGeometryFieldChanged();
+  }
+
+  function onMakeDividersChanged() {
+    updateDividerSection();
+    onGeometryFieldChanged();
+  }
+
+  function onDividerCountChanged() {
+    updateDividerSection();
+    dividerSpaceEvenly();
+  }
+
+  function onDividerFieldChanged() {
+    updateDividerInfo();
+    onGeometryFieldChanged();
+  }
+  setInterval(updateDividerInfo, 1000);   // picks up InvalidDividers written by Lua
+
   // Width/Depth/Height/joint widths/dovetail angle/allowance are plain number
   // fields with no LuaButton class, so edits don't reach Lua on their own.
   // Clicking the hidden DimensionsChanged checkbox both flips its value and
   // fires the LuaButton click that notifies Lua.
+  // Startup sets every panel up through the same handlers the user's clicks use,
+  // and several of them end here. While that runs, skip the Lua round trip - one
+  // is made once at the end of startup instead of one per handler.
+  //                                                         -- by Claude 11/26/2026
+  var g_initDeferLua = false;
   function onGeometryFieldChanged() {
+    if (g_initDeferLua) { return; }
     // This round-trip makes Lua re-read EVERY field (ReadOptionsFromDialog), not
     // just the one that was edited, so make sure none of them is still sitting
     // on an un-computed expression first. Cheap, and it closes the gap for a
@@ -1016,6 +1208,7 @@
       if (g_iso && g_iso.mode) { isoUpdate(); }
       pollInvalidFieldFlags();
       updateLidTabLabels();
+      updateDividerInfo();   // depth / spaces changed -- by Claude 11/26/2026
     }, 0);
   }
 
@@ -1407,7 +1600,18 @@
     "InvalidLidHoleDistance":   "LidHoleDistanceField",
     "InvalidLidHoleLength":     "LidHoleLengthField",
     "InvalidLidHoleRadius":     "LidHoleRadiusField",
-    "InvalidLidHoleDepth":      "LidHoleDepthField"
+    "InvalidLidHoleDepth":      "LidHoleDepthField",
+    "InvalidDividerInset":      "DividerInsetField",    // dividers -- by Claude 11/26/2026
+    "InvalidDividerSpace1":     "DividerSpace1Field",
+    "InvalidDividerSpace2":     "DividerSpace2Field",
+    "InvalidDividerSpace3":     "DividerSpace3Field",
+    "InvalidDividerSpace4":     "DividerSpace4Field",
+    "InvalidDividerSpace5":     "DividerSpace5Field",
+    "InvalidDividerSpace6":     "DividerSpace6Field",
+    "InvalidDividerSpace7":     "DividerSpace7Field",
+    "InvalidDividerSpace8":     "DividerSpace8Field",
+    "InvalidDividerSpace9":     "DividerSpace9Field",
+    "InvalidDividerSpace10":    "DividerSpace10Field"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -1506,7 +1710,10 @@
   // Plain ES3, no textContent.                               -- by Claude 10/31/2026
   var g_iso = { mode: "", key: "", W: 780, H: 300 };
 
-  function isoInit() {
+  // setupOnly: just pick VML / canvas and swap the view box in for the picture
+  // (startup phase 1, before the dialog is shown); the first drawing and the poll
+  // then start with isoStart() once it has painted.          -- by Claude 11/26/2026
+  function isoInit(setupOnly) {
     var view = document.getElementById("BoxIsoView");
     var img = document.getElementById("BoxDimImage");
     if (!view) { return; }
@@ -1527,6 +1734,12 @@
     if (!g_iso.mode) { return; }   // keep the picture
     view.style.display = "block";
     if (img) { img.style.display = "none"; }
+    if (!setupOnly) { isoStart(); }
+  }
+
+  function isoStart() {
+    if (!g_iso.mode || g_iso.started) { return; }
+    g_iso.started = true;
     isoUpdate();
     setInterval(isoUpdate, 1000);
   }
@@ -1555,6 +1768,7 @@
               "|" + isoNum("End1HeightField") + "|" + isoNum("End2HeightField") + "|" + isoNum("End1ChamferAngleField") + "|" + isoNum("End2ChamferAngleField") +
               "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid") +
               "|" + isoDovetailFlare() +           // dovetail joints and their angle
+              "|" + isoDividerSettings(t).key +    // dividers -- by Claude 11/26/2026
               "|" + document.body.style.zoom;   // Zoom Level changes the fix below
     if (key === g_iso.key) { return; }
     g_iso.key = key;
@@ -1777,6 +1991,42 @@
     if (n > 60) { n = 60; }
     var gap = (inner - n * jw) / (n + 1);
     for (k = 0; k < n; k++) { res.push([t + gap + k * (jw + gap), t + gap + k * (jw + gap) + jw]); }
+    return res;
+  }
+
+  // Dividers for the view: the y of each divider's front face (from Front's outer
+  // face), from the Space fields - empty when Dividers is not ticked.
+  //                                                           -- by Claude 11/26/2026
+  function isoDividerSettings(t) {
+    var cb = document.getElementById("MakeDividers");
+    var D = { ys: [], key: "off", inset: 0 };
+    if (!(cb && cb.checked) || !(t > 0)) { return D; }
+    var ins = document.getElementById("DividerInsetField");   // Top inset -- by Claude 11/26/2026
+    D.inset = ins ? (parseFloat(ins.value) || 0) : 0;
+    if (D.inset < 0) { D.inset = 0; }
+    var n = dividerCount(), y = t, k, el, s;
+    for (k = 1; k <= n; k++) {
+      el = document.getElementById("DividerSpace" + k + "Field");
+      s = el ? parseFloat(el.value) : NaN;
+      if (!isFinite(s) || s < 0) { s = 0; }
+      y += s;
+      D.ys.push(y);
+      y += t;
+    }
+    D.key = D.ys.join(",") + "/" + D.inset;
+    return D;
+  }
+
+  // A divider's fingers along an edge `len` long, offset by `start` - the same
+  // rule as DividerFingerSpans in CreateFaces.xlua (gap at both ends, at least
+  // one finger when the edge is longer than one).             -- by Claude 11/26/2026
+  function isoDividerSpans(len, jw, start) {
+    var res = [], n, gap, k, a;
+    if (!(jw > 0) || len <= jw) { return res; }
+    n = Math.max(1, Math.floor((0.5 * len) / jw));
+    if (n > 60) { n = 60; }
+    gap = (len - n * jw) / (n + 1);
+    for (k = 0; k < n; k++) { a = start + gap + k * (jw + gap); res.push([a, a + jw]); }
     return res;
   }
 
@@ -2741,6 +2991,103 @@
       }
     }
 
+    // ── Dividers ─────────────────────────────────────────────────────────
+    // Each divider is a slab across the inside width (x = t .. w - t) at its depth,
+    // standing from dz0 to dz1 like DividerJoints in CreateFaces.xlua works them
+    // out, with through fingers into whatever it joints into. Only what can really
+    // be seen is emitted: a finger buried in a wall or panel that is there is left
+    // out, and where it comes through that wall's outer face (Left, x = w) or the
+    // lid's top, its end grain is laid on it. A finger whose wall / panel is not
+    // being made (joints still cut) stands free and gets its own faces.
+    //
+    // Sorting: a divider is in front of the Right and Back walls' inside faces and
+    // rims, and behind Left and Front (whose rims and fingers can stand across it),
+    // so every divider face is pinned just past the nearest of the former - the
+    // back divider first, so each one stands in front of the one behind it. The
+    // lids come later anyway (LIDS layer).                     -- by Claude 11/26/2026
+    var dvs = isoDividerSettings(t);
+    if (open && dvs.ys.length) {
+      var dz0, dz1, dJB, dJL;
+      if (bType === "Fingers" || bType === "Flat" || bType === "Inset") { dz0 = t; dJB = fc.bottom || fc.tabs; }
+      else if (bType === "Grooved") { dz0 = t; dJB = false; }     // stands on the slide-in panel (drawn at t)
+      else { dz0 = 0; dJB = false; }
+      if (lid.type === "Fingers" || lid.type === "Flat" || lid.type === "Inset") { dz1 = h - t; dJL = fc.lid || fc.tabs; }
+      else if (lid.type === "Grooved") { dz1 = lidZ0; dJL = false; }   // stops under the sliding lid
+      else if (lid.type === "OpenChamfer") { dz1 = Math.min(h, isoNum("End1HeightField") || h, isoNum("End2HeightField") || h); dJL = false; }
+      else { dz1 = h; dJL = false; }
+      // Top inset: that much lower, and no longer reaching the lid -- by Claude 11/26/2026
+      if (dvs.inset > 1e-9) { dz1 -= dvs.inset; dJL = false; }
+      if (dz1 - dz0 <= 1e-9) { dvs.ys = []; }   // nothing left of them - the dialog flags it
+      var dJLeft = fc.left || fc.tabs, dJRight = fc.right || fc.tabs;   // Left is the x = w wall
+
+      var dvSide = isoDividerSpans(dz1 - dz0, isoNum("SideTabWidthField"), dz0);
+      var dvBot = dJB ? isoDividerSpans(w - 2 * t, isoJointWidth("bottom"), t) : [];
+      var dvLid = dJL ? isoDividerSpans(w - 2 * t, isoJointWidth("lid"), t) : [];
+      // free-standing fingers (their wall / panel not there) vs. buried ones
+      var lidClosed = fc.lid && lid.type === "Fingers";
+      var freeTop = dJL && !lidClosed;               // Flat / Inset lids are drawn lifted clear
+      var freeBot = dJB && !fc.bottom;
+      var freeLeft = dJLeft && !fc.left, freeRight = dJRight && !fc.right;
+
+      var dRaw = function (x, y, z) { return x - y + z; };
+      var zMid = (zB + zT) / 2;
+      var dBase = Math.max(dRaw(t, d / 2, zMid), dRaw(t / 2, d / 2, zT),
+                           dRaw(w / 2, d - t, zMid), dRaw(w / 2, d - t / 2, zT));
+      if (typeof pinRight === "number") { dBase = Math.max(dBase, pinRight); }
+      if (typeof pinBack === "number") { dBase = Math.max(dBase, pinBack); }
+      var dStep = 0;
+      var dPin = function () { dStep++; return dBase + DETAIL + dStep * 1e-7; };
+      var segsOf = function (spans) { var r = [], q; for (q = 0; q < spans.length; q++) { r.push([spans[q][0], spans[q][1]]); } return r; };
+
+      var dk, dy0, dy1, q, sp;
+      for (dk = dvs.ys.length - 1; dk >= 0; dk--) {
+        dy0 = dvs.ys[dk]; dy1 = dy0 + t;
+        if (dy1 > d - t + 1e-9) { continue; }   // doesn't fit - the dialog flags it
+        // its front face as one outline, free fingers built in (see wallPoly)
+        wallPoly("x", dy0, t, w - t, dz0, dz1,
+                 freeBot ? { teeth: dvBot, tip: 0, fl: 0 } : null,
+                 freeTop ? { teeth: dvLid, tip: h, fl: 0 } : null,
+                 freeRight ? { segs: segsOf(dvSide), tip: 0, fl: 0 } : null,
+                 freeLeft ? { segs: segsOf(dvSide), tip: w, fl: 0 } : null,
+                 front, dPin());
+        // its top, and its end where Left is not there to hide it
+        F([[t,dy0,dz1],[w-t,dy0,dz1],[w-t,dy1,dz1],[t,dy1,dz1]], top, dPin());
+        if (!fc.left) { F([[w-t,dy0,dz0],[w-t,dy1,dz0],[w-t,dy1,dz1],[w-t,dy0,dz1]], side, dPin()); }
+        // free fingers' other camera-facing sides
+        for (q = 0; q < dvLid.length && freeTop; q++) {
+          sp = dvLid[q];
+          F([[sp[1],dy0,dz1],[sp[1],dy1,dz1],[sp[1],dy1,h],[sp[1],dy0,h]], side, dPin());
+          F([[sp[0],dy0,h],[sp[1],dy0,h],[sp[1],dy1,h],[sp[0],dy1,h]], top, dPin());
+        }
+        for (q = 0; q < dvBot.length && freeBot; q++) {
+          sp = dvBot[q];
+          F([[sp[1],dy0,0],[sp[1],dy1,0],[sp[1],dy1,dz0],[sp[1],dy0,dz0]], side, dPin());
+        }
+        for (q = 0; q < dvSide.length; q++) {
+          sp = dvSide[q];
+          if (freeRight) { F([[0,dy0,sp[1]],[t,dy0,sp[1]],[t,dy1,sp[1]],[0,dy1,sp[1]]], top, dPin()); }
+          if (freeLeft) {
+            F([[w-t,dy0,sp[1]],[w,dy0,sp[1]],[w,dy1,sp[1]],[w-t,dy1,sp[1]]], top, dPin());
+            F([[w,dy0,sp[0]],[w,dy1,sp[0]],[w,dy1,sp[1]],[w,dy0,sp[1]]], side);   // outer plane
+          }
+          // through Left: end grain on its outer face (outer plane, after the wall)
+          if (dJLeft && fc.left) { F([[w,dy0,sp[0]],[w,dy1,sp[0]],[w,dy1,sp[1]],[w,dy0,sp[1]]], front); }
+        }
+        // through the lid: end grain on a closed Fingers lid's top, or the empty
+        // slots in a Flat / Inset lid drawn lifted above the box
+        if (dJL && fc.lid) {
+          layer = LIDS;
+          var lzTop = lidClosed ? h : zT + Math.max(h * 0.3, 2 * t) + t;   // same lift as the lid below
+          for (q = 0; q < dvLid.length; q++) {
+            sp = dvLid[q];
+            F([[sp[0],dy0,lzTop],[sp[1],dy0,lzTop],[sp[1],dy1,lzTop],[sp[0],dy1,lzTop]],
+              lidClosed ? top : holeCol, lidClosed ? LATEST + DETAIL : depthAt(w / 2, d / 2, lzTop));
+          }
+          layer = 0;
+        }
+      }
+    }
+
     // Lid: Flat a plain plate lifted off the box, Inset a plate with the plug
     // that drops into the box under it, Fingers shown closed on the box so its
     // finger joints show (the walls' fingers come up through its edges). All of
@@ -3158,12 +3505,22 @@
     onSideOverhangFieldsChanged();
     updateBottomRabbetInfo();
     updateLidRabbetInfo();
+    updateDividerSection();   // keep the imported spaces, don't re-space -- by Claude 11/26/2026
     if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
     if (darkMode) { onDarkModeChanged(darkMode); }
     onGeometryFieldChanged();
   }, 100);
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
+  // Two phases so the dialog shows at its final size straight away:  -- by Claude 11/26/2026
+  //  1. Zoom Level first, then dark mode and which panels are open - all quick,
+  //     and done before anything is shown (the body starts hidden), so it never
+  //     appears at 100% or with the wrong panels and then jumps.
+  //  2. Once the page has painted: the slow part - the isometric view's first
+  //     drawing (VML), the field calculator and one Lua validation pass. IE7 has
+  //     no background threads (no Web Workers) and VML has to be built on the page
+  //     itself, so this can't run in parallel; deferring it is what keeps it from
+  //     holding the window back.
   setTimeout(function() {
     var zoomSelect = document.getElementById("ZoomLevel");
     var zoomVal = zoomSelect ? zoomSelect.options[zoomSelect.selectedIndex].value : "Auto";
@@ -3176,32 +3533,44 @@
       onDarkModeChanged(darkMode);
     }
 
-    var lidSelect = document.getElementById("LidTypeSelect");
-    if (lidSelect) {
-      onLidTypeChanged(lidSelect);
+    g_initDeferLua = true;   // the handlers below would each call Lua - once, in phase 2
+    try {
+      var lidSelect = document.getElementById("LidTypeSelect");
+      if (lidSelect) {
+        onLidTypeChanged(lidSelect);
+      }
+
+      var bottomSelect = document.getElementById("BottomTypeSelect");
+      if (bottomSelect) {
+        onBottomTypeChanged(bottomSelect);
+      }
+      updateBottomRabbetInfo();
+      onGrooveOffsetRefChanged();
+      updateLidRabbetInfo();
+      onLidGrooveOffsetRefChanged();
+      onLidGripShapeChanged();
+      onLidGripTypeChanged();
+      showLidTab("Groove");
+      updateDividerSection();   // Divider Options open if Dividers is ticked -- by Claude 11/26/2026
+      isoInit(true);            // view box in place of the picture, drawn in phase 2
+
+      var allWidths = document.getElementById("AllJointWidths");
+      if (allWidths) { onShowAllWidthsChanged(allWidths); }
+
+      for (var invalidFieldId in g_invalidFieldMap) { updateInvalidFieldFlag(invalidFieldId); }
+
+      onJointTypeChanged();
+    } finally {
+      g_initDeferLua = false;
+      document.body.style.visibility = "visible";
     }
 
-    var bottomSelect = document.getElementById("BottomTypeSelect");
-    if (bottomSelect) {
-      onBottomTypeChanged(bottomSelect);
-    }
-    updateBottomRabbetInfo();
-    onGrooveOffsetRefChanged();
-    updateLidRabbetInfo();
-    onLidGrooveOffsetRefChanged();
-    onLidGripShapeChanged();
-    onLidGripTypeChanged();
-    showLidTab("Groove");
-    isoInit();   // live isometric box view -- by Claude 10/31/2026
-
-    var allWidths = document.getElementById("AllJointWidths");
-    if (allWidths) { onShowAllWidthsChanged(allWidths); }
-
-    for (var invalidFieldId in g_invalidFieldMap) { updateInvalidFieldFlag(invalidFieldId); }
-
-    calcAttachAll();   // expressions in every numeric field -- by Claude 11/1/2026
-
-    onJointTypeChanged();
+    // phase 2, after the page has painted
+    setTimeout(function () {
+      calcAttachAll();   // expressions in every numeric field -- by Claude 11/1/2026
+      onGeometryFieldChanged();   // the one Lua validation pass skipped above
+      isoStart();        // live isometric box view: first drawing -- by Claude 10/31/2026
+    }, 0);
   }, 100);
 
 </script>

@@ -20,8 +20,11 @@ FaceType = {
   Bottom = 1,
   Lid = 2,
   Side = 3,
-  End = 4
+  End = 4,
+  Divider = 5   -- divider across the width, finger jointed into Left/Right (and bottom/lid) -- by Claude 11/26/2026
 }
+
+G_maxDividers = 10   -- most dividers the dialog offers (DividerCountSelect / DividerSpace<n>Field) -- by Claude 11/26/2026
 
 local unit_x = Vector2D(1,0)
 local unit_y = Vector2D(0,1)
@@ -116,6 +119,11 @@ function TransformFace(face, xform)
   -- Transform the Grooved lid's finger hole -- by Claude 10/26/2026
   if (face.hole_contours ~= nil) then
     face.hole_contours:Transform(xform)
+  end
+
+  -- Transform the through slots the divider fingers go into -- by Claude 11/26/2026
+  if (face.slot_contours ~= nil) then
+    face.slot_contours:Transform(xform)
   end
 
   -- Transform the bottom panel's own rabbet band (Falz), only present when
@@ -2035,3 +2043,366 @@ end
 
     return Face(contour, inset_contours, dovetail_markers, tablist, name, FaceType.Lid, lidType, flute_sockets, fingerSides)
   end
+
+--[[  -------------- Dividers --------------------------------------------------
+|
+|  Dividers run across the width (parallel to Front and Back) at the spacing
+|  set in the dialog. Each one is finger jointed into the walls it touches,
+|  with plain box-joint fingers even on a dovetailed box: through fingers, one
+|  material thickness long, that pass right through slots in Left and Right,
+|  and through the bottom and the lid when those are Fingers, Flat or Inset.
+|  A Grooved bottom or lid slides in and out, so the divider never joints into
+|  it: it stands on the bottom panel and stops under the lid groove. An open
+|  top or no bottom has nothing to joint into.
+|
+|  Coordinates: y_box is measured along the depth from Front's outer face,
+|  z from the walls' bottom edge. "Space k" in the dialog is the clear gap in
+|  front of divider k (from Front's inside face, or from the divider before
+|  it). Whatever is left behind the last divider goes to the Back. A "Top
+|  inset" (options.dividerInset) above 0 makes the dividers that much shorter
+|  at the top, without fingers into the lid (see DividerJoints).
+|
+|  The divider part is drawn with x across the box width (Left at x = 0) and
+|  y = z. The slots are cut by their own "Divider Slots" toolpath; see
+|  DividerSlotToolPath.
+|
+|  Added by Claude 11/26/2026
+|
+]]
+
+-- Number of dividers actually being made (0 when the Dividers box is unticked).
+function DividerCount(options)
+  if not options.makeDividers then
+    return 0
+  end
+  local n = math.floor((tonumber(options.dividerCount) or 0) + 0.5)
+  return math.max(0, math.min(n, G_maxDividers))
+end
+
+-- y_box of each divider's front face.
+function DividerPositions(options)
+  local t = options.thickness
+  local positions = {}
+  local y = t
+  for k = 1, DividerCount(options) do
+    y = y + (options["dividerSpace" .. k] or 0)
+    positions[k] = y
+    y = y + t
+  end
+  return positions
+end
+
+-- Clear space behind the last divider, up to Back's inside face.
+function DividerLastSpace(options)
+  local t = options.thickness
+  local n = DividerCount(options)
+  local behind = t
+  if n > 0 then
+    behind = DividerPositions(options)[n] + t
+  end
+  return (options.depth - t) - behind
+end
+
+-- Fill every divider space with an even spacing for the current count. Used
+-- when nothing usable has been saved yet.
+function SetEvenDividerSpaces(options)
+  local t = options.thickness
+  local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
+  local even = ((options.depth - 2*t) - n*t) / (n + 1)
+  even = math.max(0, Truncate(even, 3))
+  for k = 1, G_maxDividers do
+    options["dividerSpace" .. k] = even
+  end
+end
+
+-- Finger widths: the divider's side fingers use the side joint width, its
+-- bottom / top fingers the bottom / lid joint widths (the side width too
+-- unless "Show all joint widths" is on, like everywhere else).
+function DividerFingerWidths(options)
+  local side = options.sideOrAllTabWidth
+  local bottom, lid = side, side
+  if options.useAllJointWidths then
+    bottom = options.bottomTabWidth or side
+    lid = options.lidTabWidth or side
+  end
+  return { side = side, bottom = bottom, lid = lid }
+end
+
+-- Where the divider's body starts and ends (z_bot / z_top) and which of its
+-- four edges get fingers.
+function DividerJoints(options, facesToMake)
+  local t = options.thickness
+  local h = options.height
+  local tabsForMissing = options.create_tabs_for_missing_faces
+  local j = {}
+
+  local bt = options.bottomType
+  if (bt == FaceJointType.Fingers or bt == FaceJointType.Flat or bt == FaceJointType.Inset) then
+    -- the bottom panel fills z = 0..t under the divider, whatever its edge joint
+    j.z_bot = t
+    j.bottom = (facesToMake.bottom or tabsForMissing) and true or false
+  elseif (bt == FaceJointType.Grooved) then
+    -- stand on the sliding panel (never below the top of its groove)
+    local panel_top = BottomPanelUndersideHeight(options) + (options.bottomThickness or t)
+    j.z_bot = math.max(panel_top, options.bottomGrooveOffset or 0)
+    j.bottom = false
+  else
+    j.z_bot = 0
+    j.bottom = false
+  end
+
+  local lt = options.lidType
+  if (lt == FaceJointType.Fingers or lt == FaceJointType.Flat or lt == FaceJointType.Inset) then
+    j.z_top = h - t
+    j.lid = (facesToMake.lid or tabsForMissing) and true or false
+  elseif (lt == FaceJointType.Grooved) then
+    -- stop at the lid's underside (the lower edge of the lid groove)
+    j.z_top = h - (options.lidGrooveOffset or 0)
+    j.lid = false
+  elseif (lt == FaceJointType.OpenChamfer) then
+    -- stay below the lower of the two ends, so it never sticks up out of a chamfer
+    j.z_top = math.min(h, options.end1Height or h, options.end2Height or h)
+    j.lid = false
+  else
+    j.z_top = h
+    j.lid = false
+  end
+
+  -- Top inset: the divider stops this much lower than it otherwise would (the
+  -- top of the walls, or the underside of the lid) and so no longer reaches the
+  -- lid to finger into it.                                   -- by Claude 11/26/2026
+  local inset = tonumber(options.dividerInset) or 0
+  if inset > 0.0001 then
+    j.z_top = j.z_top - inset
+    j.lid = false
+  end
+
+  j.side1 = (facesToMake.side1 or tabsForMissing) and true or false
+  j.side2 = (facesToMake.side2 or tabsForMissing) and true or false
+  return j
+end
+
+-- Fingers along an edge `length` long, `width` wide, evenly spaced with a gap
+-- at both ends (same rule as the box's own edges, but at least one finger
+-- whenever the edge is longer than one finger). Returns { {from, to}, ... }
+-- measured from the start of the edge. Symmetric, so it is the same from
+-- either end.
+function DividerFingerSpans(length, width)
+  local spans = {}
+  if (width == nil or width <= 0.0001 or length <= width + 0.0001) then
+    return spans
+  end
+  local n = math.max(1, math.floor((0.5*length) / width))
+  local gap = (length - n*width) / (n + 1)
+  for k = 1, n do
+    local a = gap + (k - 1)*(width + gap)
+    spans[k] = { a, a + width }
+  end
+  return spans
+end
+
+-- Draws one edge of the divider from `start` along `along`, with a finger
+-- sticking out by `depth` (towards `out`) for each span. The contour must
+-- already end at `start`.
+local function DrawDividerEdge(contour, start, along, out, length, spans, depth, tablist, fingerSides)
+  local function at(d)
+    return start + d*along
+  end
+  local prev = 0
+  for k = 1, #spans do
+    local a = spans[k][1]
+    local b = spans[k][2]
+    if (a - prev > 0.000001) then
+      contour:LineTo(at(a))
+      tablist[#tablist + 1] = at(0.5*(prev + a))
+    end
+    local a_out = at(a) + depth*out
+    local b_out = at(b) + depth*out
+    if fingerSides then
+      fingerSides:AddTail(MakeLine(at(a), a_out))
+      fingerSides:AddTail(MakeLine(b_out, at(b)))
+    end
+    contour:LineTo(a_out)
+    contour:LineTo(b_out)
+    contour:LineTo(at(b))
+    prev = b
+  end
+  if (length - prev > 0.000001) then
+    contour:LineTo(at(length))
+    tablist[#tablist + 1] = at(0.5*(prev + length))
+  end
+end
+
+--[[  -------------- MakeDividerFace --------------------------------------------------
+|
+|  One divider: the inside width (Left to Right inside faces) by z_bot..z_top,
+|  with through fingers into each neighbour DividerJoints says to joint into.
+|  Drawn anti-clockwise, Left at x = 0, y = z.
+|
+]]
+function MakeDividerFace(options, facesToMake, index)
+  local t = options.thickness
+  local sp = options.start_point
+  local j = DividerJoints(options, facesToMake)
+  local fw = DividerFingerWidths(options)
+
+  local x0 = sp.x + t
+  local x1 = sp.x + options.width - t
+  local y0 = sp.y + j.z_bot
+  local y1 = sp.y + j.z_top
+  local inner_w = x1 - x0
+  local inner_h = y1 - y0
+  local side_spans = DividerFingerSpans(inner_h, fw.side)
+  local none = {}
+
+  local tablist = {}
+  local fingerSides = ContourGroup(true)
+  local contour = Contour(0.0)
+  contour:AppendPoint(Point2D(x0, y0))
+  -- bottom edge, left to right: fingers down through the bottom panel
+  DrawDividerEdge(contour, Point2D(x0, y0), unit_x, -unit_y, inner_w,
+    j.bottom and DividerFingerSpans(inner_w, fw.bottom) or none, t, tablist, fingerSides)
+  -- right edge, upwards: fingers through Right (Side 2)
+  DrawDividerEdge(contour, Point2D(x1, y0), unit_y, unit_x, inner_h,
+    j.side2 and side_spans or none, t, tablist, fingerSides)
+  -- top edge, right to left: fingers up through the lid
+  DrawDividerEdge(contour, Point2D(x1, y1), -unit_x, unit_y, inner_w,
+    j.lid and DividerFingerSpans(inner_w, fw.lid) or none, t, tablist, fingerSides)
+  -- left edge, downwards: fingers through Left (Side 1)
+  DrawDividerEdge(contour, Point2D(x0, y1), -unit_y, -unit_x, inner_h,
+    j.side1 and side_spans or none, t, tablist, fingerSides)
+
+  return Face(contour, nil, {}, tablist, "Divider" .. index, FaceType.Divider, FaceJointType.Fingers, {}, fingerSides)
+end
+
+-- Height in the side wall's own drawing that matches box height z: the wall's
+-- inside bottom corner (start + thickness) is where its own bottom edge sits,
+-- which is z = bottom_thickness (see MakeSideFace).
+local function SideWallBottomZ(options)
+  local t = options.thickness
+  local bt = options.bottomType
+  if (bt == FaceJointType.None or bt == FaceJointType.Grooved) then
+    return 0
+  elseif (bt == FaceJointType.Inset) then
+    return 0.5*t
+  end
+  return t
+end
+
+--[[  -------------- AddDividerSlotsToFaces --------------------------------------------------
+|
+|  Adds the through slots for every divider finger to the faces they pass
+|  through, as face.slot_contours (the slot outlines at their true size; the
+|  tool path is worked out at toolpath time). Must run while the faces are
+|  still at their own origins, before they are laid out on the sheets.
+|
+|  Left wall: its x runs from Front (x = 0) to Back. Right wall: from Back to
+|  Front (see MakeSideFace). Bottom: Front at y = 0. Lid: drawn inside face up,
+|  so Front is at y = depth (see MakeInsetContours).
+|
+]]
+function AddDividerSlotsToFaces(faces, options, facesToMake)
+  local n = DividerCount(options)
+  if n == 0 then
+    return
+  end
+  local t = options.thickness
+  local sp = options.start_point
+  local positions = DividerPositions(options)
+  local j = DividerJoints(options, facesToMake)
+  local fw = DividerFingerWidths(options)
+  local inner_w = options.width - 2*t
+  local side_spans = DividerFingerSpans(j.z_top - j.z_bot, fw.side)
+  local bottom_spans = DividerFingerSpans(inner_w, fw.bottom)
+  local lid_spans = DividerFingerSpans(inner_w, fw.lid)
+  local wall_bottom = SideWallBottomZ(options)
+
+  local function AddSlot(face, xa, ya, xb, yb)
+    if face.slot_contours == nil then
+      face.slot_contours = ContourGroup(true)
+    end
+    local c = Contour(0.0)
+    c:AppendPoint(Point2D(xa, ya))
+    c:LineTo(Point2D(xb, ya))
+    c:LineTo(Point2D(xb, yb))
+    c:LineTo(Point2D(xa, yb))
+    c:LineTo(Point2D(xa, ya))
+    face.slot_contours:AddTail(c)
+  end
+
+  for i = 1, #faces do
+    local face = faces[i]
+    if (face.facetype == FaceType.Side) then
+      local is_side1 = (face.name == "SideFace1")
+      if (is_side1 and j.side1) or ((not is_side1) and j.side2) then
+        for k = 1, n do
+          local xa = sp.x + positions[k]
+          if not is_side1 then
+            xa = sp.x + options.depth - positions[k] - t
+          end
+          for s = 1, #side_spans do
+            local ya = sp.y + t + (j.z_bot + side_spans[s][1] - wall_bottom)
+            local yb = sp.y + t + (j.z_bot + side_spans[s][2] - wall_bottom)
+            AddSlot(face, xa, ya, xa + t, yb)
+          end
+        end
+      end
+    elseif (face.facetype == FaceType.Bottom and j.bottom) then
+      for k = 1, n do
+        local ya = sp.y + positions[k]
+        for s = 1, #bottom_spans do
+          AddSlot(face, sp.x + t + bottom_spans[s][1], ya, sp.x + t + bottom_spans[s][2], ya + t)
+        end
+      end
+    elseif (face.facetype == FaceType.Lid and j.lid) then
+      for k = 1, n do
+        local ya = sp.y + options.depth - positions[k] - t
+        for s = 1, #lid_spans do
+          AddSlot(face, sp.x + t + lid_spans[s][1], ya, sp.x + t + lid_spans[s][2], ya + t)
+        end
+      end
+    end
+  end
+end
+
+--[[  -------------- DividerSlotToolPath --------------------------------------------------
+|
+|  Tool centre path (cut "on" the line, like the cutout) for one rectangular
+|  slot: the slot moved in by `radius` (tool radius minus allowance, so a
+|  positive allowance makes the slot bigger = looser, the same way it makes
+|  the parts smaller). With dogbones, each corner gets a relief so the tool
+|  reaches right into it and the square finger fits; without, the corners stay
+|  round like the box's own finger joints (the roundover tool handles the
+|  fingers then). Clockwise, as the inside of a hole. nil if the slot is too
+|  small for the tool.
+|
+]]
+function DividerSlotToolPath(slot, radius, dogbones)
+  local b = slot.BoundingBox2D
+  local x0, y0, x1, y1 = b.MinX + radius, b.MinY + radius, b.MaxX - radius, b.MaxY - radius
+  if (x1 - x0 < 0.0001 or y1 - y0 < 0.0001) then
+    return nil
+  end
+  local relief = radius - radius / math.sqrt(2)   -- from the corner of the path towards the slot corner
+  local corners = {
+    { x0, y0, -1, -1 },   -- clockwise from lower left: up the left side first
+    { x0, y1, -1,  1 },
+    { x1, y1,  1,  1 },
+    { x1, y0,  1, -1 }
+  }
+  local path = Contour(0.0)
+  for i = 1, #corners do
+    local c = corners[i]
+    if i == 1 then
+      path:AppendPoint(Point2D(c[1], c[2]))
+    else
+      path:LineTo(Point2D(c[1], c[2]))
+    end
+    if dogbones and relief > 0.000001 then
+      path:LineTo(Point2D(c[1] + c[3]*relief, c[2] + c[4]*relief))
+      path:LineTo(Point2D(c[1], c[2]))
+    end
+  end
+  path:LineTo(Point2D(x0, y0))
+  return path
+end

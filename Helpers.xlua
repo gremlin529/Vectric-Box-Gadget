@@ -196,7 +196,11 @@ function GetFriendlyFaceLabel(face)
   -- drawer's left/right walls, End1/End2 its front/back - clearer labels for
   -- a drawer than the generic Side/End naming.               -- by Claude 9/20/2026
   local lookup = { BottomFace = "BOTTOM", SideFace1 = "LEFT", SideFace2 = "RIGHT", EndFace1 = "FRONT", EndFace2 = "BACK", Lid = "LID" }
-  if face == nil then return "PART" end return lookup[face.name] or tostring(face.name or "PART")
+  if face == nil then return "PART" end
+  -- Divider1, Divider2, ... -> "DIVIDER 1" (numbered from the Front) -- by Claude 11/26/2026
+  local divider_number = string.match(tostring(face.name or ""), "^Divider(%d+)$")
+  if divider_number then return "DIVIDER " .. divider_number end
+  return lookup[face.name] or tostring(face.name or "PART")
   end
 
   function GetFaceLabelHeight(face, thickness)
@@ -325,6 +329,39 @@ function GetFriendlyFaceLabel(face)
 
       elseif letter == 50 then
         AddPoly({pA6, pA8, pF8, pG6, pA0, pG0})
+        return pH0
+
+      -- Digits 3-9 for the divider labels (DIVIDER 3 ... DIVIDER 10), squared
+      -- off on the same grid points as the letters.        -- by Claude 11/26/2026
+      elseif letter == 51 then -- 3
+        AddPoly({pA8, pG8, pG0, pA0})
+        AddLine(pB4, pG4)
+        return pH0
+
+      elseif letter == 52 then -- 4
+        AddPoly({pA8, pA4, pG4})
+        AddLine(pF8, pF0)
+        return pH0
+
+      elseif letter == 53 then -- 5
+        AddPoly({pG8, pA8, pA4, pG4, pG0, pA0})
+        return pH0
+
+      elseif letter == 54 then -- 6
+        AddPoly({pG8, pA8, pA0, pG0, pG4, pA4})
+        return pH0
+
+      elseif letter == 55 then -- 7
+        AddPoly({pA8, pG8, pC0})
+        return pH0
+
+      elseif letter == 56 then -- 8
+        AddPoly({pA0, pA8, pG8, pG0, pA0})
+        AddLine(pA4, pG4)
+        return pH0
+
+      elseif letter == 57 then -- 9
+        AddPoly({pA0, pG0, pG8, pA8, pA4, pG4})
         return pH0
 
       elseif letter == 65 or letter == 97 then
