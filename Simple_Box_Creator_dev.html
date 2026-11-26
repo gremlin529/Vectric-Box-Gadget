@@ -2792,7 +2792,12 @@
           if (nFW) { notchBits(patFm, 0, t, zT, w - t, w, true); }
         }
         if (fc.back) {
-          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((lY1 > d - t || nBW) ? " px" : ""));
+          panel(0, w, d - t, d, zB, backZ, side, inner, top, omit("", false, topTeeth, true) + ((lY1 > d - t || nBW) ? " px" : "") + (sideOver ? " pz" : ""));
+          // Lowered Back (sliding lid): the side walls run on over its two ends
+          // (sideOver), so only its top between them shows. Drawn the full width,
+          // the ends poked out over Right's inside face at the lid groove and made
+          // the Back look shifted forward and into the groove.  -- by Claude 11/26/2026
+          if (sideOver && bx1 - bx0 > EPSB) { F([[bx0,d-t,backZ],[bx1,d-t,backZ],[bx1,d,backZ],[bx0,d,backZ]], top); }
           // Back's rim runs the full width even where its inside face is clipped
           if (topTeeth) { rimSegments("x", d - t, d, 0, w, zT, lidW, top, pinBack - DETAIL); }
           if (nB0) { notchBits(patBm, d, d - t, backZ, 0, t, false); }
