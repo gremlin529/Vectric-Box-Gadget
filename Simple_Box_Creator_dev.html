@@ -1194,9 +1194,9 @@
     scheduleUiRefresh();
   }
 
-  // Runs the preview redraw and the invalid/warning flag refresh once, on the
-  // next tick, instead of waiting for the 1s polls. Deferred so a clicked
-  // checkbox repaints straight away rather than after the (VML) redraw, and
+  // Runs the preview redraw and invalid/warning flag refresh after the current
+  // focus/change sequence has completed. The short delay lets IE7 select the
+  // next edit field before the VML preview build uses the UI thread. Calls are
   // coalesced so several triggers in one event cost one redraw.
   //                                                   -- by Claude 11/7/2026
   var g_uiRefreshPending = false;
@@ -1209,7 +1209,7 @@
       pollInvalidFieldFlags();
       updateLidTabLabels();
       updateDividerInfo();   // depth / spaces changed -- by Claude 11/26/2026
-    }, 0);
+    }, 50);
   }
 
   // Checkboxes such as Faces to Machine have no handler of their own (their
@@ -1741,7 +1741,6 @@
     if (!g_iso.mode || g_iso.started) { return; }
     g_iso.started = true;
     isoUpdate();
-    setInterval(isoUpdate, 1000);
   }
 
   function isoNum(id) {
