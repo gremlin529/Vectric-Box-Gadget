@@ -14,6 +14,21 @@ local G_decimalPlaces = 3  --- Number of decimal places to show in the UI for jo
 local G_dialogOptions
 local G_settingsImportCounter = 0
 
+-- The live checks write ~50 hidden message fields (Invalid*/Warn*) on every
+-- change, nearly always with the same text as before (usually ""), and each
+-- write is a call across into the dialog's page. Remember what each one last
+-- got and only write it when it changes. Reset whenever a dialog opens, since
+-- a new one starts with every field empty.                  -- by Claude 11/26/2026
+local G_dialogTextCache = {}
+local function SetDialogText(dialog, field, value)
+  value = value or ""
+  if G_dialogTextCache[field] == value then
+    return
+  end
+  G_dialogTextCache[field] = value
+  dialog:UpdateTextField(field, value)
+end
+
 -- Resolve the selected tool once per validation pass. The allowance-adjusted
 -- diameter is shared by joint, groove, and finger-hole fit checks.
 local function GetValidationToolDiameters(options)
@@ -71,7 +86,7 @@ local function ValidateBoxDimensions(dialog, options, report_as_dialog)
         return false
       end
     else
-      dialog:UpdateTextField(dim.invalid_field, message)
+      SetDialogText(dialog, dim.invalid_field, message)
     end
   end
 
@@ -356,7 +371,7 @@ end
 local function ValidateDovetailAngle(dialog, options, report_as_dialog)
   if not options.dovetailJoint then
     if not report_as_dialog then
-      dialog:UpdateTextField("InvalidDovetailAngle", "")
+      SetDialogText(dialog, "InvalidDovetailAngle", "")
     end
     return true
   end
@@ -372,7 +387,7 @@ local function ValidateDovetailAngle(dialog, options, report_as_dialog)
     return true
   end
 
-  dialog:UpdateTextField("InvalidDovetailAngle", message)
+  SetDialogText(dialog, "InvalidDovetailAngle", message)
   return not is_invalid
 end
 
@@ -464,7 +479,7 @@ local function ValidateOpenChamferOptions(dialog, options, report_as_dialog)
   end
 
   for _, field in ipairs(order) do
-    dialog:UpdateTextField(field, messages[field])
+    SetDialogText(dialog, field, messages[field])
   end
   return not AnyProblem()
 end
@@ -629,7 +644,7 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
   end
 
   if not report_as_dialog then
-    dialog:UpdateTextField("InvalidAllowance", allowance_message)
+    SetDialogText(dialog, "InvalidAllowance", allowance_message)
   end
 
   if can_check_tool_fit then
@@ -729,9 +744,9 @@ local function ValidateJointWidths(dialog, options, sideDoveTail, bottomDoveTail
     lid_field_message = ""
   end
 
-  dialog:UpdateTextField("InvalidSideJointWidth", side_field_message)
-  dialog:UpdateTextField("InvalidBottomJointWidth", bottom_field_message)
-  dialog:UpdateTextField("InvalidLidJointWidth", lid_field_message)
+  SetDialogText(dialog, "InvalidSideJointWidth", side_field_message)
+  SetDialogText(dialog, "InvalidBottomJointWidth", bottom_field_message)
+  SetDialogText(dialog, "InvalidLidJointWidth", lid_field_message)
 
   return bottom_message == "" and lid_message == "" and side_message == "" and allowance_message == ""
 end
@@ -792,7 +807,7 @@ local function ValidateBottomGrooveToolFit(dialog, options, report_as_dialog, ef
     return true
   end
 
-  dialog:UpdateTextField("InvalidBottomGrooveWidth", message)
+  SetDialogText(dialog, "InvalidBottomGrooveWidth", message)
   return message == ""
 end
 
@@ -897,7 +912,7 @@ local function ValidateLidGrooveToolFit(dialog, options, report_as_dialog, effec
     return true
   end
 
-  dialog:UpdateTextField("InvalidLidGrooveWidth", message)
+  SetDialogText(dialog, "InvalidLidGrooveWidth", message)
   return message == ""
 end
 
@@ -946,8 +961,8 @@ local function ValidateGrooveDepths(dialog, options, report_as_dialog)
     return true
   end
 
-  dialog:UpdateTextField("InvalidBottomGrooveDepth", bottom_message)
-  dialog:UpdateTextField("InvalidLidGrooveDepth", lid_message)
+  SetDialogText(dialog, "InvalidBottomGrooveDepth", bottom_message)
+  SetDialogText(dialog, "InvalidLidGrooveDepth", lid_message)
   return bottom_message == "" and lid_message == ""
 end
 
@@ -1010,12 +1025,12 @@ local function ValidateGroovedPanelDimensionsLive(dialog, options)
     end
   end
 
-  dialog:UpdateTextField("InvalidBottomGrooveOffset", bottom_offset)
-  dialog:UpdateTextField("InvalidBottomThickness", bottom_thickness)
-  dialog:UpdateTextField("InvalidBottomGrooveClearance", bottom_clearance)
-  dialog:UpdateTextField("InvalidLidGrooveOffset", lid_offset)
-  dialog:UpdateTextField("InvalidLidThickness", lid_thickness)
-  dialog:UpdateTextField("InvalidLidGrooveClearance", lid_clearance)
+  SetDialogText(dialog, "InvalidBottomGrooveOffset", bottom_offset)
+  SetDialogText(dialog, "InvalidBottomThickness", bottom_thickness)
+  SetDialogText(dialog, "InvalidBottomGrooveClearance", bottom_clearance)
+  SetDialogText(dialog, "InvalidLidGrooveOffset", lid_offset)
+  SetDialogText(dialog, "InvalidLidThickness", lid_thickness)
+  SetDialogText(dialog, "InvalidLidGrooveClearance", lid_clearance)
 end
 
 -- Thin wall strip outside a groove: below the bottom groove (to the walls' bottom
@@ -1070,12 +1085,12 @@ end
 
 local function UpdateGrooveStripWarnings(dialog, options)
   local bottom_warning, lid_warning = GrooveStripWarnings(options)
-  dialog:UpdateTextField("WarnBottomGrooveOffset", bottom_warning)
-  dialog:UpdateTextField("WarnLidGrooveOffset", lid_warning)
+  SetDialogText(dialog, "WarnBottomGrooveOffset", bottom_warning)
+  SetDialogText(dialog, "WarnLidGrooveOffset", lid_warning)
   local bottom_depth_warning, lid_depth_warning = GrooveDepthWarnings(options)
-  dialog:UpdateTextField("WarnBottomGrooveDepth", bottom_depth_warning)
-  dialog:UpdateTextField("WarnLidGrooveDepth", lid_depth_warning)
-  dialog:UpdateTextField("WarnLidHoleDepth", LidRecessDepthWarning(options))
+  SetDialogText(dialog, "WarnBottomGrooveDepth", bottom_depth_warning)
+  SetDialogText(dialog, "WarnLidGrooveDepth", lid_depth_warning)
+  SetDialogText(dialog, "WarnLidHoleDepth", LidRecessDepthWarning(options))
 end
 
 -- Grip width of the Grooved lid's grip tab: must be > 0 when there is a tab, and
@@ -1106,7 +1121,7 @@ local function ValidateLidGripWidth(dialog, options, report_as_dialog)
     return true
   end
 
-  dialog:UpdateTextField("InvalidLidGripWidth", message)
+  SetDialogText(dialog, "InvalidLidGripWidth", message)
   return message == ""
 end
 
@@ -1207,11 +1222,11 @@ local function ValidateLidFingerHole(dialog, options, report_as_dialog, effectiv
     return true
   end
 
-  dialog:UpdateTextField("InvalidLidHoleSize", size_message)
-  dialog:UpdateTextField("InvalidLidHoleLength", length_message)
-  dialog:UpdateTextField("InvalidLidHoleRadius", radius_message)
-  dialog:UpdateTextField("InvalidLidHoleDistance", dist_message)
-  dialog:UpdateTextField("InvalidLidHoleDepth", depth_message)
+  SetDialogText(dialog, "InvalidLidHoleSize", size_message)
+  SetDialogText(dialog, "InvalidLidHoleLength", length_message)
+  SetDialogText(dialog, "InvalidLidHoleRadius", radius_message)
+  SetDialogText(dialog, "InvalidLidHoleDistance", dist_message)
+  SetDialogText(dialog, "InvalidLidHoleDepth", depth_message)
   return size_message == "" and length_message == "" and radius_message == "" and dist_message == "" and depth_message == ""
 end
 
@@ -1373,10 +1388,10 @@ local function ValidateDividers(dialog, options, report_as_dialog, effective_dia
   end
 
   for k = 1, G_maxDividers do
-    dialog:UpdateTextField("InvalidDividerSpace" .. k, messages[k] or "")
+    SetDialogText(dialog, "InvalidDividerSpace" .. k, messages[k] or "")
   end
-  dialog:UpdateTextField("InvalidDividers", general)
-  dialog:UpdateTextField("InvalidDividerInset", inset_message)
+  SetDialogText(dialog, "InvalidDividers", general)
+  SetDialogText(dialog, "InvalidDividerInset", inset_message)
   return general == "" and inset_message == "" and next(messages) == nil
 end
 
@@ -1385,6 +1400,7 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   G_dialogSideDoveTail = sideDoveTail
   G_dialogBottomDoveTail = bottomDoveTail
   G_dialogLidDoveTail = lidDoveTail
+  G_dialogTextCache = {}   -- a new dialog starts with every message field empty -- by Claude 11/26/2026
 
   local html_path = "file:" .. script_path .. "\\" .. G_htmlFile
   local dialog = HTML_Dialog(false, html_path, options.window_width, options.window_height, string.format("%s - Version %s %s", G_title, G_version, G_subVersion))
