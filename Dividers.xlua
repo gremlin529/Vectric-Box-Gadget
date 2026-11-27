@@ -106,14 +106,17 @@ function AddDividerDialogFields(dialog, options)
   dialog:AddTextField("InvalidDividers", "")
   dialog:AddDoubleField("DividerInsetField", options.dividerInset or 0)
   dialog:AddTextField("InvalidDividerInset", "")
-  dialog:AddDropDownList("DividerJointSelect", options.dividerJoint == "Groove" and "Groove" or "Finger")
+  -- the dropdown says Fingers / Grooved; options.dividerJoint (and what is saved)
+  -- stays "Finger" / "Groove", so earlier settings still load -- by Claude 11/26/2026
+  dialog:AddDropDownList("DividerJointSelect", options.dividerJoint == "Groove" and "Grooved" or "Fingers")
 end
 
 function ReadDividerOptionsFromDialog(dialog, options)
   options.makeDividers = dialog:GetCheckBox("MakeDividers")
   options.dividerCount = tonumber(dialog:GetDropDownListValue("DividerCountSelect")) or 1
   options.dividerInset = dialog:GetDoubleField("DividerInsetField") or 0
-  options.dividerJoint = (dialog:GetDropDownListValue("DividerJointSelect") == "Groove") and "Groove" or "Finger"
+  local joint = dialog:GetDropDownListValue("DividerJointSelect")
+  options.dividerJoint = (joint == "Grooved" or joint == "Groove") and "Groove" or "Finger"
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = dialog:GetDoubleField("DividerSpace" .. k .. "Field") or 0
   end
@@ -153,7 +156,7 @@ function ImportDividerSettings(dialog, values)
     dialog:UpdateDropDownListValue("DividerCountSelect", tostring(count))
   end
   if values.dividerJoint ~= nil then
-    dialog:UpdateDropDownListValue("DividerJointSelect", values.dividerJoint == DividerJointCodes.Groove and "Groove" or "Finger")
+    dialog:UpdateDropDownListValue("DividerJointSelect", values.dividerJoint == DividerJointCodes.Groove and "Grooved" or "Fingers")
   end
 end
 

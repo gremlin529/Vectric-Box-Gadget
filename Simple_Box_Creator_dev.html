@@ -30,10 +30,12 @@
     /* count / Space Evenly / Top inset all inline on one field-row, vertical-align
        middle like the other field-row controls (no floats) -- by Claude 11/26/2026 */
     /* header row: joint + Space Evenly left, Count + Top inset right -- by Claude 11/26/2026 */
-    .divider-head { width: 100%; margin-bottom: 2px; border-collapse: collapse; }
-    .divider-head td { vertical-align: middle; padding: 0; }
-    .divider-head-left { text-align: left; }
-    .divider-head-right { text-align: right; }
+    /* not full width: Count / Top inset follow Space Evenly closely instead of
+       being pushed to the far right -- by Claude 11/26/2026 */
+    .divider-head { margin-bottom: 2px; border-collapse: collapse; }
+    .divider-head td { vertical-align: middle; padding: 0; text-align: left; }
+    .divider-head td.divider-head-right { padding-left: 14px; }   /* td. so it beats the padding: 0 above */
+    .divider-head .field-row input.divider-even-button { margin-left: 12px; }
     .field-row select#DividerCountSelect { width: 70px; }
     .field-row select#DividerJointSelect { width: 100px; }
     .field-row label.divider-count-label { width: 50px; }
@@ -249,7 +251,7 @@
   <div class="section-header" id="showHideDividerSectionHeader" style="display: none;">Divider Options</div>
   <div class="card" id="showHideDividerOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Groove). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Grooved). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
       <div class="sub-panel clearfix">
         <!-- Joint (Finger / Groove) + Space Evenly on the left, Count + Top inset on
              the right: a two-cell table (IE7-safe), each cell one field-row with
@@ -257,11 +259,14 @@
              Option texts of both dropdowns are read back by Lua.  -- by Claude 11/26/2026 -->
         <table class="divider-head" cellpadding="0" cellspacing="0" border="0">
           <tr>
-            <td class="divider-head-left"><div class="field-row">
-            <label for="DividerJointSelect" title="Finger: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Groove: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">Dividers</label>
-            <select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Finger: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Groove: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">
-              <option value="Finger">Finger</option>
-              <option value="Groove">Groove</option>
+            <!-- No whitespace between the label and the dropdown (the comment
+                 swallows the line break): a space there pushed the dropdown a few
+                 pixels right of the Space boxes below, whose labels butt straight
+                 up against them.                         -- by Claude 11/26/2026 -->
+            <td class="divider-head-left"><div class="field-row"><label for="DividerJointSelect" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">Dividers</label><!--
+            --><select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">
+              <option value="Fingers">Fingers</option>
+              <option value="Grooved">Grooved</option>
             </select>
             <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
             </div></td>
@@ -2052,7 +2057,7 @@
     var cb = document.getElementById("MakeDividers");
     var D = { ys: [], key: "off", inset: 0, groove: false };
     if (!(cb && cb.checked) || !(t > 0)) { return D; }
-    D.groove = selectedValue("DividerJointSelect", "Finger") === "Groove";   // by Claude 11/26/2026
+    D.groove = selectedValue("DividerJointSelect", "Fingers") === "Grooved";   // by Claude 11/26/2026
     var ins = document.getElementById("DividerInsetField");   // Top inset -- by Claude 11/26/2026
     D.inset = ins ? (parseFloat(ins.value) || 0) : 0;
     if (D.inset < 0) { D.inset = 0; }
