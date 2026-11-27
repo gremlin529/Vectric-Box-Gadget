@@ -50,7 +50,8 @@
        width (~700px of the ~820px there is). The boxes' 10px margin-left comes from
        .field-row input.                     -- by Claude 11/27/2026, tightened 11/27/2026 */
     .field-row label.divider-label { width: 80px; }
-    .field-row label.divider-count-label { width: 44px; white-space: nowrap; }
+    /* Count / Spacing dropdown: Tahoma, no padding, like the Dividers dropdown -- by Claude 11/27/2026 */
+    .field-row select.divider-mode-select { width: 82px; margin-left: 12px; padding: 0; font-family: Tahoma, Arial, sans-serif; font-size: 15px; }
     .field-row label.divider-inset-label { margin-left: 12px; width: 72px; white-space: nowrap; }
     .field-row label.divider-thickness-label { margin-left: 12px; width: 76px; white-space: nowrap; }
     .field-row input.divider-small-field { width: 58px; }   /* room for 0.125 / 12.75 */
@@ -322,12 +323,17 @@
             --><select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - divider thickness + allowance wide, half the wall thickness deep - with a tongue on each edge to fit them.">
               <option value="Fingers">Fingers</option>
               <option value="Grooved">Grooved</option>
-            </select>
-            <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
+            </select><!--
+            Count / Spacing in place of the Count label, then its box: the count, or in
+            Spacing mode the minimum gap (its own box - the count box holds whole numbers
+            only); then Space Evenly (Count mode only). The option texts are read back
+            by Lua.                                          -- by Claude 11/27/2026
+            --><select id="DividerModeSelect" class="divider-mode-select" onchange="onDividerModeChanged()" title="Count: say how many dividers, then set each Space (or Space Evenly). Spacing: give the smallest gap you want - as many dividers as fit are made, all gaps equal and none smaller than that."><option value="Count">Count</option><option value="Spacing">Spacing</option></select><!--
+            --><input type="text" id="DividerCountField" class="divider-small-field" maxlength="2" title="How many dividers to make, 1 to 50. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven." onchange="onDividerCountChanged()"/><!--
+            --><input type="number" class="calcfield divider-small-field" step="any" id="DividerMinGapField" style="display: none;" placeholder="Gap" title="The smallest gap allowed between dividers (and the walls). As many dividers as fit are made, all gaps equal and at least this big - up to 50." onchange="onDividerFieldChanged()"/><!--
+            --><input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
             </div></td>
             <td class="divider-head-right"><div class="field-row"><!--
-            --><label for="DividerCountField" class="divider-count-label" title="How many dividers to make, 1 to 50. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Count</label><!--
-            --><input type="text" id="DividerCountField" class="divider-small-field" maxlength="2" title="How many dividers to make, 1 to 50. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven." onchange="onDividerCountChanged()"/><!--
             --><label for="DividerInsetField" class="divider-inset-label" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid.">Top inset</label><!--
             --><input type="number" class="calcfield divider-small-field" step="any" id="DividerInsetField" placeholder="Inset" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid." onchange="onDividerFieldChanged()"/><!--
             --><label for="DividerThicknessField" class="divider-thickness-label" title="Thickness of the dividers - set to the material thickness when Dividers is ticked. Another thickness means they are cut from other stock: they always go on sheets of their own (with their own cutout depth), and their slots / grooves are made for this thickness (grooves + the allowance).">Thickness</label><!--
@@ -768,6 +774,7 @@
     <input type="text" id="DividerSpacesList" value=""/>
     <input type="text" id="InvalidDividerCount" value=""/>
     <input type="text" id="InvalidDividerThickness" value=""/>
+    <input type="text" id="InvalidDividerMinGap" value=""/><!-- Spacing mode -- by Claude 11/27/2026 -->
     <!-- Material size, filled by Lua when the dialog opens. These feed the -->
     <!-- field calculator's W/X, H/Y and T/Z variables, and MaterialInMM tells -->
     <!-- it which unit ' (feet) and " (inches) have to land in. -->
@@ -1186,17 +1193,66 @@
     return { inside: depth - 2 * t, t: t, td: td };
   }
 
+  // Count / Spacing dropdown: Spacing = as many dividers as fit at a minimum gap.
+  //                                                         -- by Claude 11/27/2026
+  function dividerSpacingMode() {
+    return selectedValue("DividerModeSelect", "Count") === "Spacing";
+  }
+
+  // The dividers as the gadget will make them: how many (n) and the gap in front
+  // of each (gaps[1..n]) - the Count + Space fields, or in Spacing mode as many as
+  // fit at the minimum gap with every gap equal (DividerSpacingCount / DividerSpace
+  // in Dividers.xlua). null if the box can't be read yet.    -- by Claude 11/27/2026
+  function dividerLayout() {
+    var dt = dividerDepthAndThickness();
+    if (!dt) { return null; }
+    var L = { n: 0, gaps: [], spacing: dividerSpacingMode(), even: 0, dt: dt };
+    var k;
+    if (L.spacing) {
+      var gEl = document.getElementById("DividerMinGapField");
+      var g = gEl ? parseFloat(gEl.value) : NaN;
+      if (g > 0) {
+        L.n = Math.floor((dt.inside - g) / (g + dt.td) + 0.000001);
+        if (L.n < 0) { L.n = 0; }
+        if (L.n > MAX_DIVIDERS) { L.n = MAX_DIVIDERS; }
+      }
+      L.even = (dt.inside - L.n * dt.td) / (L.n + 1);
+      for (k = 1; k <= L.n; k++) { L.gaps[k] = L.even; }
+    } else {
+      L.n = dividerCount();
+      for (k = 1; k <= L.n; k++) {
+        var el = document.getElementById("DividerSpace" + k + "Field");
+        var s = el ? parseFloat(el.value) : NaN;
+        L.gaps[k] = isFinite(s) ? s : NaN;
+      }
+    }
+    return L;
+  }
+
   function updateDividerSection() {
     var cb = document.getElementById("MakeDividers");
     var on = !!(cb && cb.checked);
     setSectionVisible("showHideDividerSectionHeader", "showHideDividerOptions", on);
-    var n = dividerCount();
+    // Spacing mode: the minimum-gap box in place of the count box, no Space Evenly
+    // and no Space fields - they aren't used.                -- by Claude 11/27/2026
+    var spacing = dividerSpacingMode();
+    var show = function (id, visible) {
+      var el = document.getElementById(id), want = visible ? "" : "none";
+      if (el && el.style.display !== want) { el.style.display = want; }
+    };
+    show("DividerCountField", !spacing);
+    show("DividerMinGapField", spacing);
+    show("DividerSpaceEvenly", !spacing);
+    var n = spacing ? 0 : dividerCount();
     for (var k = 1; k <= MAX_DIVIDERS; k++) {
-      var row = document.getElementById("DividerSpaceRow" + k);
-      var want = (k <= n) ? "" : "none";
-      if (row && row.style.display !== want) { row.style.display = want; }
+      show("DividerSpaceRow" + k, k <= n);
     }
     updateDividerInfo();
+  }
+
+  function onDividerModeChanged() {
+    updateDividerSection();
+    onGeometryFieldChanged();
   }
 
   // The Space boxes aren't registered with Lua one by one: all 50 values travel as
@@ -1268,9 +1324,16 @@
     var text = "";
     var bad = false;
     var dt = dividerDepthAndThickness();
+    var lay = dividerSpacingMode() ? dividerLayout() : null;   // Spacing mode -- by Claude 11/27/2026
     if (err) {
       text = err;
       bad = true;
+    } else if (lay) {
+      // Spacing mode: how many that gives, and the actual (equal) gap
+      bad = lay.n < 1;
+      text = bad ? "No divider fits at that gap - make it smaller."
+                 : (lay.n + " divider" + (lay.n === 1 ? "" : "s") + ", gaps of " + calcFormat(Math.round(lay.even * 1000) / 1000) +
+                    (lay.n >= MAX_DIVIDERS ? " (at most " + MAX_DIVIDERS + " dividers)" : ""));
     } else if (dt) {
       var n = dividerCount();
       var used = 0;
@@ -1845,7 +1908,8 @@
     "InvalidLidHoleDepth":      "LidHoleDepthField",
     "InvalidDividerInset":      "DividerInsetField",    // dividers -- by Claude 11/26/2026
     "InvalidDividerCount":      "DividerCountField",    // the Space fields: InvalidDividerSpaces, see updateDividerSpaceFlags -- by Claude 11/27/2026
-    "InvalidDividerThickness":  "DividerThicknessField"
+    "InvalidDividerThickness":  "DividerThicknessField",
+    "InvalidDividerMinGap":     "DividerMinGapField"    // Spacing mode -- by Claude 11/27/2026
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -2279,10 +2343,12 @@
     var ins = document.getElementById("DividerInsetField");   // Top inset -- by Claude 11/26/2026
     D.inset = ins ? (parseFloat(ins.value) || 0) : 0;
     if (D.inset < 0) { D.inset = 0; }
-    var n = dividerCount(), y = t, k, el, s;
+    // where they go: the same layout the readout uses - Count + Space fields, or in
+    // Spacing mode as many as fit at the minimum gap         -- by Claude 11/27/2026
+    var lay = dividerLayout(), y = t, k, s;
+    var n = lay ? lay.n : 0;
     for (k = 1; k <= n; k++) {
-      el = document.getElementById("DividerSpace" + k + "Field");
-      s = el ? parseFloat(el.value) : NaN;
+      s = lay.gaps[k];
       if (!isFinite(s) || s < 0) { s = 0; }
       y += s;
       D.ys.push(y);

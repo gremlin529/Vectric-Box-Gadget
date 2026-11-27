@@ -160,7 +160,8 @@ function main(script_path)
     partLayout = { Auto = 1, Normal = 2, Rotated = 3 },
     ZoomLevel = { Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
       ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 },
-    dividerJoint = DividerJointCodes   -- Dividers.xlua -- by Claude 11/26/2026
+    dividerJoint = DividerJointCodes,  -- Dividers.xlua -- by Claude 11/26/2026
+    dividerMode = DividerModeCodes     -- Count / Spacing -- by Claude 11/27/2026
   }
 
   local job = VectricJob()

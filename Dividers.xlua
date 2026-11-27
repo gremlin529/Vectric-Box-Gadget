@@ -21,6 +21,7 @@ G_dividerSlotLayerName = "Divider Slots"   -- tool paths for the through slots t
 G_dividerLayerName = "Divider Panel"         -- dividers on sheets of their own: their outlines -- by Claude 11/27/2026
 G_dividerCutoutLayerName = "CutOut Dividers" -- ... and their cutout vectors
 DividerJointCodes = { Finger = 1, Groove = 2 }   -- options.dividerJoint as a number (document variables, Export)
+DividerModeCodes = { Count = 1, Spacing = 2 }    -- options.dividerMode as a number (document variables, Export) -- by Claude 11/27/2026
 
 -- LineTo that skips a (near) zero length span.
 local function LineToIfNeeded(contour, pt)
@@ -45,6 +46,8 @@ function InitDividerOptions(options)
   options.dividerInset = 0
   options.dividerJoint = "Finger"
   options.dividerThickness = 0
+  options.dividerMode = "Count"   -- "Count" (Count + Space fields) or "Spacing" (as many as fit at dividerMinGap) -- by Claude 11/27/2026
+  options.dividerMinGap = 0       -- Spacing mode: the smallest gap allowed; 0 = not set yet (see ResolveDividerSpacing)
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = 0
   end
@@ -74,7 +77,7 @@ end
 
 -- Every numeric divider option (document variables, Export).
 function DividerDocumentFieldNames()
-  local names = { "makeDividers", "dividerCount", "dividerInset", "dividerThickness" }
+  local names = { "makeDividers", "dividerCount", "dividerInset", "dividerThickness", "dividerMinGap" }
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
   end
@@ -83,7 +86,7 @@ end
 
 -- The divider options that are lengths (rescaled between inches and mm).
 function DividerLengthFieldNames()
-  local names = { "dividerInset", "dividerThickness" }
+  local names = { "dividerInset", "dividerThickness", "dividerMinGap" }
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
   end
@@ -117,6 +120,12 @@ function ResolveDividerSpacing(options)
   end
   if not spacing_ok or used >= options.depth - options.thickness then
     SetEvenDividerSpaces(options)
+  end
+  -- Spacing mode's minimum gap: start from the (even) first space when nothing
+  -- usable is saved.                                       -- by Claude 11/27/2026
+  if options.dividerMode ~= "Spacing" then options.dividerMode = "Count" end
+  if (tonumber(options.dividerMinGap) or 0) <= 0.0001 then
+    options.dividerMinGap = options.dividerSpace1 or 0
   end
 end
 
@@ -190,9 +199,15 @@ function AddDividerDialogFields(dialog, options)
   -- the dropdown says Fingers / Grooved; options.dividerJoint (and what is saved)
   -- stays "Finger" / "Groove", so earlier settings still load -- by Claude 11/26/2026
   dialog:AddDropDownList("DividerJointSelect", options.dividerJoint == "Groove" and "Grooved" or "Fingers")
+  -- Count / Spacing (option texts read back as-is) and Spacing mode's minimum gap -- by Claude 11/27/2026
+  dialog:AddDropDownList("DividerModeSelect", options.dividerMode == "Spacing" and "Spacing" or "Count")
+  dialog:AddDoubleField("DividerMinGapField", options.dividerMinGap or 0)
+  dialog:AddTextField("InvalidDividerMinGap", "")
 end
 
 function ReadDividerOptionsFromDialog(dialog, options)
+  options.dividerMode = (dialog:GetDropDownListValue("DividerModeSelect") == "Spacing") and "Spacing" or "Count"   -- by Claude 11/27/2026
+  options.dividerMinGap = dialog:GetDoubleField("DividerMinGapField") or 0
   options.makeDividers = dialog:GetCheckBox("MakeDividers")
   options.dividerCountEntered = GetCountField(dialog, "DividerCountField")   -- as typed, for ValidateDividers
   options.dividerCount = ClampDividerCount(options.dividerCountEntered)
@@ -216,6 +231,8 @@ function SaveDividerRegistry(registry, options)
   registry:SetDouble("DividerInset", options.dividerInset or 0)
   registry:SetDouble("DividerThickness", options.dividerThickness or 0)
   registry:SetString("DividerJoint", options.dividerJoint == "Groove" and "Groove" or "Finger")
+  registry:SetString("DividerMode", options.dividerMode == "Spacing" and "Spacing" or "Count")   -- by Claude 11/27/2026
+  registry:SetDouble("DividerMinGap", options.dividerMinGap or 0)
   for k = 1, G_maxDividers do
     registry:SetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
   end
@@ -227,6 +244,8 @@ function LoadDividerRegistry(registry, options)
   options.dividerInset = registry:GetDouble("DividerInset", options.dividerInset or 0)
   options.dividerThickness = registry:GetDouble("DividerThickness", options.dividerThickness or 0)
   options.dividerJoint = (registry:GetString("DividerJoint", options.dividerJoint or "Finger") == "Groove") and "Groove" or "Finger"
+  options.dividerMode = (registry:GetString("DividerMode", options.dividerMode or "Count") == "Spacing") and "Spacing" or "Count"   -- by Claude 11/27/2026
+  options.dividerMinGap = registry:GetDouble("DividerMinGap", options.dividerMinGap or 0)
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = registry:GetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
   end
@@ -248,6 +267,12 @@ function ImportDividerSettings(dialog, values, options)
     dialog:UpdateDoubleField("DividerThicknessField", values.dividerThickness)
   end
   if values.makeDividers ~= nil then dialog:UpdateCheckBox("MakeDividers", values.makeDividers ~= 0) end
+  if values.dividerMode ~= nil then   -- by Claude 11/27/2026
+    dialog:UpdateDropDownListValue("DividerModeSelect", values.dividerMode == DividerModeCodes.Spacing and "Spacing" or "Count")
+  end
+  if values.dividerMinGap ~= nil and values.dividerMinGap > 0 then
+    dialog:UpdateDoubleField("DividerMinGapField", values.dividerMinGap)
+  end
   if values.dividerCount ~= nil then
     UpdateCountField(dialog, "DividerCountField", ClampDividerCount(values.dividerCount))
   end
@@ -279,13 +304,26 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
   local inset_message = ""
   local count_message = ""
   local thickness_message = ""
+  local min_gap_message = ""   -- Spacing mode -- by Claude 11/27/2026
+  local spacing = DividerUsesSpacing(options)
   local n = DividerCount(options)
   local fmt = "%." .. (decimals or 3) .. "f"
 
   if options.makeDividers then
-    local entered = tonumber(options.dividerCountEntered or options.dividerCount)
-    if entered == nil or entered < 1 or entered > G_maxDividers or math.abs(entered - math.floor(entered + 0.5)) > 0.0001 then
-      count_message = string.format("The number of dividers must be a whole number from 1 to %d.", G_maxDividers)
+    if spacing then
+      -- Spacing mode: a minimum gap that leaves room for at least one divider
+      local g = tonumber(options.dividerMinGap) or 0
+      if g <= 0.0001 then
+        min_gap_message = "The minimum gap between dividers must be greater than 0."
+      elseif n < 1 then
+        min_gap_message = string.format("Not even one divider fits with gaps of at least " .. fmt .. " - the inside depth is only " .. fmt .. ". Use a smaller gap.",
+          g, options.depth - 2*options.thickness)
+      end
+    else
+      local entered = tonumber(options.dividerCountEntered or options.dividerCount)
+      if entered == nil or entered < 1 or entered > G_maxDividers or math.abs(entered - math.floor(entered + 0.5)) > 0.0001 then
+        count_message = string.format("The number of dividers must be a whole number from 1 to %d.", G_maxDividers)
+      end
     end
     if (tonumber(options.dividerThickness) or 0) <= 0.0001 then
       thickness_message = "The divider thickness must be greater than 0."
@@ -310,6 +348,7 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
     end
 
     for k = 1, n do
+      if spacing then break end   -- no Space fields in Spacing mode -- by Claude 11/27/2026
       local space = options["dividerSpace" .. k]
       if not space or space <= 0.0001 then
         messages[k] = string.format("Space %d must be greater than 0.", k)
@@ -347,7 +386,7 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
   end
 
   if report_as_dialog then
-    for _, m in ipairs({ count_message, thickness_message }) do
+    for _, m in ipairs({ count_message, min_gap_message, thickness_message }) do
       if m ~= "" then
         DisplayMessageBox(m)
         return false
@@ -381,7 +420,8 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
   set_text(dialog, "InvalidDividerInset", inset_message)
   set_text(dialog, "InvalidDividerCount", count_message)
   set_text(dialog, "InvalidDividerThickness", thickness_message)
-  return general == "" and inset_message == "" and count_message == "" and thickness_message == "" and next(messages) == nil
+  set_text(dialog, "InvalidDividerMinGap", min_gap_message)   -- by Claude 11/27/2026
+  return general == "" and inset_message == "" and count_message == "" and min_gap_message == "" and thickness_message == "" and next(messages) == nil
 end
 
 --[[  -------------- Building the box --------------------------------------------------
@@ -532,8 +572,45 @@ function DividerCount(options)
   if not options.makeDividers then
     return 0
   end
+  if DividerUsesSpacing(options) then
+    return DividerSpacingCount(options)   -- as many as fit at the minimum gap -- by Claude 11/27/2026
+  end
   local n = math.floor((tonumber(options.dividerCount) or 0) + 0.5)
   return math.max(0, math.min(n, G_maxDividers))
+end
+
+--[[  -------------- Spacing mode --------------------------------------------------
+|
+|  "Spacing" instead of "Count" in the dialog: the box takes a minimum gap and the
+|  gadget makes as many dividers as fit with every gap (the one behind the last
+|  divider included) at least that big - all gaps equal. n dividers of thickness td
+|  leave n + 1 gaps of (inside - n x td) / (n + 1), which stays >= g while
+|  n <= (inside - g) / (g + td). Capped at G_maxDividers. The Space fields aren't
+|  used in this mode.                                         -- by Claude 11/27/2026
+|
+]]
+function DividerUsesSpacing(options)
+  return options.dividerMode == "Spacing"
+end
+
+function DividerSpacingCount(options)
+  local g = tonumber(options.dividerMinGap) or 0
+  if g <= 0.0001 then
+    return 0
+  end
+  local inside = options.depth - 2*options.thickness
+  local n = math.floor((inside - g) / (g + DividerThickness(options)) + 0.000001)
+  return math.max(0, math.min(n, G_maxDividers))
+end
+
+-- The gap in front of divider k: the Space field, or in Spacing mode the even gap.
+function DividerSpace(options, k)
+  if DividerUsesSpacing(options) then
+    local n = DividerSpacingCount(options)
+    local inside = options.depth - 2*options.thickness
+    return (inside - n*DividerThickness(options)) / (n + 1)
+  end
+  return options["dividerSpace" .. k] or 0
 end
 
 -- y_box of each divider's front face. The walls are the material thickness (t),
@@ -544,7 +621,7 @@ function DividerPositions(options)
   local positions = {}
   local y = t
   for k = 1, DividerCount(options) do
-    y = y + (options["dividerSpace" .. k] or 0)
+    y = y + DividerSpace(options, k)   -- Space field, or the even gap in Spacing mode -- by Claude 11/27/2026
     positions[k] = y
     y = y + td
   end
