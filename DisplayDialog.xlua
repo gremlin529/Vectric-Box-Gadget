@@ -1506,6 +1506,9 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddTextField("UnitsLabel", units_string)
   -- material thickness for the live isometric view in the dialog header (read-only) -- by Claude 10/31/2026
   dialog:AddTextField("MaterialThicknessInfo", string.format("%.4f", options.thickness or 0))
+  -- cutting tool diameter for the preview's divider groove ends, filled on every
+  -- live check (OnLuaButton_DimensionsChanged)              -- by Claude 11/26/2026
+  dialog:AddTextField("ToolDiameterInfo", "")
 
   local validator = function(dialog)
     -- Gremlin added bottomDoveTail seperation from side which is just sideDoveTail
@@ -2359,6 +2362,7 @@ function OnLuaButton_DimensionsChanged(dialog)
 
   ReadOptionsFromDialog(dialog, G_dialogOptions, G_dialogSideDoveTail, G_dialogBottomDoveTail, G_dialogLidDoveTail)
   local tool_diameter, effective_diameter = GetValidationToolDiameters(G_dialogOptions)
+  SetDialogText(dialog, "ToolDiameterInfo", string.format("%.4f", tool_diameter or 0))   -- for the preview -- by Claude 11/26/2026
 
   ValidateBoxDimensions(dialog, G_dialogOptions, false)
   ValidateDovetailAngle(dialog, G_dialogOptions, false)

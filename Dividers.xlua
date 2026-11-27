@@ -551,8 +551,9 @@ end
 |  extra sits inside the joint between wall and panel, out of sight). With a Top
 |  inset the side grooves stop above the divider by the allowance (+ that run-on)
 |  rather than going on up the wall (11/26/2026). Otherwise, on an open
-|  top (no lid, Open Chamfer or a sliding lid) the grooves in Left / Right run out
-|  through the top edge, so the dividers lift in and out.
+|  top (no lid or Open Chamfer) the grooves in Left / Right run out through the
+|  top edge, so the dividers lift in and out. With a sliding (Grooved) lid they
+|  stop at the lid groove, like the divider (11/26/2026).
 |
 |  Added by Claude 11/26/2026
 |
@@ -575,9 +576,11 @@ local function DividerTongue(options)
 end
 
 -- the top is open, so Left / Right's grooves can run out through it
+-- Not with a sliding (Grooved) lid: the divider stops at the lid's underside, so
+-- its grooves stop there too (at the lid groove) rather than running on up
+-- across the lid groove to the top edge.                       -- by Claude 11/26/2026
 local function DividerGroovesOpenTop(options)
-  local lt = options.lidType
-  return IsOpenLidType(lt) or lt == FaceJointType.Grooved
+  return IsOpenLidType(options.lidType)
 end
 
 -- tool radius, in job units, that a closed groove end is run on by

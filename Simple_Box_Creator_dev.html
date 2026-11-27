@@ -697,6 +697,8 @@
     <input type="text" id="WarnLidGrooveDepth" value=""/>
     <input type="text" id="WarnLidHoleDepth" value=""/>
     <input type="text" id="MaterialThicknessInfo" value=""/>
+    <!-- cutting tool diameter (job units), for where the preview ends the divider grooves -- by Claude 11/26/2026 -->
+    <input type="text" id="ToolDiameterInfo" value=""/>
     <input type="text" id="InvalidLidHoleSize" value=""/>
     <input type="text" id="InvalidLidHoleDistance" value=""/>
     <input type="text" id="InvalidLidHoleLength" value=""/>
@@ -1825,6 +1827,7 @@
               "|" + (bsel ? bsel.selectedIndex : -1) + "|" + isoJointWidth("bottom") + "|" + isoJointWidth("lid") +
               "|" + isoDovetailFlare() +           // dovetail joints and their angle
               "|" + isoDividerSettings(t).key +    // dividers -- by Claude 11/26/2026
+              "|" + isoNum("ToolDiameterInfo") + "|" + isoNum("AllowanceField") +   // where the divider grooves end -- by Claude 11/26/2026
               "|" + document.body.style.zoom;   // Zoom Level changes the fix below
     if (key === g_iso.key) { return; }
     g_iso.key = key;
@@ -3177,11 +3180,9 @@
       var dvSide = isoDividerSpans(dz1 - dz0, isoNum("SideTabWidthField"), dz0);
       var dvBot = dJB ? isoDividerSpans(w - 2 * t, isoJointWidth("bottom"), t) : [];
       var dvLid = dJL ? isoDividerSpans(w - 2 * t, isoJointWidth("lid"), t) : [];
-      // Dividers: Groove - no fingers at all; the tongues sit hidden in the grooves.
-      // What does show: on an open top, the grooves in Left / Right running on up
-      // above the divider to the rim (drawn per divider below). -- by Claude 11/26/2026
+      // Dividers: Groove - no fingers at all; the tongues sit in the grooves. What
+      // shows of the grooves is drawn per divider below.          -- by Claude 11/26/2026
       var dvGroove = dvs.groove;
-      var dvOpenTop = (lid.type === "None" || lid.type === "OpenChamfer" || lid.type === "Grooved");
       if (dvGroove) { dvSide = []; dvBot = []; dvLid = []; }
       // free-standing fingers (their wall / panel not there) vs. buried ones
       var lidClosed = fc.lid && lid.type === "Fingers";
@@ -3203,37 +3204,46 @@
       for (dk = dvs.ys.length - 1; dk >= 0; dk--) {
         dy0 = dvs.ys[dk]; dy1 = dy0 + t;
         if (dy1 > d - t + 1e-9) { continue; }   // doesn't fit - the dialog flags it
+        // Grooved: how far the divider reaches into each groove (groove depth less
+        // the allowance, like MakeGroovedDividerFace) - into Right / Left, and up
+        // into the lid's groove when it joints into the lid (Fingers / Flat / Inset,
+        // no Top inset): then its middle stands that much taller. -- by Claude 11/26/2026
+        var tongue = dvGroove ? Math.max(0, t / 2 - isoNum("AllowanceField")) : 0;
+        var tR = (dvGroove && dJRight) ? tongue : 0, tL = (dvGroove && dJLeft) ? tongue : 0;
+        var tT = (dvGroove && dJL) ? tongue : 0;
+        var dzTop = dz1 + tT;   // top of the divider's middle
         // its front face as one outline, free fingers built in (see wallPoly)
-        wallPoly("x", dy0, t, w - t, dz0, dz1,
+        wallPoly("x", dy0, t, w - t, dz0, dzTop,
                  freeBot ? { teeth: dvBot, tip: 0, fl: 0 } : null,
                  freeTop ? { teeth: dvLid, tip: h, fl: 0 } : null,
                  freeRight ? { segs: segsOf(dvSide), tip: 0, fl: 0 } : null,
                  freeLeft ? { segs: segsOf(dvSide), tip: w, fl: 0 } : null,
                  front, dPin());
-        // grooved, open top: the groove above it in Right's inside face (the one
-        // that faces the camera) and the notches it leaves in both rims. Drawn
-        // before the divider's top, which reaches into the groove in front of it.
-        // Grooved: how far the divider reaches into each groove (groove depth less
-        // the allowance, like MakeGroovedDividerFace).
-        var tongue = dvGroove ? Math.max(0, t / 2 - isoNum("AllowanceField")) : 0;
-        var tR = (dvGroove && dJRight) ? tongue : 0, tL = (dvGroove && dJLeft) ? tongue : 0;
-        var atRim = dz1 >= zT - 1e-9;   // divider as tall as the walls (no Top inset)
-        // With a Top inset the grooves stop just above the divider (allowance +
-        // a tool-radius run-on, see AddDividerSlotsToFaces in Dividers.xlua) instead
-        // of running out through the rim: only that stub shows (the allowance part -
-        // the tool size isn't known here), and no notches in the rims.
+        // Where the side grooves end, the same rule AddDividerSlotsToFaces
+        // (Dividers.xlua) cuts them by: out through the top on an open box (no lid
+        // / Open Chamfer) with no Top inset, otherwise at the divider's top + the
+        // allowance + a tool-radius run-on (ToolDiameterInfo, filled by Lua) - which
+        // can still come out through the top of the walls, e.g. with a Flat lid the
+        // walls end level with the divider. Shown: the groove above the divider in
+        // Right's inside face (the one facing the camera), and - wherever a groove
+        // reaches the rim - the notches it leaves in both rims. All drawn before the
+        // divider's top, which reaches into the grooves in front of them.
         //                                                    -- by Claude 11/26/2026
-        var dvInsetStop = dvGroove && dvs.inset > 1e-9;
-        if (dvInsetStop && fc.right) {
-          var gStub = Math.min(dz1 + isoNum("AllowanceField"), zT);
-          if (gStub - dz1 > EPSB) { F([[t,dy0,dz1],[t,dy1,dz1],[t,dy1,gStub],[t,dy0,gStub]], holeCol, dPin()); }
+        var atRim = dz1 >= zT - 1e-9;   // divider (its side tongues) level with the rims
+        // What goes over the rims (notches, a divider top at rim level) sorts after
+        // everything in the box but still UNDER any lid (LIDS layer) - a lifted Flat /
+        // Inset lid or a closed Fingers lid stands in front of them. Only with a
+        // sliding lid are the rims themselves redrawn over the lid (OUTER - 1), so
+        // their notches have to follow them there.         -- by Claude 11/26/2026
+        var overRims = (lid.type === "Grooved") ? OUTER - 1 : LIDS - 2000;
+        var gThrough = dvGroove && (lid.type === "None" || lid.type === "OpenChamfer") && !(dvs.inset > 1e-9);
+        var gTopZ = gThrough ? zT : dz1 + isoNum("AllowanceField") + isoNum("ToolDiameterInfo") / 2;
+        if (dvGroove && fc.right && !(gThrough && lid.type === "OpenChamfer")) {
+          var gStrip = Math.min(gTopZ, zT);
+          if (gStrip - dz1 > EPSB) { F([[t,dy0,dz1],[t,dy1,dz1],[t,dy1,gStrip],[t,dy0,gStrip]], holeCol, dPin()); }
         }
-        if (dvGroove && dvOpenTop && !dvInsetStop) {
-          var gTop = (lid.type === "OpenChamfer") ? dz1 : zT;
+        if (dvGroove && gTopZ >= zT - 1e-9) {
           var gd = t / 2;
-          if (fc.right && gTop - dz1 > EPSB) {
-            F([[t,dy0,dz1],[t,dy1,dz1],[t,dy1,gTop],[t,dy0,gTop]], holeCol, dPin());
-          }
           if (lid.type !== "OpenChamfer") {
             // On top of the rims: nothing of the box stands over a rim, and with a
             // sliding lid the rims themselves are redrawn at OUTER - 1 (over the
@@ -3245,8 +3255,8 @@
             //                                                -- by Claude 11/26/2026
             var nR0 = t - gd, nR1 = atRim ? t - tR : t;
             var nL0 = atRim ? w - t + tL : w - t, nL1 = w - t + gd;
-            if (fc.right && nR1 - nR0 > EPSB) { F([[nR0,dy0,zT],[nR1,dy0,zT],[nR1,dy1,zT],[nR0,dy1,zT]], holeCol, OUTER - 1); }
-            if (fc.left && nL1 - nL0 > EPSB)  { F([[nL0,dy0,zT],[nL1,dy0,zT],[nL1,dy1,zT],[nL0,dy1,zT]], holeCol, OUTER - 1); }
+            if (fc.right && nR1 - nR0 > EPSB) { F([[nR0,dy0,zT],[nR1,dy0,zT],[nR1,dy1,zT],[nR0,dy1,zT]], holeCol, overRims); }
+            if (fc.left && nL1 - nL0 > EPSB)  { F([[nL0,dy0,zT],[nL1,dy0,zT],[nL1,dy1,zT],[nL0,dy1,zT]], holeCol, overRims); }
           }
         }
         // its top, and its end where Left is not there to hide it. Grooved: the top
@@ -3259,9 +3269,21 @@
         // after the rims covers both. Nothing of an open box stands in front of a
         // surface at rim height, so OUTER - 1 (after the notches) is safe.
         //                                                    -- by Claude 11/26/2026
+        // With a tongue up into the lid the middle stands taller (dzTop): its top
+        // is then one piece, the side tongues' tops their own pieces down at dz1 (a
+        // real step - its edge line belongs there), and the raised part's +x end
+        // shows above them.                                  -- by Claude 11/26/2026
         var tx0 = t - tR, tx1 = w - t + tL;
-        var topOverRims = dvGroove && dvOpenTop && atRim && lid.type !== "OpenChamfer";
-        F([[tx0,dy0,dz1],[tx1,dy0,dz1],[tx1,dy1,dz1],[tx0,dy1,dz1]], top, topOverRims ? OUTER - 1 : dPin());
+        var topOverRims = dvGroove && atRim && gTopZ >= zT - 1e-9 && lid.type !== "OpenChamfer";
+        var topPin = function () { return topOverRims ? overRims : dPin(); };
+        if (tT > EPSB) {
+          if (tR > EPSB) { F([[tx0,dy0,dz1],[t,dy0,dz1],[t,dy1,dz1],[tx0,dy1,dz1]], top, topPin()); }
+          if (tL > EPSB) { F([[w-t,dy0,dz1],[tx1,dy0,dz1],[tx1,dy1,dz1],[w-t,dy1,dz1]], top, topPin()); }
+          F([[w-t,dy0,dz1],[w-t,dy1,dz1],[w-t,dy1,dzTop],[w-t,dy0,dzTop]], side, topPin());
+          F([[t,dy0,dzTop],[w-t,dy0,dzTop],[w-t,dy1,dzTop],[t,dy1,dzTop]], top, topPin());
+        } else {
+          F([[tx0,dy0,dz1],[tx1,dy0,dz1],[tx1,dy1,dz1],[tx0,dy1,dz1]], top, topPin());
+        }
         if (!fc.left) { F([[w-t,dy0,dz0],[w-t,dy1,dz0],[w-t,dy1,dz1],[w-t,dy0,dz1]], side, dPin()); }
         // free fingers' other camera-facing sides
         for (q = 0; q < dvLid.length && freeTop; q++) {
