@@ -29,8 +29,15 @@
        to a row. Floats and fixed widths only (IE7, Zoom Level). -- by Claude 11/26/2026 */
     /* count / Space Evenly / Top inset all inline on one field-row, vertical-align
        middle like the other field-row controls (no floats) -- by Claude 11/26/2026 */
-    .divider-count-row { margin-bottom: 10px; }
+    /* header row: joint + Space Evenly left, Count + Top inset right -- by Claude 11/26/2026 */
+    .divider-head { width: 100%; margin-bottom: 2px; border-collapse: collapse; }
+    .divider-head td { vertical-align: middle; padding: 0; }
+    .divider-head-left { text-align: left; }
+    .divider-head-right { text-align: right; }
     .field-row select#DividerCountSelect { width: 70px; }
+    .field-row select#DividerJointSelect { width: 100px; }
+    .field-row label.divider-count-label { width: 50px; }
+    .field-row input#DividerInsetField { width: 60px; }
     .field-row input.divider-even-button { width: auto; margin-left: 18px; padding: 2px 8px;
                            background-color: #dce8ff; color: #2255aa; border: 1px solid #2255aa;
                            font-family: Tahoma, Arial, sans-serif; font-size: 15px; font-weight: bold;
@@ -242,13 +249,24 @@
   <div class="section-header" id="showHideDividerSectionHeader" style="display: none;">Divider Options</div>
   <div class="card" id="showHideDividerOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed. Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Groove). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
       <div class="sub-panel clearfix">
-        <!-- One field-row, everything inline and vertical-align: middle, so the
-             button and the Top inset field sit on the dropdown's line (the floated
-             button sat higher than the dropdown).                -- by Claude 11/26/2026 -->
-        <div class="field-row divider-count-row">
-            <label for="DividerCountSelect" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Dividers</label>
+        <!-- Joint (Finger / Groove) + Space Evenly on the left, Count + Top inset on
+             the right: a two-cell table (IE7-safe), each cell one field-row with
+             everything inline and vertical-align: middle so it all sits on one line.
+             Option texts of both dropdowns are read back by Lua.  -- by Claude 11/26/2026 -->
+        <table class="divider-head" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td class="divider-head-left"><div class="field-row">
+            <label for="DividerJointSelect" title="Finger: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Groove: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">Dividers</label>
+            <select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Finger: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Groove: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">
+              <option value="Finger">Finger</option>
+              <option value="Groove">Groove</option>
+            </select>
+            <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
+            </div></td>
+            <td class="divider-head-right"><div class="field-row">
+            <label for="DividerCountSelect" class="divider-count-label" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Count</label>
             <select id="DividerCountSelect" onchange="onDividerCountChanged()" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">
               <option value="1">1</option>
               <option value="2">2</option>
@@ -261,10 +279,11 @@
               <option value="9">9</option>
               <option value="10">10</option>
             </select>
-            <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
             <label for="DividerInsetField" class="divider-inset-label" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid.">Top inset</label>
             <input type="number" class="calcfield" step="any" id="DividerInsetField" placeholder="Inset" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid." onchange="onDividerFieldChanged()"/>
-        </div>
+            </div></td>
+          </tr>
+        </table>
         <div class="divider-space-grid clearfix">
           <div class="divider-space" id="DividerSpaceRow1"><div class="field-row" title="Clear gap from Front's inside face to divider 1"><label for="DividerSpace1Field">Space 1</label><input type="number" class="calcfield" step="any" id="DividerSpace1Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
           <div class="divider-space" id="DividerSpaceRow2"><div class="field-row" title="Clear gap from divider 1 to divider 2"><label for="DividerSpace2Field">Space 2</label><input type="number" class="calcfield" step="any" id="DividerSpace2Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
@@ -2031,8 +2050,9 @@
   //                                                           -- by Claude 11/26/2026
   function isoDividerSettings(t) {
     var cb = document.getElementById("MakeDividers");
-    var D = { ys: [], key: "off", inset: 0 };
+    var D = { ys: [], key: "off", inset: 0, groove: false };
     if (!(cb && cb.checked) || !(t > 0)) { return D; }
+    D.groove = selectedValue("DividerJointSelect", "Finger") === "Groove";   // by Claude 11/26/2026
     var ins = document.getElementById("DividerInsetField");   // Top inset -- by Claude 11/26/2026
     D.inset = ins ? (parseFloat(ins.value) || 0) : 0;
     if (D.inset < 0) { D.inset = 0; }
@@ -2045,7 +2065,7 @@
       D.ys.push(y);
       y += t;
     }
-    D.key = D.ys.join(",") + "/" + D.inset;
+    D.key = D.ys.join(",") + "/" + D.inset + "/" + D.groove;
     return D;
   }
 
@@ -3152,6 +3172,12 @@
       var dvSide = isoDividerSpans(dz1 - dz0, isoNum("SideTabWidthField"), dz0);
       var dvBot = dJB ? isoDividerSpans(w - 2 * t, isoJointWidth("bottom"), t) : [];
       var dvLid = dJL ? isoDividerSpans(w - 2 * t, isoJointWidth("lid"), t) : [];
+      // Dividers: Groove - no fingers at all; the tongues sit hidden in the grooves.
+      // What does show: on an open top, the grooves in Left / Right running on up
+      // above the divider to the rim (drawn per divider below). -- by Claude 11/26/2026
+      var dvGroove = dvs.groove;
+      var dvOpenTop = (lid.type === "None" || lid.type === "OpenChamfer" || lid.type === "Grooved");
+      if (dvGroove) { dvSide = []; dvBot = []; dvLid = []; }
       // free-standing fingers (their wall / panel not there) vs. buried ones
       var lidClosed = fc.lid && lid.type === "Fingers";
       var freeTop = dJL && !lidClosed;               // Flat / Inset lids are drawn lifted clear
@@ -3179,8 +3205,58 @@
                  freeRight ? { segs: segsOf(dvSide), tip: 0, fl: 0 } : null,
                  freeLeft ? { segs: segsOf(dvSide), tip: w, fl: 0 } : null,
                  front, dPin());
-        // its top, and its end where Left is not there to hide it
-        F([[t,dy0,dz1],[w-t,dy0,dz1],[w-t,dy1,dz1],[t,dy1,dz1]], top, dPin());
+        // grooved, open top: the groove above it in Right's inside face (the one
+        // that faces the camera) and the notches it leaves in both rims. Drawn
+        // before the divider's top, which reaches into the groove in front of it.
+        // Grooved: how far the divider reaches into each groove (groove depth less
+        // the allowance, like MakeGroovedDividerFace).
+        var tongue = dvGroove ? Math.max(0, t / 2 - isoNum("AllowanceField")) : 0;
+        var tR = (dvGroove && dJRight) ? tongue : 0, tL = (dvGroove && dJLeft) ? tongue : 0;
+        var atRim = dz1 >= zT - 1e-9;   // divider as tall as the walls (no Top inset)
+        // With a Top inset the grooves stop just above the divider (allowance +
+        // a tool-radius run-on, see AddDividerSlotsToFaces in Dividers.xlua) instead
+        // of running out through the rim: only that stub shows (the allowance part -
+        // the tool size isn't known here), and no notches in the rims.
+        //                                                    -- by Claude 11/26/2026
+        var dvInsetStop = dvGroove && dvs.inset > 1e-9;
+        if (dvInsetStop && fc.right) {
+          var gStub = Math.min(dz1 + isoNum("AllowanceField"), zT);
+          if (gStub - dz1 > EPSB) { F([[t,dy0,dz1],[t,dy1,dz1],[t,dy1,gStub],[t,dy0,gStub]], holeCol, dPin()); }
+        }
+        if (dvGroove && dvOpenTop && !dvInsetStop) {
+          var gTop = (lid.type === "OpenChamfer") ? dz1 : zT;
+          var gd = t / 2;
+          if (fc.right && gTop - dz1 > EPSB) {
+            F([[t,dy0,dz1],[t,dy1,dz1],[t,dy1,gTop],[t,dy0,gTop]], holeCol, dPin());
+          }
+          if (lid.type !== "OpenChamfer") {
+            // On top of the rims: nothing of the box stands over a rim, and with a
+            // sliding lid the rims themselves are redrawn at OUTER - 1 (over the
+            // lid), so the notches go there too, added after them. A divider as
+            // tall as the walls fills the groove up to the rim, so then only the gap
+            // beyond its tongue shows dark and the tongue's own top is laid over
+            // the notch at rim level - drawn as the full notch it painted right over
+            // the tongue and the divider looked as if it stopped short of the wall.
+            //                                                -- by Claude 11/26/2026
+            var nR0 = t - gd, nR1 = atRim ? t - tR : t;
+            var nL0 = atRim ? w - t + tL : w - t, nL1 = w - t + gd;
+            if (fc.right && nR1 - nR0 > EPSB) { F([[nR0,dy0,zT],[nR1,dy0,zT],[nR1,dy1,zT],[nR0,dy1,zT]], holeCol, OUTER - 1); }
+            if (fc.left && nL1 - nL0 > EPSB)  { F([[nL0,dy0,zT],[nL1,dy0,zT],[nL1,dy1,zT],[nL0,dy1,zT]], holeCol, OUTER - 1); }
+          }
+        }
+        // its top, and its end where Left is not there to hide it. Grooved: the top
+        // runs on into the grooves by the tongue - below the rim that shows in
+        // Right's groove (Left's opens away from the camera).  -- by Claude 11/26/2026
+        // Level with the rims (no Top inset): the whole top, tongues and all, is
+        // laid over the rims as ONE piece. Drawn as separate tongue pieces, each got
+        // its own outline - a black line across the divider where it meets each
+        // wall - and the rims' inner edges ran across it too; one piece painted
+        // after the rims covers both. Nothing of an open box stands in front of a
+        // surface at rim height, so OUTER - 1 (after the notches) is safe.
+        //                                                    -- by Claude 11/26/2026
+        var tx0 = t - tR, tx1 = w - t + tL;
+        var topOverRims = dvGroove && dvOpenTop && atRim && lid.type !== "OpenChamfer";
+        F([[tx0,dy0,dz1],[tx1,dy0,dz1],[tx1,dy1,dz1],[tx0,dy1,dz1]], top, topOverRims ? OUTER - 1 : dPin());
         if (!fc.left) { F([[w-t,dy0,dz0],[w-t,dy1,dz0],[w-t,dy1,dz1],[w-t,dy0,dz1]], side, dPin()); }
         // free fingers' other camera-facing sides
         for (q = 0; q < dvLid.length && freeTop; q++) {
@@ -3609,6 +3685,14 @@
   function onZoomLevelChanged(select) {
     var val = select.options[select.selectedIndex].value;
     document.body.style.zoom = (val === "Auto") ? dpiToZoom() : val;
+    // The isometric view has to be redrawn for the new zoom: VCarve's IE7 doesn't
+    // zoom what was drawn into it (see isoZoomFix), so the old drawing stays at
+    // its old size. Forget the last key so it can't be skipped, and redraw once
+    // the page has laid itself out at the new zoom.          -- by Claude 11/26/2026
+    if (g_iso && g_iso.started) {
+      g_iso.key = "";
+      setTimeout(function () { g_iso.key = ""; isoUpdate(); }, 30);
+    }
   }
 
   // Lua updates imported settings through HTML_Dialog's Update* methods. Watch

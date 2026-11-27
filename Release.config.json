@@ -5,6 +5,7 @@
     "AppendVersionToFileNames": true,
     "FilesToRelease": [
         "CreateFaces.xlua",
+        "Dividers.xlua",
         "Helpers.xlua",
         "Dovetails.xlua",
         "SheetArrangement.xlua",

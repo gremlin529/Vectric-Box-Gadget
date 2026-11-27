@@ -64,7 +64,6 @@ G_lidLayerName = "Lid Panel"                    -- Grooved lid thinner than the 
 G_lidCutoutLayerName = "CutOut Lid"
 G_flipOutlineLayerName = "Front Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
 G_flipSheetName = "Front Groove (flipped)"
-G_dividerSlotLayerName = "Divider Slots"        -- tool paths for the through slots the divider fingers go into -- by Claude 11/26/2026
 G_doveTailAngleDegrees = 60
 
 local libraryModule
@@ -83,12 +82,9 @@ local documentOptionFields = {
   "lidGripOverhang", "lidGripWidth", "lidGripRadius", "end1Height", "end2Height",
   "end1ChamferAngle", "end2ChamferAngle", "label_faces", "no_toolpath",
   "create_dogbones", "useSingleSheet", "roundover_cut_depth",
-  "create_tabs_for_missing_faces",
-  "makeDividers", "dividerCount", "dividerInset"   -- dividers, plus dividerSpace1..N added below -- by Claude 11/26/2026
+  "create_tabs_for_missing_faces"
+  -- the divider options are appended in main(), once Dividers.xlua is loaded -- by Claude 11/26/2026
 }
-for k = 1, 10 do   -- 10 = G_maxDividers (CreateFaces.xlua isn't loaded yet here) -- by Claude 11/26/2026
-  documentOptionFields[#documentOptionFields + 1] = "dividerSpace" .. k
-end
 
 local documentEnumFields = {}
 
@@ -141,7 +137,13 @@ function main(script_path)
   libraryModule = assert(loadfile(script_path .. "\\Dovetails.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\SheetArrangement.xlua"))(libraryModule)
   libraryModule = assert(loadfile(script_path .. "\\CreateFaces.xlua"))(libraryModule)
+  libraryModule = assert(loadfile(script_path .. "\\Dividers.xlua"))(libraryModule)   -- after CreateFaces, before DisplayDialog -- by Claude 11/26/2026
   libraryModule = assert(loadfile(script_path .. "\\DisplayDialog.xlua"))(libraryModule)
+
+  -- the divider options are saved with the document too -- by Claude 11/26/2026
+  for _, name in ipairs(DividerDocumentFieldNames()) do
+    documentOptionFields[#documentOptionFields + 1] = name
+  end
 
   -- FaceJointType is provided by the loaded gadget modules, so build mappings
   -- that reference it only after those modules have initialized.
@@ -157,7 +159,8 @@ function main(script_path)
     lidGripShape = { Square = 1, Rounded = 2, Arc = 3 },
     partLayout = { Auto = 1, Normal = 2, Rotated = 3 },
     ZoomLevel = { Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
-      ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 }
+      ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 },
+    dividerJoint = DividerJointCodes   -- Dividers.xlua -- by Claude 11/26/2026
   }
 
   local job = VectricJob()
@@ -265,15 +268,7 @@ function main(script_path)
   options.facesToMake.end2 = true                  --- end 2 checkbox default      
   options.create_tabs_for_missing_faces = true  --- create tabs for missing faces (if false then dont create the tabs on edges for faces not selected)
 
-  -- Dividers across the width, finger jointed into Left/Right (and bottom/lid), see
-  -- the Dividers section in CreateFaces.xlua. dividerSpace<k> = clear gap in front of
-  -- divider k; 0 = not set yet (filled with an even spacing below).  -- by Claude 11/26/2026
-  options.makeDividers = false
-  options.dividerCount = 1
-  options.dividerInset = 0   -- "Top inset": dividers this much shorter at the top, no fingers into the lid -- by Claude 11/26/2026
-  for k = 1, G_maxDividers do
-    options["dividerSpace" .. k] = 0
-  end
+  InitDividerOptions(options)   -- dividers across the width, see Dividers.xlua -- by Claude 11/26/2026
 
 -----------------------------------------------------------------------------------------------------------------------------------------
 
@@ -346,29 +341,12 @@ function main(script_path)
     options.end2Height = Truncate(options.end2Height * multiplier, 2)
     -- end1ChamferAngle/end2ChamferAngle are in degrees, not a length, so they
     -- don't get rescaled when switching between inches and mm.  -- by Claude 9/20/2026
-    for k = 1, G_maxDividers do   -- by Claude 11/26/2026
-      options["dividerSpace" .. k] = Truncate((options["dividerSpace" .. k] or 0) * multiplier, 2)
-    end
-    options.dividerInset = Truncate((options.dividerInset or 0) * multiplier, 2)
+    ConvertDividerUnits(options, multiplier)   -- Dividers.xlua -- by Claude 11/26/2026
     options.InMM = job.InMM
   end
 
-  -- Dividers: if the saved spacing doesn't fit this box (or nothing was saved yet),
-  -- start from an even spacing.                              -- by Claude 11/26/2026
-  do
-    local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
-    options.dividerCount = n
-    local spacing_ok = true
-    local used = options.thickness
-    for k = 1, n do
-      local space = options["dividerSpace" .. k] or 0
-      if space <= 0 then spacing_ok = false end
-      used = used + space + options.thickness
-    end
-    if not spacing_ok or used >= options.depth - options.thickness then
-      SetEvenDividerSpaces(options)
-    end
-  end
+  -- Dividers: an even spacing if the saved one doesn't fit this box -- by Claude 11/26/2026
+  ResolveDividerSpacing(options)
 
   -- Bottom Thickness defaults to the material thickness: when nothing has been saved yet (0)
   -- or the saved value is thicker than the current material, use the material thickness.
@@ -569,15 +547,9 @@ function CreateBoxFaces(options, sideDoveTail, bottomDoveTail, lidDoveTail, comp
     faces[#faces + 1] = lid
   end
 
-  -- Dividers: slots in the walls/bottom/lid they joint into, then the dividers
-  -- themselves (see the Dividers section in CreateFaces.xlua).  -- by Claude 11/26/2026
-  local divider_count = DividerCount(options)
-  if divider_count > 0 then
-    AddDividerSlotsToFaces(faces, options, computedFacesToMake)
-    for k = 1, divider_count do
-      faces[#faces + 1] = MakeDividerFace(options, computedFacesToMake, k)
-    end
-  end
+  -- Dividers: slots / grooves in the walls, bottom and lid they joint into, then
+  -- the dividers themselves (Dividers.xlua).                -- by Claude 11/26/2026
+  AddDividersToFaces(faces, options, computedFacesToMake)
 
   return faces
 end -- CreateBoxFaces
@@ -927,37 +899,9 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, panelLayerName, panelCutoutLayerName)
       local lid_cutout_objects = AddProfileAndCutoutVectors(lid_faces, G_lidLayerName, G_lidCutoutLayerName)
 
-      -- Divider slots: the slot outlines go on the Box layer with the parts, their
-      -- tool paths (dogboned like the cutout) on their own layer for the "Divider
-      -- Slots" toolpath below. Only full-thickness parts ever carry slots - a
-      -- separate (Grooved) bottom/lid panel never joints into a divider.  -- by Claude 11/26/2026
-      local slot_objects = nil
-      do
-        local slot_outlines = CadObjectList(true)
-        local slot_paths = CadObjectList(true)
-        local slot_count = 0
-        local slot_dogbones = options.create_dogbones or options.dovetailJoint
-        for i = 1, #main_faces do
-          local slots = main_faces[i].slot_contours
-          if slots ~= nil then
-            local pos = slots:GetHeadPosition()
-            while pos ~= nil do
-              local slot
-              slot, pos = slots:GetNext(pos)
-              slot_outlines:AddTail(CreateCadContour(slot))
-              local path = DividerSlotToolPath(slot, offset_radius, slot_dogbones)
-              if path ~= nil then
-                slot_paths:AddTail(CreateCadContour(path))
-                slot_count = slot_count + 1
-              end
-            end
-          end
-        end
-        if slot_count > 0 then
-          AddCadListToJob(job, slot_outlines, G_boxLayerName)
-          slot_objects = AddCadListToJob(job, slot_paths, G_dividerSlotLayerName)
-        end
-      end
+      -- Divider slots (Finger dividers): outlines on the Box layer, tool paths on
+      -- their own layer for the "Divider Slots" toolpath below (Dividers.xlua). -- by Claude 11/26/2026
+      local slot_objects = AddDividerSlotVectors(job, options, main_faces, offset_radius, G_boxLayerName)
 
       -- End 1 flip helper: outline only as a placement reference, no cutout
       if #flip_faces > 0 then
@@ -1020,6 +964,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
         CreateLidGroovePocketToolpath(job, options, sheet_faces, options.tool, "Lid Groove")
         CreateLidRabbetToolpath(job, options, sheet_faces, options.tool, "Lid Rabbet")
         CreateLidFingerHoleToolpath(job, options, sheet_faces, options.tool, "Lid Finger Hole")  -- by Claude 10/26/2026
+        CreateDividerGrooveToolpath(job, options, sheet_faces, options.tool, "Divider Grooves")  -- Dividers: Groove -- by Claude 11/26/2026
 
         if options.dovetailJoint and fluting_objects ~= nil then
           if SelectExactObjects(job, fluting_objects) then
@@ -1028,17 +973,8 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
           end
         end
 
-        -- Divider slots, cut right through before the parts are cut free -- by Claude 11/26/2026
-        if slot_objects ~= nil then
-          CreateCutoutToolpath(
-            options.tool,
-            job,
-            options.thickness,
-            options.sideOrAllTabWidth,
-            G_dividerSlotLayerName,
-            slot_objects,
-            "Divider Slots")
-        end
+        -- Divider slots, cut right through before the parts are cut free (Dividers.xlua) -- by Claude 11/26/2026
+        CreateDividerSlotToolpath(job, options, slot_objects)
 
         if cutout_objects ~= nil then
           CreateCutoutToolpath(
