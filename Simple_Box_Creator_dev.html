@@ -123,8 +123,23 @@
       <!-- Live isometric view of the box (Width / Depth / Height as entered). Drawn
            with VML in VCarve's IE7 dialog, with canvas in other browsers; the
            picture stays as the fallback if neither works. -- by Claude 10/31/2026 -->
-      <div id="BoxIsoView" style="position: relative; width: 780px; height: 300px; display: none;"></div>
-      <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
+      <!-- Size of the job material the parts are cut from, in its own column at the
+           right of the ISO view, right-justified. Normal flow (a float, not absolute)
+           so the dialog's zoom scales it in IE7. Floated right BEFORE the ISO column
+           so IE7 puts the two side by side. Filled by updateMaterialInfo(). Restored
+           from bce66ac, which never got merged into this branch. -- by Claude 11/27/2026 -->
+      <div id="MaterialInfo" class="material-info">
+        <div class="material-info-title">Material</div>
+        <table class="material-info-table" cellspacing="0" cellpadding="0">
+          <tr><td class="material-info-label">Height</td><td class="material-info-value" id="MaterialInfoHeight">-</td></tr>
+          <tr><td class="material-info-label">Width</td><td class="material-info-value" id="MaterialInfoWidth">-</td></tr>
+          <tr><td class="material-info-label">Thickness</td><td class="material-info-value" id="MaterialInfoThickness">-</td></tr>
+        </table>
+      </div>
+      <div class="iso-column">
+        <div id="BoxIsoView" style="position: relative; width: 660px; height: 300px; margin: 0 auto; display: none;"></div>
+        <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
+      </div>
     </div>
   </div>
 
@@ -1778,7 +1793,7 @@
   // canvas and no SVG but does have VML, so VML is used there; any other
   // browser gets canvas. If neither works the old picture stays.
   // Plain ES3, no textContent.                               -- by Claude 10/31/2026
-  var g_iso = { mode: "", key: "", W: 780, H: 300 };
+  var g_iso = { mode: "", key: "", W: 660, H: 300 };   // W was 780; narrowed for the material column (keep in step with #BoxIsoView's width) -- by Claude 11/27/2026
 
   // setupOnly: just pick VML / canvas and swap the view box in for the picture
   // (startup phase 1, before the dialog is shown); the first drawing and the poll
@@ -1821,6 +1836,33 @@
     if (!g_iso.mode || g_iso.started) { return; }
     g_iso.started = true;
     isoUpdate();
+  }
+
+  // Material size in the column at the right of the ISO view (Height = job Y,
+  // Width = job X, Thickness = the thickness the box is built from), in the job's
+  // unit: mm to 2dp, inches to 3dp. Run at startup and from onIdleTick, since Lua
+  // may fill the hidden fields after load; only touches the page when the text
+  // changes. Restored from bce66ac.                          -- by Claude 11/27/2026
+  var g_materialInfoKey = "";
+  function updateMaterialInfo() {
+    var inMMRaw = calcHiddenNumber("MaterialInMM");
+    var inMM = (inMMRaw !== null) && (inMMRaw >= 0.5);
+    var unit = inMM ? " mm" : " in";
+    var dp = inMM ? 2 : 3;
+    var fmt = function (id) {
+      var v = calcHiddenNumber(id);
+      return (v !== null && v > 0) ? v.toFixed(dp) + unit : "-";
+    };
+    var h = fmt("MaterialHeight"), w = fmt("MaterialWidth"), t = fmt("MaterialThickness");
+    var key = h + "|" + w + "|" + t;
+    if (key === g_materialInfoKey) { return; }
+    g_materialInfoKey = key;
+    var hEl = document.getElementById("MaterialInfoHeight");
+    var wEl = document.getElementById("MaterialInfoWidth");
+    var tEl = document.getElementById("MaterialInfoThickness");
+    if (hEl) { hEl.innerHTML = h; }
+    if (wEl) { wEl.innerHTML = w; }
+    if (tEl) { tEl.innerHTML = t; }
   }
 
   function isoNum(id) {
@@ -3787,6 +3829,7 @@
     pollInvalidFieldFlags();
     updateLidTabLabels();
     updateDividerInfo();
+    updateMaterialInfo();   // material size by the ISO view -- by Claude 11/27/2026
     // (no preview poll: every change that alters the picture redraws it through
     // scheduleUiRefresh, and isoStart no longer polls either)
   }
@@ -3833,6 +3876,7 @@
       showLidTab("Groove");
       updateDividerSection();   // Divider Options open if Dividers is ticked -- by Claude 11/26/2026
       isoInit(true);            // view box in place of the picture, drawn in phase 2
+      updateMaterialInfo();     // material size by the ISO view -- by Claude 11/27/2026
 
       var allWidths = document.getElementById("AllJointWidths");
       if (allWidths) { onShowAllWidthsChanged(allWidths); }

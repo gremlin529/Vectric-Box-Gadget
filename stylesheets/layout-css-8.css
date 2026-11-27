@@ -61,22 +61,71 @@ body {
 }
 
 /* ── Header banner ────────────────────────────────────────────────── */
+/* Fixed pixel widths so the header's left column (External Box Dimensions,
+   Joint Type) is exactly as wide as the 300px Geometry Options column below and
+   ends where it does: the card's 1px border + 299px. Card inner width 1178px:
+   text 299 + 14 right padding = 313; image 1 border + 20 padding + 844 = 865.
+   Restored from bce66ac (never merged into this branch). -- by Claude 11/27/2026 */
 .header-image {
   float: left;
-  width: 66%;
+  width: 844px;
   background-color: #f2f4f8;
   border-left: 1px solid #d0d4de;   /* ISO view now sits on the right -- by Claude 11/3/2026 */
   padding: 10px;
   text-align: center;
 }
 .header-image img {
-  max-width: 780px;
+  max-width: 660px;
   height: auto;
+}
+
+/* ISO view on the left, the material size column on the right, both floats in
+   normal flow so the dialog's zoom scales them in IE7. The ISO column takes all
+   the room left of the material column (844 - 170 = 674) and the 660px view is
+   centred in it, so it sits centred between the panel's left edge and the
+   material text.                                          -- by Claude 11/27/2026 */
+.iso-column {
+  float: left;
+  width: 674px;
+  text-align: center;
+}
+.material-info {
+  float: right;
+  width: 170px;
+  margin-top: 100px;   /* roughly centred on the 300px-high ISO view */
+  text-align: right;
+  font-size: 16px;
+  color: #374151;
+}
+.material-info-title {
+  font-size: 15px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #2255aa;
+  margin-bottom: 4px;
+}
+.material-info-table {
+  border-collapse: collapse;
+  margin-left: auto;   /* right-justify the table in the column */
+}
+.material-info-table td {
+  padding: 2px 0;
+  text-align: right;
+  white-space: nowrap;
+  line-height: 20px;
+}
+.material-info-table td.material-info-label {
+  padding-right: 8px;
+  color: #6b7280;
+}
+.material-info-value {
+  font-weight: bold;
 }
 .header-text {
   float: left;
-  width: 27%;
-  padding: 10px 20px;
+  width: 299px;
+  padding: 10px 14px 10px 0;
 }
 .header-text p {
   font-size: 18px;
@@ -546,6 +595,9 @@ body.dark-mode .header-image {
   background-color: #2a2f3b;
   border-left-color: #383d4a;
 }
+body.dark-mode .material-info { color: #d0d6e4; }                          /* by Claude 11/27/2026 */
+body.dark-mode .material-info-title { color: #6ea0e0; }
+body.dark-mode .material-info-table td.material-info-label { color: #8a92a8; }
 body.dark-mode .header-text p {
   color: #8a92a8;
 }
