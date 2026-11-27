@@ -16,8 +16,10 @@ local unit_x = Vector2D(1,0)
 local unit_y = Vector2D(0,1)
 
 FaceType.Divider = 5   -- divider across the width
-G_maxDividers = 10     -- most dividers the dialog offers (DividerCountSelect / DividerSpace<n>Field)
+G_maxDividers = 50     -- most dividers the dialog takes (DividerCountField / DividerSpace<n>Field) - was 10 -- by Claude 11/27/2026
 G_dividerSlotLayerName = "Divider Slots"   -- tool paths for the through slots the divider fingers go into
+G_dividerLayerName = "Divider Panel"         -- dividers on sheets of their own: their outlines -- by Claude 11/27/2026
+G_dividerCutoutLayerName = "CutOut Dividers" -- ... and their cutout vectors
 DividerJointCodes = { Finger = 1, Groove = 2 }   -- options.dividerJoint as a number (document variables, Export)
 
 -- LineTo that skips a (near) zero length span.
@@ -32,7 +34,9 @@ end
 |
 |  dividerSpace<k> = clear gap in front of divider k; 0 = not set yet (filled with
 |  an even spacing by ResolveDividerSpacing). dividerInset = "Top inset".
-|  dividerJoint = "Finger" or "Groove".
+|  dividerJoint = "Finger" or "Groove". dividerThickness = the dividers' own
+|  thickness (0 = the material thickness); another thickness than the material
+|  puts them on sheets of their own (DividersOnSeparateSheets). -- by Claude 11/27/2026
 |
 ]]
 function InitDividerOptions(options)
@@ -40,14 +44,37 @@ function InitDividerOptions(options)
   options.dividerCount = 1
   options.dividerInset = 0
   options.dividerJoint = "Finger"
+  options.dividerThickness = 0
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = 0
   end
 end
 
+-- The dividers' own thickness: the Thickness field, or the material thickness.
+function DividerThickness(options)
+  local td = tonumber(options.dividerThickness) or 0
+  if td > 0.0001 then
+    return td
+  end
+  return options.thickness
+end
+
+-- Not the material thickness: cut from other stock.
+function DividerThicknessDiffers(options)
+  return math.abs(DividerThickness(options) - options.thickness) > 0.0001
+end
+
+-- Dividers of another thickness than the material are cut from other stock, so
+-- they go on sheets of their own (several may share one, but no box parts). At
+-- the material thickness they are laid out with the box parts. (The "Dividers on
+-- separate sheet" checkbox this replaced was dropped 11/27/2026.)  -- by Claude 11/27/2026
+function DividersOnSeparateSheets(options)
+  return DividerCount(options) > 0 and DividerThicknessDiffers(options)
+end
+
 -- Every numeric divider option (document variables, Export).
 function DividerDocumentFieldNames()
-  local names = { "makeDividers", "dividerCount", "dividerInset" }
+  local names = { "makeDividers", "dividerCount", "dividerInset", "dividerThickness" }
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
   end
@@ -56,7 +83,7 @@ end
 
 -- The divider options that are lengths (rescaled between inches and mm).
 function DividerLengthFieldNames()
-  local names = { "dividerInset" }
+  local names = { "dividerInset", "dividerThickness" }
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
   end
@@ -71,17 +98,22 @@ function ConvertDividerUnits(options, multiplier)
   end
 end
 
--- If the saved spacing doesn't fit this box (or nothing was saved yet), start
--- from an even spacing.
+-- Before the dialog opens: the Thickness starts at the material thickness unless
+-- dividers are in use with a thickness of their own; and if the saved spacing
+-- doesn't fit this box (or nothing was saved yet), start from an even spacing.
 function ResolveDividerSpacing(options)
+  if not options.makeDividers or (tonumber(options.dividerThickness) or 0) <= 0.0001 then
+    options.dividerThickness = options.thickness
+  end
   local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
   options.dividerCount = n
+  local td = DividerThickness(options)
   local spacing_ok = true
   local used = options.thickness
   for k = 1, n do
     local space = options["dividerSpace" .. k] or 0
     if space <= 0 then spacing_ok = false end
-    used = used + space + options.thickness
+    used = used + space + td
   end
   if not spacing_ok or used >= options.depth - options.thickness then
     SetEvenDividerSpaces(options)
@@ -91,21 +123,70 @@ end
 --[[  -------------- Dialog side --------------------------------------------------
 |
 |  The fields live in Simple_Box_Creator_dev.html (Faces To Machine: MakeDividers;
-|  Divider Options: DividerJointSelect, DividerCountSelect, DividerInsetField,
-|  DividerSpace<k>Field; hidden: InvalidDividers, InvalidDividerInset,
-|  InvalidDividerSpace<k>). Option texts of the dropdowns are read back as-is.
-|
+|  Divider Options: DividerJointSelect, DividerCountField, DividerInsetField,
+|  DividerThicknessField, and the 50 DividerSpace<k>Field boxes - written by a
+|  script as the page loads). The Space boxes are NOT registered with Lua one by
+|  one: all of their values travel as ONE hidden text field, DividerSpacesList
+|  ("s1,s2,...,s50"), that the page keeps up to date - one read per live check
+|  instead of 50. Their messages come back the same way, InvalidDividerSpaces
+|  ("k:message|k:message"). Other hidden fields: InvalidDividers,
+|  InvalidDividerInset, InvalidDividerCount, InvalidDividerThickness. The joint
+|  dropdown's texts are read back.                           -- by Claude 11/27/2026
 ]]
+
+-- The count box holds a whole number: an integer field where the host has one.
+local function AddCountField(dialog, id, value)
+  if dialog.AddIntegerField ~= nil then
+    dialog:AddIntegerField(id, value)
+  else
+    dialog:AddDoubleField(id, value)
+  end
+end
+
+local function GetCountField(dialog, id)
+  if dialog.GetIntegerField ~= nil then
+    return dialog:GetIntegerField(id)
+  end
+  return dialog:GetDoubleField(id)
+end
+
+local function UpdateCountField(dialog, id, value)
+  if dialog.UpdateIntegerField ~= nil then
+    dialog:UpdateIntegerField(id, value)
+  else
+    dialog:UpdateDoubleField(id, value)
+  end
+end
+
+local function ClampDividerCount(value)
+  return math.max(1, math.min(math.floor((tonumber(value) or 1) + 0.5), G_maxDividers))
+end
+
+-- All G_maxDividers spaces as "s1,s2,..." for DividerSpacesList; `get(k)` gives
+-- space k. %.6f with the trailing zeros trimmed, so it reads back exactly what
+-- the boxes show.
+local function DividerSpacesText(get)
+  local parts = {}
+  for k = 1, G_maxDividers do
+    local s = string.format("%.6f", tonumber(get(k)) or 0)
+    s = string.gsub(s, "0+$", "")
+    s = string.gsub(s, "%.$", "")
+    parts[k] = s
+  end
+  return table.concat(parts, ",")
+end
+
 function AddDividerDialogFields(dialog, options)
   dialog:AddCheckBox("MakeDividers", options.makeDividers)
-  dialog:AddDropDownList("DividerCountSelect", tostring(math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))))
-  for k = 1, G_maxDividers do
-    dialog:AddDoubleField("DividerSpace" .. k .. "Field", options["dividerSpace" .. k] or 0)
-    dialog:AddTextField("InvalidDividerSpace" .. k, "")
-  end
+  AddCountField(dialog, "DividerCountField", ClampDividerCount(options.dividerCount))
+  dialog:AddTextField("DividerSpacesList", DividerSpacesText(function(k) return options["dividerSpace" .. k] end))
+  dialog:AddTextField("InvalidDividerSpaces", "")
   dialog:AddTextField("InvalidDividers", "")
+  dialog:AddTextField("InvalidDividerCount", "")
   dialog:AddDoubleField("DividerInsetField", options.dividerInset or 0)
   dialog:AddTextField("InvalidDividerInset", "")
+  dialog:AddDoubleField("DividerThicknessField", DividerThickness(options))
+  dialog:AddTextField("InvalidDividerThickness", "")
   -- the dropdown says Fingers / Grooved; options.dividerJoint (and what is saved)
   -- stays "Finger" / "Groove", so earlier settings still load -- by Claude 11/26/2026
   dialog:AddDropDownList("DividerJointSelect", options.dividerJoint == "Groove" and "Grooved" or "Fingers")
@@ -113,12 +194,19 @@ end
 
 function ReadDividerOptionsFromDialog(dialog, options)
   options.makeDividers = dialog:GetCheckBox("MakeDividers")
-  options.dividerCount = tonumber(dialog:GetDropDownListValue("DividerCountSelect")) or 1
+  options.dividerCountEntered = GetCountField(dialog, "DividerCountField")   -- as typed, for ValidateDividers
+  options.dividerCount = ClampDividerCount(options.dividerCountEntered)
   options.dividerInset = dialog:GetDoubleField("DividerInsetField") or 0
+  options.dividerThickness = dialog:GetDoubleField("DividerThicknessField") or 0
   local joint = dialog:GetDropDownListValue("DividerJointSelect")
   options.dividerJoint = (joint == "Grooved" or joint == "Groove") and "Groove" or "Finger"
-  for k = 1, G_maxDividers do
-    options["dividerSpace" .. k] = dialog:GetDoubleField("DividerSpace" .. k .. "Field") or 0
+  -- every space in one read: "s1,s2,...". A missing or unreadable entry counts as
+  -- 0 (not filled in), which ValidateDividers flags for the spaces in use.
+  local k = 0
+  for item in string.gmatch((dialog:GetTextField("DividerSpacesList") or "") .. ",", "([^,]*),") do
+    k = k + 1
+    if k > G_maxDividers then break end
+    options["dividerSpace" .. k] = tonumber(item) or 0
   end
 end
 
@@ -126,6 +214,7 @@ function SaveDividerRegistry(registry, options)
   registry:SetBool("MakeDividers", options.makeDividers)
   registry:SetDouble("DividerCount", options.dividerCount or 1)
   registry:SetDouble("DividerInset", options.dividerInset or 0)
+  registry:SetDouble("DividerThickness", options.dividerThickness or 0)
   registry:SetString("DividerJoint", options.dividerJoint == "Groove" and "Groove" or "Finger")
   for k = 1, G_maxDividers do
     registry:SetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
@@ -136,6 +225,7 @@ function LoadDividerRegistry(registry, options)
   options.makeDividers = registry:GetBool("MakeDividers", options.makeDividers)
   options.dividerCount = registry:GetDouble("DividerCount", options.dividerCount)
   options.dividerInset = registry:GetDouble("DividerInset", options.dividerInset or 0)
+  options.dividerThickness = registry:GetDouble("DividerThickness", options.dividerThickness or 0)
   options.dividerJoint = (registry:GetString("DividerJoint", options.dividerJoint or "Finger") == "Groove") and "Groove" or "Finger"
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = registry:GetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
@@ -143,17 +233,23 @@ function LoadDividerRegistry(registry, options)
 end
 
 -- Import (OnLuaButton_ImportSettings): put the imported divider values into the
--- dialog. `values` holds the file's numbers, already converted to the job's units.
-function ImportDividerSettings(dialog, values)
-  for k = 1, G_maxDividers do
+-- dialog. `values` holds the file's numbers, already converted to the job's units;
+-- `options` the current settings, which keep any space the file doesn't have
+-- (an older file with fewer spaces). The page copies DividerSpacesList into the
+-- Space boxes when it sees the import token change.
+function ImportDividerSettings(dialog, values, options)
+  dialog:UpdateTextField("DividerSpacesList", DividerSpacesText(function(k)
     local v = values["dividerSpace" .. k]
-    if v ~= nil then dialog:UpdateDoubleField("DividerSpace" .. k .. "Field", v) end
-  end
+    if v == nil and options then v = options["dividerSpace" .. k] end
+    return v
+  end))
   if values.dividerInset ~= nil then dialog:UpdateDoubleField("DividerInsetField", values.dividerInset) end
+  if values.dividerThickness ~= nil and values.dividerThickness > 0 then
+    dialog:UpdateDoubleField("DividerThicknessField", values.dividerThickness)
+  end
   if values.makeDividers ~= nil then dialog:UpdateCheckBox("MakeDividers", values.makeDividers ~= 0) end
   if values.dividerCount ~= nil then
-    local count = math.max(1, math.min(math.floor(values.dividerCount + 0.5), G_maxDividers))
-    dialog:UpdateDropDownListValue("DividerCountSelect", tostring(count))
+    UpdateCountField(dialog, "DividerCountField", ClampDividerCount(values.dividerCount))
   end
   if values.dividerJoint ~= nil then
     dialog:UpdateDropDownListValue("DividerJointSelect", values.dividerJoint == DividerJointCodes.Groove and "Grooved" or "Fingers")
@@ -162,27 +258,42 @@ end
 
 --[[  -------------- ValidateDividers --------------------------------------------------
 |
-|  Every space in use must be more than 0, and the dividers must still fit in the
-|  inside depth with room to spare behind the last one. Top inset: 0 or more, and
-|  not all of the divider. Finger: enough height for a side finger, and a tool
-|  that fits the slots (one material thickness wide). Groove: the allowance must
-|  leave a tongue, and the tool must fit the grooves.
+|  Count: a whole number from 1 to G_maxDividers. Thickness: more than 0. Every
+|  space in use must be more than 0, and the dividers (at their own thickness) must
+|  still fit in the inside depth with room to spare behind the last one. Top inset:
+|  0 or more, and not all of the divider. Finger: enough height for a side finger,
+|  and a tool that fits the slots (one divider thickness wide). Groove: the
+|  allowance must leave a tongue, and the tool must fit the grooves.
 |
-|  Space problems go to InvalidDividerSpace<k> (red field), the inset's to
-|  InvalidDividerInset, the rest to InvalidDividers (shown in red under the
-|  spacing fields). report_as_dialog as for the other validators in
-|  DisplayDialog.xlua; set_text writes a hidden field (DisplayDialog's cached
-|  SetDialogText), decimals is the number of places in the messages.
+|  Space problems go to InvalidDividerSpaces as "k:message|k:message" (the page
+|  marks those Space fields red), count / inset / thickness to their own
+|  Invalid... field, the rest to InvalidDividers (shown in red under the spacing
+|  fields). report_as_dialog as for the other validators in DisplayDialog.xlua;
+|  set_text writes a hidden field (DisplayDialog's cached SetDialogText), decimals
+|  is the number of places in the messages.                 -- updated by Claude 11/27/2026
 |
 ]]
 function ValidateDividers(dialog, options, report_as_dialog, effective_diameter, set_text, decimals)
   local messages = {}
   local general = ""
   local inset_message = ""
+  local count_message = ""
+  local thickness_message = ""
   local n = DividerCount(options)
   local fmt = "%." .. (decimals or 3) .. "f"
 
+  if options.makeDividers then
+    local entered = tonumber(options.dividerCountEntered or options.dividerCount)
+    if entered == nil or entered < 1 or entered > G_maxDividers or math.abs(entered - math.floor(entered + 0.5)) > 0.0001 then
+      count_message = string.format("The number of dividers must be a whole number from 1 to %d.", G_maxDividers)
+    end
+    if (tonumber(options.dividerThickness) or 0) <= 0.0001 then
+      thickness_message = "The divider thickness must be greater than 0."
+    end
+  end
+
   if n > 0 then
+    local td = DividerThickness(options)
     local inset = options.dividerInset or 0
     if inset < 0 then
       inset_message = "Top inset must be 0 or more."
@@ -208,7 +319,7 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
     if last <= 0.0001 then
       local inside = options.depth - 2*options.thickness
       local used = inside - last
-      messages[n] = messages[n] or string.format("The dividers don't fit: the spaces plus %d divider(s) of " .. fmt .. " come to " .. fmt .. ", but the inside depth is only " .. fmt .. ".", n, options.thickness, used, inside)
+      messages[n] = messages[n] or string.format("The dividers don't fit: the spaces plus %d divider(s) of " .. fmt .. " come to " .. fmt .. ", but the inside depth is only " .. fmt .. ".", n, td, used, inside)
       general = messages[n]
     end
 
@@ -223,19 +334,25 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
       if allowance >= DividerGrooveDepth(options) - 0.0001 then
         general = string.format("The allowance " .. fmt .. " leaves the dividers no tongue to sit in their grooves (" .. fmt .. " deep). Use a smaller allowance.", allowance, DividerGrooveDepth(options))
       elseif not options.no_toolpath and raw_dia > 0 and raw_dia >= gw - 0.0001 then
-        general = string.format("The divider grooves are only " .. fmt .. " wide (material thickness + allowance), the tool (" .. fmt .. ") does not fit in them. Use a smaller tool.", gw, raw_dia)
+        general = string.format("The divider grooves are only " .. fmt .. " wide (divider thickness + allowance), the tool (" .. fmt .. ") does not fit in them. Use a smaller tool.", gw, raw_dia)
       end
     end
     if not grooves and general == "" and inset_message == "" and (j.side1 or j.side2) and divider_height <= (fw.side or 0) + 0.0001 then
       general = string.format("The dividers are only " .. fmt .. " tall inside the box - too short for a side joint of " .. fmt .. ". Use a smaller side joint width or a taller box.", divider_height, fw.side or 0)
     end
     if not grooves and general == "" and not options.no_toolpath and effective_diameter
-        and effective_diameter > 0 and options.thickness <= effective_diameter + 0.0001 then
-      general = string.format("The divider slots are only " .. fmt .. " wide (the material thickness), the tool does not fit in them (" .. fmt .. "). Use a smaller tool.", options.thickness, effective_diameter)
+        and effective_diameter > 0 and td <= effective_diameter + 0.0001 then
+      general = string.format("The divider slots are only " .. fmt .. " wide (the divider thickness), the tool does not fit in them (" .. fmt .. "). Use a smaller tool.", td, effective_diameter)
     end
   end
 
   if report_as_dialog then
+    for _, m in ipairs({ count_message, thickness_message }) do
+      if m ~= "" then
+        DisplayMessageBox(m)
+        return false
+      end
+    end
     for k = 1, n do
       if messages[k] then
         DisplayMessageBox(messages[k])
@@ -253,12 +370,18 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
     return true
   end
 
-  for k = 1, G_maxDividers do
-    set_text(dialog, "InvalidDividerSpace" .. k, messages[k] or "")
+  local list = {}
+  for k = 1, n do
+    if messages[k] then
+      list[#list + 1] = k .. ":" .. string.gsub(messages[k], "[|]", "/")
+    end
   end
+  set_text(dialog, "InvalidDividerSpaces", table.concat(list, "|"))
   set_text(dialog, "InvalidDividers", general)
   set_text(dialog, "InvalidDividerInset", inset_message)
-  return general == "" and inset_message == "" and next(messages) == nil
+  set_text(dialog, "InvalidDividerCount", count_message)
+  set_text(dialog, "InvalidDividerThickness", thickness_message)
+  return general == "" and inset_message == "" and count_message == "" and thickness_message == "" and next(messages) == nil
 end
 
 --[[  -------------- Building the box --------------------------------------------------
@@ -279,6 +402,37 @@ function AddDividersToFaces(faces, options, facesToMake)
   for k = 1, n do
     faces[#faces + 1] = MakeDividerFace(options, facesToMake, k)
   end
+end
+
+-- LayoutFacesOnSheets / CreateBoxToolpaths: with DividersOnSeparateSheets the
+-- dividers come out of the list of faces laid out with the box parts and get
+-- sheets of their own (several dividers may share one). Returns the remaining
+-- faces and the dividers; with them on the box's sheets, all faces and {}.
+--                                                             -- by Claude 11/27/2026
+function SplitOffDividerFaces(faces, options)
+  if not DividersOnSeparateSheets(options) then
+    return faces, {}
+  end
+  local rest, dividers = {}, {}
+  for i = 1, #faces do
+    if faces[i].facetype == FaceType.Divider then
+      dividers[#dividers + 1] = faces[i]
+    else
+      rest[#rest + 1] = faces[i]
+    end
+  end
+  return rest, dividers
+end
+
+-- Name of the dividers' (first) sheet. In brackets, so SheetNameForIndex numbers
+-- any more as "-2", "-3" instead of counting up the thickness at the end.
+function DividerSheetName(options)
+  return string.format("Dividers (%g)", DividerThickness(options))
+end
+
+-- Cutout depth / name for the dividers on their own sheets: their own thickness.
+function DividerCutoutName(options)
+  return string.format("Cut Out Dividers (%g)", DividerThickness(options))
 end
 
 -- TransformFace: the slot / groove contours a face carries move with it.
@@ -382,15 +536,17 @@ function DividerCount(options)
   return math.max(0, math.min(n, G_maxDividers))
 end
 
--- y_box of each divider's front face.
+-- y_box of each divider's front face. The walls are the material thickness (t),
+-- each divider its own thickness (td).                -- td: by Claude 11/27/2026
 function DividerPositions(options)
   local t = options.thickness
+  local td = DividerThickness(options)
   local positions = {}
   local y = t
   for k = 1, DividerCount(options) do
     y = y + (options["dividerSpace" .. k] or 0)
     positions[k] = y
-    y = y + t
+    y = y + td
   end
   return positions
 end
@@ -401,7 +557,7 @@ function DividerLastSpace(options)
   local n = DividerCount(options)
   local behind = t
   if n > 0 then
-    behind = DividerPositions(options)[n] + t
+    behind = DividerPositions(options)[n] + DividerThickness(options)
   end
   return (options.depth - t) - behind
 end
@@ -410,8 +566,9 @@ end
 -- when nothing usable has been saved yet.
 function SetEvenDividerSpaces(options)
   local t = options.thickness
+  local td = DividerThickness(options)
   local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
-  local even = ((options.depth - 2*t) - n*t) / (n + 1)
+  local even = ((options.depth - 2*t) - n*td) / (n + 1)
   even = math.max(0, Truncate(even, 3))
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = even
@@ -566,8 +723,10 @@ function DividerGrooveDepth(options)
   return 0.5*options.thickness
 end
 
+-- the divider's own thickness + the allowance (the depth stays half the WALL
+-- thickness, see DividerGrooveDepth)                  -- td: by Claude 11/27/2026
 function DividerGrooveWidth(options)
-  return options.thickness + math.max(0, options.allowance or 0)
+  return DividerThickness(options) + math.max(0, options.allowance or 0)
 end
 
 -- how far the divider's tongues reach into the grooves
@@ -707,7 +866,8 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
   if n == 0 then
     return
   end
-  local t = options.thickness
+  local t = options.thickness            -- the walls / bottom / lid
+  local td = DividerThickness(options)   -- the dividers: slot / groove width across the depth -- by Claude 11/27/2026
   local sp = options.start_point
   local positions = DividerPositions(options)
   local j = DividerJoints(options, facesToMake)
@@ -722,7 +882,7 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
   -- same faces and the same coordinates as the slots below.  -- by Claude 11/26/2026
   if DividerUsesGrooves(options) then
     local gw = DividerGrooveWidth(options)
-    local half_play = 0.5*(gw - t)            -- the groove is centred on the divider
+    local half_play = 0.5*(gw - td)           -- the groove is centred on the divider
     local run = DividerGrooveRunOn(options)
     local function AddGroove(face, xa, ya, xb, yb)
       if face.divider_groove_contours == nil then
@@ -758,7 +918,7 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
           for k = 1, n do
             local xa = sp.x + positions[k] - half_play
             if not is_side1 then
-              xa = sp.x + options.depth - positions[k] - t - half_play
+              xa = sp.x + options.depth - positions[k] - td - half_play
             end
             AddGroove(face, xa, ya, xa + gw, yb)
           end
@@ -770,7 +930,7 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
         end
       elseif (face.facetype == FaceType.Lid and j.lid) then
         for k = 1, n do
-          local ya = sp.y + options.depth - positions[k] - t - half_play
+          local ya = sp.y + options.depth - positions[k] - td - half_play
           AddGroove(face, sp.x + t - run, ya, sp.x + options.width - t + run, ya + gw)
         end
       end
@@ -799,12 +959,12 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
         for k = 1, n do
           local xa = sp.x + positions[k]
           if not is_side1 then
-            xa = sp.x + options.depth - positions[k] - t
+            xa = sp.x + options.depth - positions[k] - td
           end
           for s = 1, #side_spans do
             local ya = sp.y + t + (j.z_bot + side_spans[s][1] - wall_bottom)
             local yb = sp.y + t + (j.z_bot + side_spans[s][2] - wall_bottom)
-            AddSlot(face, xa, ya, xa + t, yb)
+            AddSlot(face, xa, ya, xa + td, yb)
           end
         end
       end
@@ -812,14 +972,14 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
       for k = 1, n do
         local ya = sp.y + positions[k]
         for s = 1, #bottom_spans do
-          AddSlot(face, sp.x + t + bottom_spans[s][1], ya, sp.x + t + bottom_spans[s][2], ya + t)
+          AddSlot(face, sp.x + t + bottom_spans[s][1], ya, sp.x + t + bottom_spans[s][2], ya + td)
         end
       end
     elseif (face.facetype == FaceType.Lid and j.lid) then
       for k = 1, n do
-        local ya = sp.y + options.depth - positions[k] - t
+        local ya = sp.y + options.depth - positions[k] - td
         for s = 1, #lid_spans do
-          AddSlot(face, sp.x + t + lid_spans[s][1], ya, sp.x + t + lid_spans[s][2], ya + t)
+          AddSlot(face, sp.x + t + lid_spans[s][1], ya, sp.x + t + lid_spans[s][2], ya + td)
         end
       end
     end

@@ -33,19 +33,34 @@
     /* not full width: Count / Top inset follow Space Evenly closely instead of
        being pushed to the far right -- by Claude 11/26/2026 */
     .divider-head { margin-bottom: 2px; border-collapse: collapse; }
-    .divider-head td { vertical-align: middle; padding: 0; text-align: left; }
-    .divider-head td.divider-head-right { padding-left: 14px; }   /* td. so it beats the padding: 0 above */
-    .divider-head .field-row input.divider-even-button { margin-left: 12px; }
-    .field-row select#DividerCountSelect { width: 70px; }
-    .field-row select#DividerJointSelect { width: 100px; }
-    .field-row label.divider-count-label { width: 50px; }
-    .field-row input#DividerInsetField { width: 60px; }
-    .field-row input.divider-even-button { width: auto; margin-left: 18px; padding: 2px 8px;
+    /* nowrap on the cells too: everything on this row stays on one line -- by Claude 11/27/2026 */
+    .divider-head td { vertical-align: middle; padding: 0; text-align: left; white-space: nowrap; }
+    .divider-head td.divider-head-right { padding-left: 10px; }   /* td. so it beats the padding: 0 above */
+    .divider-head .field-row input.divider-even-button { margin-left: 10px; }
+    /* Tahoma and no padding, like the Lid / Bottom Type dropdowns whose text sits
+       centred: an IE7 dropdown doesn't take the page's font (it used the system font
+       at 15px, sitting low in the box), and padding on its native control throws the
+       text off. Still 100px, lined up with the Space boxes.  -- by Claude 11/27/2026 */
+    .field-row select#DividerJointSelect { width: 100px; padding: 0; font-family: Tahoma, Arial, sans-serif; font-size: 15px; }
+    /* The section's labels: 80px instead of the usual 100px, so the boxes sit about
+       20% closer to them; the Dividers dropdown and the Space boxes keep lining up as
+       both use it. Count / Top inset / Thickness: tight labels that can't wrap, small
+       boxes (Count only needs two digits) and small gaps, so the whole row fits on
+       one line even with IE7 adding every box's padding and borders on top of its
+       width (~700px of the ~820px there is). The boxes' 10px margin-left comes from
+       .field-row input.                     -- by Claude 11/27/2026, tightened 11/27/2026 */
+    .field-row label.divider-label { width: 80px; }
+    .field-row label.divider-count-label { width: 44px; white-space: nowrap; }
+    .field-row label.divider-inset-label { margin-left: 12px; width: 72px; white-space: nowrap; }
+    .field-row label.divider-thickness-label { margin-left: 12px; width: 76px; white-space: nowrap; }
+    .field-row input.divider-small-field { width: 58px; }   /* room for 0.125 / 12.75 */
+    .field-row input#DividerCountField { width: 36px; }
+    .field-row input.divider-even-button { width: auto; margin-left: 18px; padding: 2px 6px;
                            background-color: #dce8ff; color: #2255aa; border: 1px solid #2255aa;
-                           font-family: Tahoma, Arial, sans-serif; font-size: 15px; font-weight: bold;
+                           font-family: Tahoma, Arial, sans-serif; font-size: 14px; font-weight: bold;
                            cursor: pointer; overflow: visible; vertical-align: middle; }
-    .field-row label.divider-inset-label { margin-left: 24px; width: 80px; }
-    .divider-space { float: left; width: 262px; }
+    /* four across: 80 label + 10 gap + 100 box = 190, +15 between (was 240, three across) -- by Claude 11/27/2026 */
+    .divider-space { float: left; width: 205px; }
     /* Space boxes exactly as wide as the Dividers dropdown above them (100px
        overall). IE7 ignores box-sizing and adds the padding and borders on top -
        see the IE7-only rule in the conditional comment below. -- by Claude 11/26/2026 */
@@ -82,7 +97,10 @@
     <div class="header-text">
       <p class="release-link-row"><a class="release-link" href="https://github.com/gremlin529/Vectric-Box-Gadget/releases" target="_blank">Simple Box Creator</a></p>
       <!-- Box dimensions moved here from Geometry Options to tighten the dialog -- by Claude 11/3/2026 -->
-      <div class="section-header" style="margin-top: 6px;">External Box Dimensions</div>
+      <!-- Blue bar the full width, the box under it inset (header-section-body) - the
+           same look as Geometry Options below. Same for Joint Type. -- by Claude 11/27/2026 -->
+      <div class="section-header">External Box Dimensions</div><!-- gap above now part of the title row -- by Claude 11/27/2026 -->
+      <div class="header-section-body">
       <div class="sub-panel">
         <div class="field-row" title="Side to side width of the box outside">
           <label for="WidthField">Width</label>
@@ -97,10 +115,12 @@
           <input type="number" class="calcfield" step="any" id="HeightField" placeholder="Height of Box" oninput="onSideOverhangFieldsChanged()" onchange="onGeometryFieldChanged()"/>
         </div>
       </div>
+      </div>
       <!-- Joint type moved up here under the box dimensions (Lid / Bottom type
            live in the right column) -- by Claude 11/3/2026 -->
-      <div class="type-panel" style="margin-top: 10px;">
-        <div class="type-panel-header">Joint Type</div>
+      <div class="section-header">Joint Type</div>
+      <div class="header-section-body">
+      <div class="sub-panel header-joint-panel">
         <div class="type-option clearfix">
           <div class="type-option-radio">
             <label><input type="radio" class="LuaButton" name="TabTypeRadio" id="TabTypeRadio1" onclick="onJointTypeChanged()" />Box</label>
@@ -117,6 +137,7 @@
             <img src="Images/dovetails.png" alt="Dovetail joint preview" />
           </div>
         </div>
+      </div>
       </div>
     </div>
     <div class="header-image">
@@ -137,7 +158,11 @@
         </table>
       </div>
       <div class="iso-column">
-        <div id="BoxIsoView" style="position: relative; width: 660px; height: 300px; margin: 0 auto; display: none;"></div>
+        <!-- The view fills the whole ISO column (674px), so the drawing - which
+             centres itself in the view's own width - comes out centred left to right
+             between the panel's left edge and the material text, without relying on
+             IE7 to centre a narrower view with auto margins. -- by Claude 11/27/2026 -->
+        <div id="BoxIsoView" style="position: relative; width: 674px; height: 300px; display: none;"></div>
         <img id="BoxDimImage" src="Images/boxdim.png" alt="Box dimensions diagram" />
       </div>
     </div>
@@ -280,53 +305,53 @@
     <div class="card-body clearfix">
       <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Grooved). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
       <div class="sub-panel clearfix">
-        <!-- Joint (Finger / Groove) + Space Evenly on the left, Count + Top inset on
-             the right: a two-cell table (IE7-safe), each cell one field-row with
+        <!-- Joint (Fingers / Grooved) + Space Evenly, then Count, Top inset and
+             Thickness: a two-cell table (IE7-safe), each cell one field-row with
              everything inline and vertical-align: middle so it all sits on one line.
-             Option texts of both dropdowns are read back by Lua.  -- by Claude 11/26/2026 -->
+             The joint dropdown's option texts are read back by Lua. Labels in this
+             section are narrower than elsewhere (divider-label), so the boxes sit
+             closer to them while the Dividers dropdown and the Space boxes still line
+             up.                                       -- by Claude 11/26/2026, 11/27/2026 -->
         <table class="divider-head" cellpadding="0" cellspacing="0" border="0">
           <tr>
             <!-- No whitespace between the label and the dropdown (the comment
                  swallows the line break): a space there pushed the dropdown a few
                  pixels right of the Space boxes below, whose labels butt straight
                  up against them.                         -- by Claude 11/26/2026 -->
-            <td class="divider-head-left"><div class="field-row"><label for="DividerJointSelect" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">Dividers</label><!--
-            --><select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - material thickness + allowance wide, half the thickness deep - with a tongue on each edge to fit them.">
+            <td class="divider-head-left"><div class="field-row"><label for="DividerJointSelect" class="divider-label" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - divider thickness + allowance wide, half the wall thickness deep - with a tongue on each edge to fit them.">Dividers</label><!--
+            --><select id="DividerJointSelect" onchange="onDividerFieldChanged()" title="Fingers: through fingers into Left / Right (and the bottom / lid where those are Fingers, Flat or Inset). Grooved: the dividers sit in grooves milled into the inside faces instead - divider thickness + allowance wide, half the wall thickness deep - with a tongue on each edge to fit them.">
               <option value="Fingers">Fingers</option>
               <option value="Grooved">Grooved</option>
             </select>
             <input type="button" id="DividerSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every space to the same size, so the compartments are all equal" onclick="dividerSpaceEvenly()" />
             </div></td>
-            <td class="divider-head-right"><div class="field-row">
-            <label for="DividerCountSelect" class="divider-count-label" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Count</label>
-            <select id="DividerCountSelect" onchange="onDividerCountChanged()" title="How many dividers to make. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
-              <option value="4">4</option>
-              <option value="5">5</option>
-              <option value="6">6</option>
-              <option value="7">7</option>
-              <option value="8">8</option>
-              <option value="9">9</option>
-              <option value="10">10</option>
-            </select>
-            <label for="DividerInsetField" class="divider-inset-label" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid.">Top inset</label>
-            <input type="number" class="calcfield" step="any" id="DividerInsetField" placeholder="Inset" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid." onchange="onDividerFieldChanged()"/>
+            <td class="divider-head-right"><div class="field-row"><!--
+            --><label for="DividerCountField" class="divider-count-label" title="How many dividers to make, 1 to 50. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven.">Count</label><!--
+            --><input type="text" id="DividerCountField" class="divider-small-field" maxlength="2" title="How many dividers to make, 1 to 50. Changing this spaces them evenly - adjust the spaces afterwards if you want them uneven." onchange="onDividerCountChanged()"/><!--
+            --><label for="DividerInsetField" class="divider-inset-label" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid.">Top inset</label><!--
+            --><input type="number" class="calcfield divider-small-field" step="any" id="DividerInsetField" placeholder="Inset" title="0 = the dividers run right to the top (and finger into the lid where there is one). More than 0 = they stop this much lower than that - below the top of the walls on an open box, below the underside of the lid otherwise - and no longer finger into the lid." onchange="onDividerFieldChanged()"/><!--
+            --><label for="DividerThicknessField" class="divider-thickness-label" title="Thickness of the dividers - set to the material thickness when Dividers is ticked. Another thickness means they are cut from other stock: they always go on sheets of their own (with their own cutout depth), and their slots / grooves are made for this thickness (grooves + the allowance).">Thickness</label><!--
+            --><input type="number" class="calcfield divider-small-field" step="any" id="DividerThicknessField" placeholder="Thickness" title="Thickness of the dividers - set to the material thickness when Dividers is ticked. Another thickness means they are cut from other stock: they always go on sheets of their own (with their own cutout depth), and their slots / grooves are made for this thickness (grooves + the allowance)." onkeyup="updateDividerInfo()" onchange="onDividerThicknessChanged()"/>
             </div></td>
           </tr>
         </table>
+        <!-- One Space box per divider, up to 50 (G_maxDividers in Dividers.xlua), written
+             here while the page loads so they are ordinary fields by the time VCarve
+             fills them in - rather than 50 rows written out by hand. Only the first
+             Count of them are shown.                         -- by Claude 11/27/2026 -->
         <div class="divider-space-grid clearfix">
-          <div class="divider-space" id="DividerSpaceRow1"><div class="field-row" title="Clear gap from Front's inside face to divider 1"><label for="DividerSpace1Field">Space 1</label><input type="number" class="calcfield" step="any" id="DividerSpace1Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow2"><div class="field-row" title="Clear gap from divider 1 to divider 2"><label for="DividerSpace2Field">Space 2</label><input type="number" class="calcfield" step="any" id="DividerSpace2Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow3"><div class="field-row" title="Clear gap from divider 2 to divider 3"><label for="DividerSpace3Field">Space 3</label><input type="number" class="calcfield" step="any" id="DividerSpace3Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow4"><div class="field-row" title="Clear gap from divider 3 to divider 4"><label for="DividerSpace4Field">Space 4</label><input type="number" class="calcfield" step="any" id="DividerSpace4Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow5"><div class="field-row" title="Clear gap from divider 4 to divider 5"><label for="DividerSpace5Field">Space 5</label><input type="number" class="calcfield" step="any" id="DividerSpace5Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow6"><div class="field-row" title="Clear gap from divider 5 to divider 6"><label for="DividerSpace6Field">Space 6</label><input type="number" class="calcfield" step="any" id="DividerSpace6Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow7"><div class="field-row" title="Clear gap from divider 6 to divider 7"><label for="DividerSpace7Field">Space 7</label><input type="number" class="calcfield" step="any" id="DividerSpace7Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow8"><div class="field-row" title="Clear gap from divider 7 to divider 8"><label for="DividerSpace8Field">Space 8</label><input type="number" class="calcfield" step="any" id="DividerSpace8Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow9"><div class="field-row" title="Clear gap from divider 8 to divider 9"><label for="DividerSpace9Field">Space 9</label><input type="number" class="calcfield" step="any" id="DividerSpace9Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
-          <div class="divider-space" id="DividerSpaceRow10"><div class="field-row" title="Clear gap from divider 9 to divider 10"><label for="DividerSpace10Field">Space 10</label><input type="number" class="calcfield" step="any" id="DividerSpace10Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>
+          <script type="text/javascript">
+            (function () {
+              var html = [], k, tip;
+              for (k = 1; k <= 50; k++) {
+                tip = (k === 1) ? "Clear gap from Front's inside face to divider 1" : ("Clear gap from divider " + (k - 1) + " to divider " + k);
+                html.push('<div class="divider-space" id="DividerSpaceRow' + k + '"' + (k > 1 ? ' style="display: none;"' : '') + '>' +
+                  '<div class="field-row" title="' + tip + '"><label for="DividerSpace' + k + 'Field" class="divider-label">Space ' + k + '</label>' +
+                  '<input type="number" class="calcfield" step="any" id="DividerSpace' + k + 'Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>');
+              }
+              document.write(html.join(""));
+            })();
+          </script>
         </div>
         <div class="divider-info" id="DividerInfoText"></div>
       </div>
@@ -736,16 +761,13 @@
     <!-- Dividers: per-space errors, plus one for the rest (shown under the spaces) -- by Claude 11/26/2026 -->
     <input type="text" id="InvalidDividers" value=""/>
     <input type="text" id="InvalidDividerInset" value=""/>
-    <input type="text" id="InvalidDividerSpace1" value=""/>
-    <input type="text" id="InvalidDividerSpace2" value=""/>
-    <input type="text" id="InvalidDividerSpace3" value=""/>
-    <input type="text" id="InvalidDividerSpace4" value=""/>
-    <input type="text" id="InvalidDividerSpace5" value=""/>
-    <input type="text" id="InvalidDividerSpace6" value=""/>
-    <input type="text" id="InvalidDividerSpace7" value=""/>
-    <input type="text" id="InvalidDividerSpace8" value=""/>
-    <input type="text" id="InvalidDividerSpace9" value=""/>
-    <input type="text" id="InvalidDividerSpace10" value=""/>
+    <!-- every Space field's message as "k:message|k:message" (one field instead of 50), plus count / thickness -- by Claude 11/27/2026 -->
+    <input type="text" id="InvalidDividerSpaces" value=""/>
+    <!-- all 50 Space boxes' values as "s1,s2,...", the one field Lua reads them from
+         (syncDividerSpacesList / fillDividerSpacesFromList) -- by Claude 11/27/2026 -->
+    <input type="text" id="DividerSpacesList" value=""/>
+    <input type="text" id="InvalidDividerCount" value=""/>
+    <input type="text" id="InvalidDividerThickness" value=""/>
     <!-- Material size, filled by Lua when the dialog opens. These feed the -->
     <!-- field calculator's W/X, H/Y and T/Z variables, and MaterialInMM tells -->
     <!-- it which unit ' (feet) and " (inches) have to land in. -->
@@ -1137,24 +1159,31 @@
   // "Dividers" under Faces To Machine opens Divider Options above Lid Type: a
   // count, one Space field per divider (clear gap in front of it) and a live
   // reading of what is left behind the last one. Lua does the real checks
-  // (ValidateDividers) and writes InvalidDividers / InvalidDividerSpace<k>.
+  // (ValidateDividers) and writes InvalidDividers / InvalidDividerSpaces / ...
   // ES3 and innerHTML only (IE7).                            -- by Claude 11/26/2026
-  var MAX_DIVIDERS = 10;
+  var MAX_DIVIDERS = 50;   // = G_maxDividers in Dividers.xlua (was 10) -- by Claude 11/27/2026
 
+  // The Count box, as a whole number from 1 to MAX_DIVIDERS (Lua flags anything
+  // else typed in red, see InvalidDividerCount).               -- by Claude 11/27/2026
   function dividerCount() {
-    var n = parseInt(selectedValue("DividerCountSelect", "1"), 10);
+    var el = document.getElementById("DividerCountField");
+    var n = el ? parseInt(el.value, 10) : 1;
     if (!isFinite(n) || n < 1) { n = 1; }
     return Math.min(n, MAX_DIVIDERS);
   }
 
-  // Inside depth (Front inside face to Back inside face) and the material
-  // thickness, or null if either can't be read yet.
+  // Inside depth (Front inside face to Back inside face), the material thickness
+  // (t, the walls) and the dividers' own thickness (td, the Thickness field - the
+  // material thickness while it's empty), or null if they can't be read yet.
   function dividerDepthAndThickness() {
     var depthEl = document.getElementById("DepthField");
     var depth = depthEl ? parseFloat(depthEl.value) : NaN;
     var t = calcHiddenNumber("MaterialThickness");
     if (!isFinite(depth) || t === null) { return null; }
-    return { inside: depth - 2 * t, t: t };
+    var tdEl = document.getElementById("DividerThicknessField");
+    var td = tdEl ? parseFloat(tdEl.value) : NaN;
+    if (!(td > 0)) { td = t; }
+    return { inside: depth - 2 * t, t: t, td: td };
   }
 
   function updateDividerSection() {
@@ -1164,9 +1193,66 @@
     var n = dividerCount();
     for (var k = 1; k <= MAX_DIVIDERS; k++) {
       var row = document.getElementById("DividerSpaceRow" + k);
-      if (row) { row.style.display = (k <= n) ? "" : "none"; }
+      var want = (k <= n) ? "" : "none";
+      if (row && row.style.display !== want) { row.style.display = want; }
     }
     updateDividerInfo();
+  }
+
+  // The Space boxes aren't registered with Lua one by one: all 50 values travel as
+  // ONE hidden field, DividerSpacesList ("s1,s2,...,s50") - one read per live check
+  // instead of 50. Lua fills it as the dialog opens and on Import; the boxes are
+  // filled from it (fillDividerSpacesFromList) and it is rebuilt from them before
+  // anything sends the dialog to Lua (syncDividerSpacesList).  -- by Claude 11/27/2026
+  function fillDividerSpacesFromList() {
+    var src = document.getElementById("DividerSpacesList");
+    if (!src || !src.value) { return; }
+    var parts = src.value.split(","), k, el;
+    for (k = 1; k <= MAX_DIVIDERS && k <= parts.length; k++) {
+      el = document.getElementById("DividerSpace" + k + "Field");
+      if (el && el.value !== parts[k - 1]) { el.value = parts[k - 1]; }
+    }
+  }
+
+  function syncDividerSpacesList() {
+    var dst = document.getElementById("DividerSpacesList");
+    if (!dst) { return; }
+    var parts = [], k, el;
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      el = document.getElementById("DividerSpace" + k + "Field");
+      parts.push(el ? calcTrim(el.value) : "");
+    }
+    var text = parts.join(",");
+    if (dst.value !== text) { dst.value = text; }
+  }
+
+  // Lua puts every Space field's problem into one hidden field ("k:message|..."),
+  // instead of one hidden field per space: mark those fields red with their
+  // message as the tooltip, and clear the rest. Only touches a field when its
+  // state changes.                                           -- by Claude 11/27/2026
+  var g_dividerSpaceFlagsLast = null;
+  function updateDividerSpaceFlags() {
+    var src = document.getElementById("InvalidDividerSpaces");
+    var value = src ? src.value : "";
+    if (value === g_dividerSpaceFlagsLast) { return; }
+    g_dividerSpaceFlagsLast = value;
+    var msgs = {}, parts = value ? value.split("|") : [], i, k, el, cls, at;
+    for (i = 0; i < parts.length; i++) {
+      at = parts[i].indexOf(":");
+      if (at > 0) { msgs[parseInt(parts[i].substring(0, at), 10)] = parts[i].substring(at + 1); }
+    }
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      el = document.getElementById("DividerSpace" + k + "Field");
+      if (!el) { continue; }
+      cls = el.className.replace(" invalid", "").replace("invalid", "");
+      if (msgs[k]) {
+        if (el.className !== cls + " invalid") { el.className = cls + " invalid"; }
+        if (el.title !== msgs[k]) { el.title = msgs[k]; }
+      } else {
+        if (el.className !== cls) { el.className = cls; }
+        if (el.title) { el.removeAttribute("title"); }
+      }
+    }
   }
 
   function updateDividerInfo() {
@@ -1176,6 +1262,7 @@
     // updateDividerSection calls this again when it is ticked  -- by Claude 11/26/2026
     var makeDividers = document.getElementById("MakeDividers");
     if (makeDividers && !makeDividers.checked) { return; }
+    updateDividerSpaceFlags();
     var errEl = document.getElementById("InvalidDividers");
     var err = errEl ? errEl.value : "";
     var text = "";
@@ -1191,7 +1278,7 @@
         var el = document.getElementById("DividerSpace" + k + "Field");
         var s = el ? parseFloat(el.value) : NaN;
         if (!isFinite(s)) { used = NaN; break; }
-        used += s + dt.t;
+        used += s + dt.td;
       }
       if (isFinite(used)) {
         var last = dt.inside - used;
@@ -1211,28 +1298,49 @@
     var dt = dividerDepthAndThickness();
     if (!dt) { return; }
     var n = dividerCount();
-    var even = (dt.inside - n * dt.t) / (n + 1);
+    var even = (dt.inside - n * dt.td) / (n + 1);
     if (even < 0) { even = 0; }
     var text = calcFormat(Math.floor(even * 1000) / 1000);
     for (var k = 1; k <= MAX_DIVIDERS; k++) {
       var el = document.getElementById("DividerSpace" + k + "Field");
-      if (el) { el.value = text; }
+      if (el && el.value !== text) { el.value = text; }
     }
+    syncDividerSpacesList();   // what Lua reads - at once, OK may come next -- by Claude 11/27/2026
     updateDividerInfo();
     onGeometryFieldChanged();
   }
 
+  // Ticking Dividers starts the Thickness at the material thickness.  -- by Claude 11/27/2026
   function onMakeDividersChanged() {
+    var cb = document.getElementById("MakeDividers");
+    var tdEl = document.getElementById("DividerThicknessField");
+    var t = calcHiddenNumber("MaterialThickness");
+    if (cb && cb.checked && tdEl && t !== null) { tdEl.value = calcFormat(t); }
     updateDividerSection();
     onGeometryFieldChanged();
   }
 
+  // Count: a whole number, 1 to MAX_DIVIDERS - written back that way, then the
+  // shown Space rows follow and the spaces are spread evenly.  -- by Claude 11/27/2026
   function onDividerCountChanged() {
+    var el = document.getElementById("DividerCountField");
+    if (el) {
+      var n = String(dividerCount());
+      if (el.value !== n) { el.value = n; }
+    }
     updateDividerSection();
     dividerSpaceEvenly();
   }
 
+  // Thickness: the spacing reading follows it.
+  function onDividerThicknessChanged() {
+    onDividerFieldChanged();
+  }
+
+  // (also each Space box's onchange - after the calculator has computed it - so
+  // the list Lua reads is up to date before OK can be pressed) -- by Claude 11/27/2026
   function onDividerFieldChanged() {
+    syncDividerSpacesList();
     updateDividerInfo();
     onGeometryFieldChanged();
   }
@@ -1266,6 +1374,7 @@
       // field that never got a blur of its own. Only rewrites field values - fires
       // no events - so it cannot re-enter here.      -- by Claude 11/1/2026
       calcEvaluateAllFields(true);
+      syncDividerSpacesList();   // the Space boxes reach Lua as one list -- by Claude 11/27/2026
       var dimensionsChanged = document.getElementById("DimensionsChanged");
       if (dimensionsChanged) { dimensionsChanged.click(); }
       // Preview redraw + the flags Lua just wrote, after the control has painted.
@@ -1687,16 +1796,8 @@
     "InvalidLidHoleRadius":     "LidHoleRadiusField",
     "InvalidLidHoleDepth":      "LidHoleDepthField",
     "InvalidDividerInset":      "DividerInsetField",    // dividers -- by Claude 11/26/2026
-    "InvalidDividerSpace1":     "DividerSpace1Field",
-    "InvalidDividerSpace2":     "DividerSpace2Field",
-    "InvalidDividerSpace3":     "DividerSpace3Field",
-    "InvalidDividerSpace4":     "DividerSpace4Field",
-    "InvalidDividerSpace5":     "DividerSpace5Field",
-    "InvalidDividerSpace6":     "DividerSpace6Field",
-    "InvalidDividerSpace7":     "DividerSpace7Field",
-    "InvalidDividerSpace8":     "DividerSpace8Field",
-    "InvalidDividerSpace9":     "DividerSpace9Field",
-    "InvalidDividerSpace10":    "DividerSpace10Field"
+    "InvalidDividerCount":      "DividerCountField",    // the Space fields: InvalidDividerSpaces, see updateDividerSpaceFlags -- by Claude 11/27/2026
+    "InvalidDividerThickness":  "DividerThicknessField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -1793,7 +1894,7 @@
   // canvas and no SVG but does have VML, so VML is used there; any other
   // browser gets canvas. If neither works the old picture stays.
   // Plain ES3, no textContent.                               -- by Claude 10/31/2026
-  var g_iso = { mode: "", key: "", W: 660, H: 300 };   // W was 780; narrowed for the material column (keep in step with #BoxIsoView's width) -- by Claude 11/27/2026
+  var g_iso = { mode: "", key: "", W: 674, H: 300 };   // the whole ISO column next to the material column (keep in step with #BoxIsoView's width) -- by Claude 11/27/2026
 
   // setupOnly: just pick VML / canvas and swap the view box in for the picture
   // (startup phase 1, before the dialog is shown); the first drawing and the poll
@@ -2121,8 +2222,11 @@
   //                                                           -- by Claude 11/26/2026
   function isoDividerSettings(t) {
     var cb = document.getElementById("MakeDividers");
-    var D = { ys: [], key: "off", inset: 0, groove: false };
+    var D = { ys: [], key: "off", inset: 0, groove: false, td: t };
     if (!(cb && cb.checked) || !(t > 0)) { return D; }
+    var tdEl = document.getElementById("DividerThicknessField");   // the dividers' own thickness -- by Claude 11/27/2026
+    var tdv = tdEl ? parseFloat(tdEl.value) : NaN;
+    if (tdv > 0) { D.td = tdv; }
     D.groove = selectedValue("DividerJointSelect", "Fingers") === "Grooved";   // by Claude 11/26/2026
     var ins = document.getElementById("DividerInsetField");   // Top inset -- by Claude 11/26/2026
     D.inset = ins ? (parseFloat(ins.value) || 0) : 0;
@@ -2134,9 +2238,9 @@
       if (!isFinite(s) || s < 0) { s = 0; }
       y += s;
       D.ys.push(y);
-      y += t;
+      y += D.td;
     }
-    D.key = D.ys.join(",") + "/" + D.inset + "/" + D.groove;
+    D.key = D.ys.join(",") + "/" + D.inset + "/" + D.groove + "/" + D.td;
     return D;
   }
 
@@ -2206,6 +2310,40 @@
     arc(xl + r, yb + ov - r, r, Math.PI / 2, Math.PI);
     pts.push([xl, yb]);
     return pts;
+  }
+
+  // In VCarve's IE7, at any Zoom Level above 100% the drawing came out left of the
+  // view: its absolutely positioned contents are placed from the view's UNZOOMED
+  // offset on the page, while the view itself is drawn at its zoomed position - so
+  // they land short by (view's offset) x (zoom - 1). That matched the user's 175%
+  // screenshot to the pixel (offset ~442 CSS px -> ~330 device px too far left),
+  // and is nothing at 100% (both confirmed 11/27/2026). Measuring where it landed
+  // doesn't work - IE7 reports the wrapper where it thinks it is, not where it is
+  // painted - so the correction is computed: the view's offset from the page,
+  // summed up its offsetParent chain (unzoomed CSS px), times (zoom - 1), moves the
+  // wrapper right / down by exactly that. Redone on window resize too, since the
+  // page is centred in the window and the offset changes with it.
+  //                                                         -- by Claude 11/27/2026
+  function isoFixShift() {
+    var view = document.getElementById("BoxIsoView");
+    var wrap = document.getElementById("BoxIsoShift");
+    if (!view || !wrap || g_iso.mode !== "vml") { return; }
+    var z = isoZoomFix(view).vml;
+    var left = 0, top = 0, el = view;
+    while (el) {
+      left += el.offsetLeft || 0;
+      top += el.offsetTop || 0;
+      el = el.offsetParent;
+    }
+    var dx = Math.round(left * (z - 1)), dy = Math.round(top * (z - 1));
+    var sl = dx + "px", st = dy + "px";
+    if (wrap.style.left !== sl) { wrap.style.left = sl; }
+    if (wrap.style.top !== st) { wrap.style.top = st; }
+  }
+  if (window.attachEvent) {
+    window.attachEvent("onresize", isoFixShift);
+  } else if (window.addEventListener) {
+    window.addEventListener("resize", isoFixShift, false);
   }
 
   // ── Batching the VML pieces ───────────────────────────────────────────
@@ -2334,6 +2472,7 @@
     // darker as it lies in the box's shadow            -- by Claude 11/1/2026
     var floor = "#e6cfa6";
     var text = dark ? "#e3e8f2" : "#1f3b63";
+    var gapCol = "#c2410c";   // divider gap numbers: stand out on the box in either mode -- by Claude 11/27/2026
     var lidTop = "#f3e2c4";
     var lidFront = "#e3c99c";
     var lidSide = "#d2b07a";
@@ -3265,7 +3404,7 @@
 
       var dk, dy0, dy1, q, sp;
       for (dk = dvs.ys.length - 1; dk >= 0; dk--) {
-        dy0 = dvs.ys[dk]; dy1 = dy0 + t;
+        dy0 = dvs.ys[dk]; dy1 = dy0 + dvs.td;   // the dividers' own thickness -- by Claude 11/27/2026
         if (dy1 > d - t + 1e-9) { continue; }   // doesn't fit - the dialog flags it
         // Grooved: how far the divider reaches into each groove (groove depth less
         // the allowance, like MakeGroovedDividerFace) - into Right / Left, and up
@@ -3595,6 +3734,22 @@
       [ isoFmt(h), q0[0] + 6, (q0[1] + q4[1]) / 2 - 8 ]
     ];
 
+    // Divider gaps: each Space's number, over the middle of its gap at the top of
+    // the walls, so a gap in the picture can be matched to its Space field. The gap
+    // behind the last divider is what's left, so it has no number. Drawn as labels
+    // (on top, in their own colour), so they show even under a lid.
+    //                                                         -- by Claude 11/27/2026
+    if (open && dvs && dvs.ys.length) {
+      var gy0 = t;
+      for (var gk = 0; gk < dvs.ys.length; gk++) {
+        var gy1 = dvs.ys[gk];
+        if (gy1 + dvs.td > d - t + 1e-9) { break; }   // doesn't fit - not drawn
+        var gp = Q(w / 2, (gy0 + gy1) / 2, zT);
+        labels.push([ "" + (gk + 1), gp[0], gp[1] - 10, "center", "gap" ]);
+        gy0 = gy1 + dvs.td;
+      }
+    }
+
     var zf = isoZoomFix(view);
     var html = "";
     if (g_iso.mode === "vml") {
@@ -3675,11 +3830,21 @@
       var lb = labels[i];
       var align = lb[3] === "right";
       var zd = zf.div;   // zoom fix for the labels, see isoZoomFix
-      html += '<div style="position:absolute; top:' + Math.round(lb[2] * zd) + 'px; ' +
-              (align ? ('left:' + Math.round((lb[1] - 60) * zd) + 'px; width:' + Math.round(60 * zd) + 'px; text-align:right;') : ('left:' + Math.round(lb[1] * zd) + 'px;')) +
-              ' font: bold ' + Math.round(14 * zd) + 'px Tahoma, Arial, sans-serif; color:' + text + '; white-space:nowrap;">' + lb[0] + '</div>';
+      // gap numbers: centred on their point, smaller, in an accent colour -- by Claude 11/27/2026
+      var gapLabel = lb[4] === "gap";
+      var place = gapLabel
+        ? ('left:' + Math.round((lb[1] - 15) * zd) + 'px; width:' + Math.round(30 * zd) + 'px; text-align:center;')
+        : (align ? ('left:' + Math.round((lb[1] - 60) * zd) + 'px; width:' + Math.round(60 * zd) + 'px; text-align:right;') : ('left:' + Math.round(lb[1] * zd) + 'px;'));
+      html += '<div style="position:absolute; top:' + Math.round(lb[2] * zd) + 'px; ' + place +
+              ' font: bold ' + Math.round((gapLabel ? 13 : 14) * zd) + 'px Tahoma, Arial, sans-serif; color:' + (gapLabel ? gapCol : text) + '; white-space:nowrap;">' + lb[0] + '</div>';
     }
-    view.innerHTML = html;
+    // Everything goes into one wrapper the size of the drawing, so that if it lands
+    // in the wrong place the whole drawing can be moved back in one go - see
+    // isoFixShift.                                             -- by Claude 11/27/2026
+    var wrapW = (g_iso.mode === "vml") ? Math.round(g_iso.W * zf.vml) : g_iso.W;
+    var wrapH = (g_iso.mode === "vml") ? Math.round(g_iso.H * zf.vml) : g_iso.H;
+    view.innerHTML = '<div id="BoxIsoShift" style="position:absolute; left:0; top:0; width:' + wrapW + 'px; height:' + wrapH + 'px;">' + html + '</div>';
+    if (g_iso.mode === "vml") { isoFixShift(); }
 
     if (g_iso.mode === "canvas") {
       var cv = document.getElementById("BoxIsoCanvas");
@@ -3812,6 +3977,7 @@
     onSideOverhangFieldsChanged();
     updateBottomRabbetInfo();
     updateLidRabbetInfo();
+    fillDividerSpacesFromList();   // Lua put the imported spaces into the list -- by Claude 11/27/2026
     updateDividerSection();   // keep the imported spaces, don't re-space -- by Claude 11/26/2026
     if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
     if (darkMode) { onDarkModeChanged(darkMode); }
@@ -3874,6 +4040,10 @@
       onLidGripShapeChanged();
       onLidGripTypeChanged();
       showLidTab("Groove");
+      // Count as a whole number (a host without integer fields fills it as "3.000") -- by Claude 11/27/2026
+      var countField = document.getElementById("DividerCountField");
+      if (countField && countField.value !== String(dividerCount())) { countField.value = String(dividerCount()); }
+      fillDividerSpacesFromList();   // the Space boxes from the one list Lua filled -- by Claude 11/27/2026
       updateDividerSection();   // Divider Options open if Dividers is ticked -- by Claude 11/26/2026
       isoInit(true);            // view box in place of the picture, drawn in phase 2
       updateMaterialInfo();     // material size by the ISO view -- by Claude 11/27/2026

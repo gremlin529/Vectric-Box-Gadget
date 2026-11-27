@@ -73,6 +73,7 @@ body {
   border-left: 1px solid #d0d4de;   /* ISO view now sits on the right -- by Claude 11/3/2026 */
   padding: 10px;
   text-align: center;
+  min-height: 330px;   /* as tall as the left column with its inset boxes, so the grey runs to the card's bottom -- by Claude 11/27/2026 */
 }
 .header-image img {
   max-width: 660px;
@@ -125,7 +126,17 @@ body {
 .header-text {
   float: left;
   width: 299px;
-  padding: 10px 14px 10px 0;
+  padding: 0 14px 10px 0;   /* top 0: the title row is the whole space above the first bar -- by Claude 11/27/2026 */
+}
+/* Under each blue section bar in the header's left column: the box inset 10px
+   like the card padding under Geometry Options, the bar itself still running the
+   full width. Joint Type's options sit in a sub-panel with no inner padding (the
+   option rows bring their own).                            -- by Claude 11/27/2026 */
+.header-section-body {
+  padding: 10px 10px 10px 10px;
+}
+.header-joint-panel {
+  padding: 0;
 }
 .header-text p {
   font-size: 18px;
@@ -135,9 +146,16 @@ body {
 }
 /* Tight line box + no bottom margin so the gap above the External Box
    Dimensions header is set only by that header's margin-top -- by Claude 11/3/2026 */
+/* The title fills the space above the External Box Dimensions bar (same 40px as
+   the 10px padding + 24px line + 6px gap it replaced) and is centred in it both
+   ways: text-align for left/right, line-height = height for up/down (the IE7-safe
+   way). Normal flow, so it zooms with the dialog.           -- by Claude 11/27/2026 */
 .header-text p.release-link-row {
-  line-height: 1.2;
-  margin-bottom: 0;
+  height: 40px;
+  line-height: 40px;
+  margin: 0;
+  text-align: center;
+  white-space: nowrap;
 }
 .header-text a.release-link {
   font-size: 20px;

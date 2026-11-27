@@ -2289,7 +2289,7 @@ function OnLuaButton_ImportSettings(dialog)
   for name, field_id in pairs(double_fields) do
     if values[name] ~= nil then dialog:UpdateDoubleField(field_id, values[name]) end
   end
-  ImportDividerSettings(dialog, values)   -- spaces, inset, count, joint, checkbox (Dividers.xlua) -- by Claude 11/26/2026
+  ImportDividerSettings(dialog, values, G_dialogOptions)   -- spaces, inset, count, joint, checkbox, thickness (Dividers.xlua) -- by Claude 11/26/2026, 11/27/2026
 
   local checkbox_fields = {
     useAllJointWidths = "AllJointWidths", bottomFrontGrooveFlip = "BottomFrontGrooveFlip",

@@ -64,7 +64,7 @@ G_lidLayerName = "Lid Panel"                    -- Grooved lid thinner than the 
 G_lidCutoutLayerName = "CutOut Lid"
 G_flipOutlineLayerName = "Front Flip Outline"   -- Dovetail + Grooved: End 1 turned over, groove cut on its own sheet -- by Claude 10/9/2026
 G_flipSheetName = "Front Groove (flipped)"
-G_doveTailAngleDegrees = 60
+G_doveTailAngleDegrees = 80
 
 local libraryModule
 
@@ -607,6 +607,10 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
     end
     faces = main_faces
   end
+  -- Dividers on sheets of their own ("Dividers on separate sheet", or another
+  -- thickness than the material): laid out after the panels, below.  -- by Claude 11/27/2026
+  local divider_faces
+  faces, divider_faces = SplitOffDividerFaces(faces, options)
   if options.useSingleSheet then
     -- Best effort: pack everything onto the starting sheet. Pieces that don't
     -- fit are still laid out (overhanging the material) rather than opening
@@ -672,6 +676,37 @@ function LayoutFacesOnSheets(job, options, faces, converted_tool_diameter, base_
       faces[#faces + 1] = lid_faces[i]
     end
     required_sheets = lid_sheet_num
+  end
+
+  -- Dividers on sheets of their own: as many as they need ("Dividers (<thickness>)",
+  -- then "-2", "-3" ...), shared by the dividers but no box parts. With "Fit to
+  -- single sheet" they get one sheet and any that don't fit overhang it, like the
+  -- box parts.                                             -- by Claude 11/27/2026
+  if #divider_faces > 0 then
+    if #faces == 0 then
+      required_sheets = 0  -- only dividers are being made: they get the only sheets
+    end
+    local divider_sheets = 1
+    if options.useSingleSheet then
+      divider_faces = ArrangeContours(divider_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
+      for i = 1, #divider_faces do
+        divider_faces[i].sheet_number = 1
+      end
+    else
+      divider_faces, divider_sheets = ArrangeContoursToSheets(divider_faces, part_gap, job.XLength, job.YLength, clampingMargin, options.partLayout)
+    end
+    local divider_sheet_base = DividerSheetName(options)
+    for k = 1, divider_sheets do
+      if not SheetEnsureExists(job, base_sheet_id, divider_sheet_base, k) then
+        return nil
+      end
+      sheet_names[required_sheets + k] = SheetNameForIndex(divider_sheet_base, k)
+    end
+    for i = 1, #divider_faces do
+      divider_faces[i].sheet_number = required_sheets + (divider_faces[i].sheet_number or 1)
+      faces[#faces + 1] = divider_faces[i]
+    end
+    required_sheets = required_sheets + divider_sheets
   end
 
   if flip_face ~= nil then
@@ -822,6 +857,8 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
     local main_faces = {}    -- everything cut from the full material thickness
     local bottom_faces = {}  -- a Grooved bottom thinner than the material (own layers + own cutout depth)
     local lid_faces = {}     -- a Grooved lid thinner than the material (own layers + own cutout depth)
+    local divider_faces = {} -- dividers on sheets of their own (own layers + own cutout depth) -- by Claude 11/27/2026
+    local separateDividers = DividersOnSeparateSheets(options)
     local real_faces = {}    -- everything except the End 1 flip helper (labels, fluting)
     local flip_faces = {}    -- End 1 flip helper: outline for reference + groove only
     for i = 1, #faces do
@@ -839,6 +876,8 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
           bottom_faces[#bottom_faces + 1] = faces[i]
         elseif separateLid and faces[i].facetype == FaceType.Lid then
           lid_faces[#lid_faces + 1] = faces[i]
+        elseif separateDividers and faces[i].facetype == FaceType.Divider then
+          divider_faces[#divider_faces + 1] = faces[i]
         else
           main_faces[#main_faces + 1] = faces[i]
         end
@@ -898,6 +937,7 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
       local cutout_objects = AddProfileAndCutoutVectors(main_faces, G_boxLayerName, G_cutoutLayerName)
       local bottom_cutout_objects = AddProfileAndCutoutVectors(bottom_faces, panelLayerName, panelCutoutLayerName)
       local lid_cutout_objects = AddProfileAndCutoutVectors(lid_faces, G_lidLayerName, G_lidCutoutLayerName)
+      local divider_cutout_objects = AddProfileAndCutoutVectors(divider_faces, G_dividerLayerName, G_dividerCutoutLayerName)   -- by Claude 11/27/2026
 
       -- Divider slots (Finger dividers): outlines on the Box layer, tool paths on
       -- their own layer for the "Divider Slots" toolpath below (Dividers.xlua). -- by Claude 11/26/2026
@@ -1008,6 +1048,19 @@ function CreateBoxToolpaths(job, options, faces, required_sheets, computedFacesT
             G_lidCutoutLayerName,
             lid_cutout_objects,
             string.format("Cut Out Lid (%g)", options.lidThickness))
+        end
+
+        -- Dividers on sheets of their own: separate cutout, as deep as they are
+        -- thick (Dividers.xlua)                              -- by Claude 11/27/2026
+        if divider_cutout_objects ~= nil then
+          CreateCutoutToolpath(
+            options.tool,
+            job,
+            DividerThickness(options),
+            options.sideOrAllTabWidth,
+            G_dividerCutoutLayerName,
+            divider_cutout_objects,
+            DividerCutoutName(options))
         end
       end -- not options.no_toolpath
 
