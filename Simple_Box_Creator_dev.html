@@ -46,6 +46,10 @@
                            cursor: pointer; overflow: visible; vertical-align: middle; }
     .field-row label.divider-inset-label { margin-left: 24px; width: 80px; }
     .divider-space { float: left; width: 262px; }
+    /* Space boxes exactly as wide as the Dividers dropdown above them (100px
+       overall). IE7 ignores box-sizing and adds the padding and borders on top -
+       see the IE7-only rule in the conditional comment below. -- by Claude 11/26/2026 */
+    .divider-space .field-row input { width: 100px; padding-right: 0; }
     .divider-info { clear: both; font-size: 13px; min-height: 16px; }
     .divider-info-error { color: #cc3333; font-weight: bold; }
     body.dark-mode .field-row input.divider-even-button { background-color: #1a3a6b; color: #90bcf0; border-color: #3a6ab0; }
@@ -54,6 +58,14 @@
     .iso-wait { text-align: center; font-style: italic; color: #4a5a78; }   /* size set inline, scaled for the zoom */
     body.dark-mode .iso-wait { color: #9aa6c0; }
   </style>
+  <!-- IE7 only (conditional comment - every other browser skips it): IE7 ignores
+       box-sizing, so a Space box's padding (5px left, 0 right) and 2px borders come
+       on top of its width; 91px + 5 + 4 = the dropdown's 100px. -- by Claude 11/26/2026 -->
+  <!--[if lte IE 7]>
+  <style type="text/css">
+    .divider-space .field-row input { width: 91px; }
+  </style>
+  <![endif]-->
 </head>
 <!-- Hidden until the startup code has applied the Zoom Level (and dark mode), so
      the dialog never shows at 100% first and then jumps. The script right below
@@ -632,7 +644,9 @@
     <div class="footer-actions">
       <button type="button" id="ButtonOK">OK</button>
       <input type="button" id="ExportSettings" class="LuaButton" value="Export" />
-      <input type="button" id="ImportSettings" class="LuaButton" value="Import" />
+      <!-- onclick: refresh the panels as soon as Lua has imported (checkSettingsImport),
+           instead of a fast timer watching for it -- by Claude 11/26/2026 -->
+      <input type="button" id="ImportSettings" class="LuaButton" value="Import" onclick="setTimeout(checkSettingsImport, 50)" />
     </div>
     <div class="footer-options">
       <div class="footer-options-group clearfix">
@@ -751,12 +765,15 @@
   }
 
   // Applies or removes dark mode by toggling the dark-mode class on body.
+  // Only adds the class when it isn't there yet (and removes every copy): it is
+  // also called on every Import, which used to append another "dark-mode" each
+  // time - so unticking Dark mode later left the page dark - and every change to
+  // the body's class restyles the whole page in IE.          -- by Claude 11/26/2026
   function onDarkModeChanged(checkbox) {
-    if (checkbox.checked) {
-      document.body.className = document.body.className + " dark-mode";
-    } else {
-      document.body.className = document.body.className.replace(" dark-mode", "").replace("dark-mode", "");
-    }
+    var cls = (" " + document.body.className + " ").replace(/ dark-mode(?= )/g, "");
+    cls = cls.replace(/^\s+|\s+$/g, "");
+    if (checkbox.checked) { cls = cls ? cls + " dark-mode" : "dark-mode"; }
+    if (document.body.className !== cls) { document.body.className = cls; }
     applyThemedLabelColors(checkbox.checked);
   }
 
@@ -1140,6 +1157,10 @@
   function updateDividerInfo() {
     var out = document.getElementById("DividerInfoText");
     if (!out) { return; }
+    // nothing to show while Dividers is off (its section is hidden) - and
+    // updateDividerSection calls this again when it is ticked  -- by Claude 11/26/2026
+    var makeDividers = document.getElementById("MakeDividers");
+    if (makeDividers && !makeDividers.checked) { return; }
     var errEl = document.getElementById("InvalidDividers");
     var err = errEl ? errEl.value : "";
     var text = "";
@@ -1200,7 +1221,7 @@
     updateDividerInfo();
     onGeometryFieldChanged();
   }
-  setInterval(updateDividerInfo, 1000);   // picks up InvalidDividers written by Lua
+  // (picked up by onIdleTick once a second too, for InvalidDividers written by Lua)
 
   // Width/Depth/Height/joint widths/dovetail angle/allowance are plain number
   // fields with no LuaButton class, so edits don't reach Lua on their own.
@@ -1748,8 +1769,8 @@
       }
     }
   }
-  setInterval(pollInvalidFieldFlags, 1000);
-  setInterval(updateLidTabLabels, 1000);   // red tab label when a field on it is invalid -- by Claude 10/27/2026
+  // pollInvalidFieldFlags and updateLidTabLabels (red tab label when a field on it
+  // is invalid) run from onIdleTick once a second.              -- by Claude 11/26/2026
 
   // ── Live isometric box view ───────────────────────────────────────────
   // Draws the box with the Width / Depth / Height entered, to scale, with the
@@ -3658,7 +3679,7 @@
       onGeometryFieldChanged();
     }
   }
-  setInterval(pollToolNameChanged, 1000);
+  // (polled from onIdleTick, once a second)                    -- by Claude 11/26/2026
 
   // Shows or hides the Bottom and Lid joint width fields. Whether Bottom/Lid
   // share the Side field or get their own changes which fields validation
@@ -3724,8 +3745,11 @@
 
   // Lua updates imported settings through HTML_Dialog's Update* methods. Watch
   // this hidden token so the dependent panels and previews refresh afterwards.
+  // Checked straight after the Import button (see its onclick) and once a second
+  // from onIdleTick as a fallback - was a 100 ms timer running for the whole life
+  // of the dialog just for this.                              -- by Claude 11/26/2026
   var lastSettingsImportToken = "";
-  setInterval(function() {
+  function checkSettingsImport() {
     var tokenField = document.getElementById("SettingsImportToken");
     var token = tokenField ? tokenField.value : "";
     if (!token || token === lastSettingsImportToken) { return; }
@@ -3750,7 +3774,22 @@
     if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
     if (darkMode) { onDarkModeChanged(darkMode); }
     onGeometryFieldChanged();
-  }, 100);
+  }
+
+  // One timer for everything the dialog has to poll (IE7 gives no events for
+  // values Lua writes into the page, nor for the tool picker's name), instead of
+  // six separate timers each waking IE on its own. Every step only touches the
+  // page when something actually changed. Started at the end of startup.
+  //                                                         -- by Claude 11/26/2026
+  function onIdleTick() {
+    checkSettingsImport();
+    pollToolNameChanged();
+    pollInvalidFieldFlags();
+    updateLidTabLabels();
+    updateDividerInfo();
+    // (no preview poll: every change that alters the picture redraws it through
+    // scheduleUiRefresh, and isoStart no longer polls either)
+  }
 
   // On load: apply DPI zoom, then restore saved state from Lua registry.
   // Two phases so the dialog shows at its final size straight away:  -- by Claude 11/26/2026
@@ -3809,6 +3848,11 @@
     // phase 2, after the page (and the "being drawn" message) has painted - a
     // short delay rather than 0, which IE can run before it paints
     setTimeout(function () {
+      // The tool name as it is now: otherwise the first poll would take it for a
+      // change and run a second full Lua pass right after this one. -- by Claude 11/26/2026
+      var toolNameAtStart = document.getElementById("ToolNameField");
+      if (toolNameAtStart) { g_lastToolName = toolNameAtStart.innerHTML; }
+      setInterval(onIdleTick, 1000);   // the one polling timer -- by Claude 11/26/2026
       calcAttachAll();   // expressions in every numeric field -- by Claude 11/1/2026
       onGeometryFieldChanged();   // the one Lua validation pass skipped above
       isoStart();        // live isometric box view: first drawing -- by Claude 10/31/2026
