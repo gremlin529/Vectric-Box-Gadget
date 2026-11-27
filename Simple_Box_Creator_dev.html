@@ -1361,6 +1361,50 @@
   // later, after the click has landed and painted, and several triggers in a row
   // share one round trip. OK doesn't depend on it: Lua's own validator re-reads
   // the fields itself.                                       -- by Claude 11/26/2026
+  // Tabbing from a changed field to the next one left that field highlighted but
+  // deaf to the keyboard until it was clicked (user, 11/27/2026). The Lua round trip
+  // runs a moment AFTER the change, i.e. after focus has already moved on: the
+  // DimensionsChanged click hands control to VCarve, and when it comes back the
+  // page no longer has the keyboard, though IE still shows the highlight. The
+  // preview redraw that follows rebuilds part of the page as well. So both note
+  // which field had focus - and its exact caret / selection (an IE text-range
+  // bookmark, or selectionStart/End elsewhere), since the user may already be
+  // typing - and give it back afterwards: window.focus() so the page gets the
+  // keyboard again, then the field and its selection. Never blur()s anything:
+  // that would fire onchange and start another round trip.  -- by Claude 11/27/2026
+  function captureFocus() {
+    var el = null;
+    try { el = document.activeElement; } catch (e) { el = null; }
+    if (!el || !el.tagName) { return null; }
+    var tag = el.tagName.toUpperCase();
+    if (tag !== "INPUT" && tag !== "SELECT" && tag !== "TEXTAREA") { return null; }
+    var f = { el: el, bookmark: null, start: -1, end: -1 };
+    try {
+      if (document.selection && document.selection.createRange && (tag === "INPUT" || tag === "TEXTAREA")) {
+        var r = document.selection.createRange();
+        if (r && r.parentElement && r.parentElement() === el && r.getBookmark) { f.bookmark = r.getBookmark(); }
+      } else if (typeof el.selectionStart === "number") {
+        f.start = el.selectionStart; f.end = el.selectionEnd;
+      }
+    } catch (e2) { /* no selection to keep */ }
+    return f;
+  }
+
+  function restoreFocus(f) {
+    if (!f || !f.el) { return; }
+    try {
+      if (f.el.disabled || f.el.offsetWidth === 0) { return; }   // gone or hidden meanwhile
+      try { window.focus(); } catch (e0) { /* not allowed - carry on */ }
+      f.el.focus();
+      if (f.bookmark && f.el.createTextRange) {
+        var r = f.el.createTextRange();
+        if (r.moveToBookmark(f.bookmark)) { r.select(); }
+      } else if (f.start >= 0 && f.el.setSelectionRange) {
+        f.el.setSelectionRange(f.start, f.end);
+      }
+    } catch (e) { /* leave focus where it is */ }
+  }
+
   var g_luaRoundTripPending = false;
   function onGeometryFieldChanged() {
     if (g_initDeferLua) { return; }
@@ -1375,8 +1419,10 @@
       // no events - so it cannot re-enter here.      -- by Claude 11/1/2026
       calcEvaluateAllFields(true);
       syncDividerSpacesList();   // the Space boxes reach Lua as one list -- by Claude 11/27/2026
+      var keepFocus = captureFocus();   // the field Tab moved to keeps the keyboard -- by Claude 11/27/2026
       var dimensionsChanged = document.getElementById("DimensionsChanged");
       if (dimensionsChanged) { dimensionsChanged.click(); }
+      restoreFocus(keepFocus);
       // Preview redraw + the flags Lua just wrote, after the control has painted.
       scheduleUiRefresh();
     }, 40);
@@ -1393,10 +1439,12 @@
     g_uiRefreshPending = true;
     setTimeout(function () {
       g_uiRefreshPending = false;
+      var keepFocus = captureFocus();   // see captureFocus -- by Claude 11/27/2026
       if (g_iso && g_iso.mode) { isoUpdate(); }
       pollInvalidFieldFlags();
       updateLidTabLabels();
       updateDividerInfo();   // depth / spaces changed -- by Claude 11/26/2026
+      restoreFocus(keepFocus);
     }, 50);
   }
 
