@@ -70,6 +70,29 @@
     .divider-info-error { color: #cc3333; font-weight: bold; }
     body.dark-mode .field-row input.divider-even-button { background-color: #1a3a6b; color: #90bcf0; border-color: #3a6ab0; }
     body.dark-mode .divider-info-error { color: #ff7b7b; }
+    /* Divider grid: top view of the compartments, a table (IE7-safe, normal flow).
+       Column widths over the top, row depths down the left, the dividers as dark
+       strips. Built by renderDividerGrid.              -- by Claude 11/28/2026 (hardi) */
+    .dgrid-head { margin: 4px 0 2px 0; }
+    .dgrid-head label.divider-label { width: 72px; }
+    input.dgrid-count { width: 36px; }
+    table.dgrid-layout td { vertical-align: top; padding: 0; }
+    table.dgrid-layout td.dgrid-colctl { padding-left: 64px; }   /* over the grid's columns, past the row boxes */
+    table.dgrid-layout td.dgrid-rowctl { vertical-align: middle; padding-right: 8px; text-align: center; }
+    .dgrid-rowctl-item { margin: 3px 0; text-align: center; }
+    .dgrid-rowctl-item select.divider-mode-select { margin-left: 0; }
+    .dgrid-rowctl-item input.divider-even-button { margin-left: 0; }
+    label.dgrid-rowlabel { font-weight: bold; }
+    .dgrid-caption { font-size: 12px; opacity: 0.8; margin: 2px 0; }
+    table.dgrid { border-collapse: collapse; margin: 2px 0 4px 0; }
+    table.dgrid td { padding: 0; font-size: 1px; line-height: 1px; }
+    table.dgrid td.dgrid-cell { background-color: #f3ead7; }
+    table.dgrid td.dgrid-wall, table.dgrid td.dgrid-div { background-color: #8a6a3a; }
+    table.dgrid td.dgrid-lab { font-size: 12px; line-height: 14px; padding: 1px 3px; text-align: center; vertical-align: middle; white-space: nowrap; }
+    table.dgrid td.dgrid-lab input { width: 52px; padding-right: 0; font-size: 12px; }
+    table.dgrid td.dgrid-rest { font-style: italic; opacity: 0.8; }
+    body.dark-mode table.dgrid td.dgrid-cell { background-color: #3a352c; }
+    body.dark-mode table.dgrid td.dgrid-wall, body.dark-mode table.dgrid td.dgrid-div { background-color: #b08a50; }
     /* placeholder in the isometric view until its first drawing -- by Claude 11/26/2026 */
     .iso-wait { text-align: center; font-style: italic; color: #4a5a78; }   /* size set inline, scaled for the zoom */
     body.dark-mode .iso-wait { color: #9aa6c0; }
@@ -304,8 +327,14 @@
   <div class="section-header" id="showHideDividerSectionHeader" style="display: none;">Divider Options</div>
   <div class="card" id="showHideDividerOptions" style="display: none;">
     <div class="card-body clearfix">
-      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Grooved). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider.</div>
+      <div style="font-size: 13px; opacity: 0.8; margin-bottom: 8px;">Dividers run across the width, parallel to Front and Back. They are finger jointed, or set in grooves (Dividers: Grooved). Each Space is the clear gap in front of that divider, from Front's inside face or from the divider before it. Whatever is left goes behind the last divider. Rows run from Front to Back, columns from Left to Right; where dividers cross they are notched halfway and slot together.</div>
       <div class="sub-panel clearfix">
+        <!-- Across (the dividers below), Along (parallel to Left / Right, their own
+             row further down) or Both. The option texts are read back by Lua.
+             Hidden since the grid (11/28/2026): set from Rows / Columns.
+                                                        -- by Claude 11/27/2026 (hardi) -->
+        <div class="field-row" id="DividerDirectionRow" style="display: none;"><label for="DividerDirectionSelect" class="divider-label" title="Across: parallel to Front and Back (spaced from Front). Along: parallel to Left and Right (spaced from Left), jointed into Front and Back. Both: a grid - where they cross, each divider is notched halfway (across from the top, along from the bottom) so they slot together.">Direction</label><!--
+        --><select id="DividerDirectionSelect" onchange="onDividerDirectionChanged()" style="width: 100px; padding: 0; font-family: Tahoma, Arial, sans-serif; font-size: 15px;" title="Across: parallel to Front and Back (spaced from Front). Along: parallel to Left and Right (spaced from Left), jointed into Front and Back. Both: a grid - where they cross, each divider is notched halfway (across from the top, along from the bottom) so they slot together."><option value="Across">Across</option><option value="Along">Along</option><option value="Both">Both</option></select></div>
         <!-- Joint (Fingers / Grooved) + Space Evenly, then Count, Top inset and
              Thickness: a two-cell table (IE7-safe), each cell one field-row with
              everything inline and vertical-align: middle so it all sits on one line.
@@ -341,6 +370,33 @@
             </div></td>
           </tr>
         </table>
+        <!-- Divider grid: Rows (front to back) and Columns (left to right), then the
+             top view with the column widths over it and the row depths beside it.
+             Rows - 1 = the across dividers, Columns - 1 = the along ones; the
+             Count / Spacing dropdowns, minimum gap boxes and Space Evenly buttons are
+             moved in here when the page starts (initDividerGrid), the Space boxes into
+             the grid. Rows / Columns are not read by Lua: they set the hidden count
+             boxes and the Direction.                    -- by Claude 11/28/2026 (hardi) -->
+        <div class="dgrid-caption">Top view - Back at the top, Front at the bottom, Left on the left. The last row and column take what is left.</div>
+        <!-- Columns over the drawing (they go across), Rows to its left (they go up
+             it): a layout table, IE7-safe.             -- by Claude 11/28/2026 (hardi) -->
+        <table class="dgrid-layout" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td></td>
+            <td class="dgrid-colctl"><div class="field-row dgrid-head" id="DividerGridHead"><!--
+              --><label for="DividerGridColsField" class="divider-label" title="Compartments from Left to Right. 1 = no dividers along the depth.">Columns</label><span id="DividerColsCtl"></span><input type="text" id="DividerGridColsField" class="divider-small-field dgrid-count" maxlength="2" title="Compartments from Left to Right (1 to 51). 1 = no dividers along the depth. Changing this spaces them evenly." onchange="onDividerGridCountChanged('cols')"/><span id="DividerColsCtl2"></span>
+            </div></td>
+          </tr>
+          <tr>
+            <td class="dgrid-rowctl">
+              <div class="dgrid-rowctl-item"><label for="DividerGridRowsField" class="dgrid-rowlabel" title="Compartments from Front to Back. 1 = no dividers across the width.">Rows</label></div>
+              <div class="dgrid-rowctl-item" id="DividerRowsCtl"></div>
+              <div class="dgrid-rowctl-item"><input type="text" id="DividerGridRowsField" class="divider-small-field dgrid-count" maxlength="2" title="Compartments from Front to Back (1 to 51). 1 = no dividers across the width. Changing this spaces them evenly." onchange="onDividerGridCountChanged('rows')"/></div>
+              <div class="dgrid-rowctl-item" id="DividerRowsCtl2"></div>
+            </td>
+            <td class="dgrid-boxcell"><div id="DividerGridBox"></div></td>
+          </tr>
+        </table>
         <!-- One Space box per divider, up to 50 (G_maxDividers in Dividers.xlua), written
              here while the page loads so they are ordinary fields by the time VCarve
              fills them in - rather than 50 rows written out by hand. Only the first
@@ -360,6 +416,34 @@
           </script>
         </div>
         <div class="divider-info" id="DividerInfoText"></div>
+        <!-- Along dividers (Direction Along / Both): their own Count / Spacing, Space
+             Evenly and Space boxes, the same as the across ones above. Spaced from
+             Left's inside face. Floats / normal flow only (IE7 zoom). The Space
+             boxes travel to Lua as DividerAlongSpacesList.  -- by Claude 11/27/2026 (hardi) -->
+        <div id="DividerAlongBlock" style="display: none; margin-top: 8px;">
+          <div style="font-size: 13px; opacity: 0.8; margin-bottom: 4px;">Along (parallel to Left and Right): each Space is the clear gap from Left's inside face, or from the divider before it.</div>
+          <div class="field-row"><label for="DividerAlongModeSelect" class="divider-label" title="Dividers parallel to Left and Right.">Along</label><!--
+          --><select id="DividerAlongModeSelect" class="divider-mode-select" style="margin-left: 0;" onchange="onDividerAlongModeChanged()" title="Count: say how many along dividers, then set each Space (or Space Evenly). Spacing: give the smallest gap you want - as many as fit are made, all gaps equal."><option value="Count">Count</option><option value="Spacing">Spacing</option></select><!--
+          --><input type="text" id="DividerAlongCountField" class="divider-small-field" maxlength="2" title="How many along dividers to make, 1 to 50. Changing this spaces them evenly." onchange="onDividerAlongCountChanged()"/><!--
+          --><input type="number" class="calcfield divider-small-field" step="any" id="DividerAlongMinGapField" style="display: none;" placeholder="Gap" title="The smallest gap allowed between along dividers (and the walls). As many as fit are made, all gaps equal - up to 50." onchange="onDividerFieldChanged()"/><!--
+          --><input type="button" id="DividerAlongSpaceEvenly" class="divider-even-button" value="Space Evenly" title="Set every along space to the same size" onclick="dividerAlongSpaceEvenly()" />
+          </div>
+          <div class="divider-space-grid clearfix">
+            <script type="text/javascript">
+              (function () {
+                var html = [], k, tip;
+                for (k = 1; k <= 50; k++) {
+                  tip = (k === 1) ? "Clear gap from Left's inside face to along divider 1" : ("Clear gap from along divider " + (k - 1) + " to along divider " + k);
+                  html.push('<div class="divider-space" id="DividerAlongSpaceRow' + k + '"' + (k > 1 ? ' style="display: none;"' : '') + '>' +
+                    '<div class="field-row" title="' + tip + '"><label for="DividerAlongSpace' + k + 'Field" class="divider-label">Space ' + k + '</label>' +
+                    '<input type="number" class="calcfield" step="any" id="DividerAlongSpace' + k + 'Field" placeholder="Space" onkeyup="updateDividerInfo()" onchange="onDividerFieldChanged()"/></div></div>');
+                }
+                document.write(html.join(""));
+              })();
+            </script>
+          </div>
+          <div class="divider-info" id="DividerAlongInfoText"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -775,6 +859,11 @@
     <input type="text" id="InvalidDividerCount" value=""/>
     <input type="text" id="InvalidDividerThickness" value=""/>
     <input type="text" id="InvalidDividerMinGap" value=""/><!-- Spacing mode -- by Claude 11/27/2026 -->
+    <!-- along dividers: the same as the across ones above -- by Claude 11/27/2026 (hardi) -->
+    <input type="text" id="DividerAlongSpacesList" value=""/>
+    <input type="text" id="InvalidDividerAlongSpaces" value=""/>
+    <input type="text" id="InvalidDividerAlongCount" value=""/>
+    <input type="text" id="InvalidDividerAlongMinGap" value=""/>
     <!-- Material size, filled by Lua when the dialog opens. These feed the -->
     <!-- field calculator's W/X, H/Y and T/Z variables, and MaterialInMM tells -->
     <!-- it which unit ' (feet) and " (inches) have to land in. -->
@@ -1247,6 +1336,7 @@
     for (var k = 1; k <= MAX_DIVIDERS; k++) {
       show("DividerSpaceRow" + k, k <= n);
     }
+    updateDividerAlongSection();   // Direction / along dividers -- by Claude 11/27/2026 (hardi)
     updateDividerInfo();
   }
 
@@ -1261,6 +1351,7 @@
   // filled from it (fillDividerSpacesFromList) and it is rebuilt from them before
   // anything sends the dialog to Lua (syncDividerSpacesList).  -- by Claude 11/27/2026
   function fillDividerSpacesFromList() {
+    fillDividerAlongSpacesFromList();   // along dividers -- by Claude 11/27/2026 (hardi)
     var src = document.getElementById("DividerSpacesList");
     if (!src || !src.value) { return; }
     var parts = src.value.split(","), k, el;
@@ -1280,6 +1371,7 @@
     }
     var text = parts.join(",");
     if (dst.value !== text) { dst.value = text; }
+    syncDividerAlongSpacesList();   // along dividers -- by Claude 11/27/2026 (hardi)
   }
 
   // Lua puts every Space field's problem into one hidden field ("k:message|..."),
@@ -1318,6 +1410,7 @@
     // updateDividerSection calls this again when it is ticked  -- by Claude 11/26/2026
     var makeDividers = document.getElementById("MakeDividers");
     if (makeDividers && !makeDividers.checked) { return; }
+    if (dividerAlongOn()) { updateDividerAlongInfo(); }   // by Claude 11/27/2026 (hardi)
     updateDividerSpaceFlags();
     var errEl = document.getElementById("InvalidDividers");
     var err = errEl ? errEl.value : "";
@@ -1408,6 +1501,440 @@
     onGeometryFieldChanged();
   }
   // (picked up by onIdleTick once a second too, for InvalidDividers written by Lua)
+
+  // ── Along dividers (Direction Along / Both) ───────────────────────────
+  // Parallel to Left and Right, spaced along the inside width from Left's inside
+  // face, jointed into Front and Back. The same controls as the across dividers
+  // (Count / Spacing, Space Evenly, Space boxes as one list for Lua), with their
+  // own ids. Direction Along hides the across count and Space boxes; Joint, Top
+  // inset and Thickness are shared. ES3 only (IE7).       -- by Claude 11/27/2026 (hardi)
+  function dividerDirection() {
+    return selectedValue("DividerDirectionSelect", "Across");
+  }
+  function dividerAcrossOn() { return dividerDirection() !== "Along"; }
+  function dividerAlongOn() { var d = dividerDirection(); return d === "Along" || d === "Both"; }
+
+  function dividerAlongCount() {
+    var el = document.getElementById("DividerAlongCountField");
+    var n = el ? parseInt(el.value, 10) : 1;
+    if (!isFinite(n) || n < 1) { n = 1; }
+    return Math.min(n, MAX_DIVIDERS);
+  }
+
+  function dividerAlongSpacingMode() {
+    return selectedValue("DividerAlongModeSelect", "Count") === "Spacing";
+  }
+
+  // inside width, t and td - like dividerDepthAndThickness for the depth
+  function dividerWidthAndThickness() {
+    var dt = dividerDepthAndThickness();
+    var wEl = document.getElementById("WidthField");
+    var width = wEl ? parseFloat(wEl.value) : NaN;
+    if (!dt || !isFinite(width)) { return null; }
+    return { inside: width - 2 * dt.t, t: dt.t, td: dt.td };
+  }
+
+  // like dividerLayout, for the along dividers
+  function dividerAlongLayout() {
+    var dt = dividerWidthAndThickness();
+    if (!dt) { return null; }
+    var L = { n: 0, gaps: [], spacing: dividerAlongSpacingMode(), even: 0, dt: dt };
+    var k;
+    if (L.spacing) {
+      var gEl = document.getElementById("DividerAlongMinGapField");
+      var g = gEl ? parseFloat(gEl.value) : NaN;
+      if (g > 0) {
+        L.n = Math.floor((dt.inside - g) / (g + dt.td) + 0.000001);
+        if (L.n < 0) { L.n = 0; }
+        if (L.n > MAX_DIVIDERS) { L.n = MAX_DIVIDERS; }
+      }
+      L.even = (dt.inside - L.n * dt.td) / (L.n + 1);
+      for (k = 1; k <= L.n; k++) { L.gaps[k] = L.even; }
+    } else {
+      L.n = dividerAlongCount();
+      for (k = 1; k <= L.n; k++) {
+        var el = document.getElementById("DividerAlongSpace" + k + "Field");
+        var s = el ? parseFloat(el.value) : NaN;
+        L.gaps[k] = isFinite(s) ? s : NaN;
+      }
+    }
+    return L;
+  }
+
+  // Shows / hides the along row and Space boxes, and the across count / Space
+  // boxes when only along dividers are made. Called from updateDividerSection.
+  // Since the grid (11/28/2026): the Rows / Columns boxes decide which axes are on
+  // (syncDividerDirection), the Space boxes live in the grid, the old Space lists
+  // and the along block stay hidden.               -- by Claude 11/28/2026 (hardi)
+  function updateDividerAlongSection() {
+    initDividerGrid();
+    syncDividerDirection();
+    var show = function (id, visible) {
+      var el = document.getElementById(id), want = visible ? "" : "none";
+      if (el && el.style.display !== want) { el.style.display = want; }
+    };
+    var across = dividerAcrossOn(), along = dividerAlongOn();
+    var spacing = dividerSpacingMode(), aSpacing = dividerAlongSpacingMode(), k;
+    show("DividerCountField", false);
+    show("DividerAlongCountField", false);
+    show("DividerGridRowsField", !spacing);
+    show("DividerMinGapField", spacing);
+    show("DividerSpaceEvenly", across && !spacing);
+    show("DividerGridColsField", !aSpacing);
+    show("DividerAlongMinGapField", aSpacing);
+    show("DividerAlongSpaceEvenly", along && !aSpacing);
+    show("DividerInfoText", across);
+    show("DividerAlongInfoText", along);
+    show("DividerAlongBlock", false);
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      show("DividerSpaceRow" + k, false);
+      show("DividerAlongSpaceRow" + k, false);
+    }
+    renderDividerGrid();
+  }
+
+  // ── Divider grid ──────────────────────────────────────────────────────
+  // Rows (front to back) and Columns (left to right) instead of two divider
+  // counts: Rows - 1 across dividers, Columns - 1 along ones, written into the
+  // hidden count boxes Lua reads, and the hidden Direction set to match. Under
+  // them a top view of the compartments as a table (normal flow, IE7): each
+  // column's width in a box over it, each row's depth in a box to its left - the
+  // existing Space boxes, moved in - and the last row / column showing what is
+  // left. Roughly to scale; a column or row never narrower than its box.
+  //                                                     -- by Claude 11/28/2026 (hardi)
+  var MAX_GRID = 51;   // MAX_DIVIDERS + 1 compartments
+  var g_dgrid = { inited: false, sig: null, homes: {} };
+
+  function setSelectValue(id, value) {
+    var el = document.getElementById(id), i;
+    if (!el) { return; }
+    for (i = 0; i < el.options.length; i++) {
+      if (el.options[i].value === value) {
+        if (el.selectedIndex !== i) { el.selectedIndex = i; }
+        return;
+      }
+    }
+  }
+
+  function gridCount(id) {
+    var el = document.getElementById(id);
+    var n = el ? parseInt(el.value, 10) : 1;
+    if (!isFinite(n) || n < 1) { n = 1; }
+    return Math.min(n, MAX_GRID);
+  }
+
+  function setFieldText(id, text) {
+    var el = document.getElementById(id);
+    if (el && el.value !== text) { el.value = text; }
+  }
+
+  // Once, when the page starts: move the Count / Spacing dropdowns, minimum gap
+  // boxes and Space Evenly buttons next to Rows / Columns, remember where each
+  // Space box lives (it goes back there before the grid is rebuilt), and fill
+  // Rows / Columns from what Lua loaded.
+  function initDividerGrid() {
+    if (g_dgrid.inited) { return; }
+    var put = function (id, slot) {
+      var el = document.getElementById(id), s = document.getElementById(slot);
+      if (el && s) { s.appendChild(el); }
+    };
+    if (!document.getElementById("DividerGridBox")) { return; }
+    g_dgrid.inited = true;
+    put("DividerModeSelect", "DividerRowsCtl");
+    put("DividerMinGapField", "DividerRowsCtl2");
+    put("DividerSpaceEvenly", "DividerRowsCtl2");
+    put("DividerAlongModeSelect", "DividerColsCtl");
+    put("DividerAlongMinGapField", "DividerColsCtl2");
+    put("DividerAlongSpaceEvenly", "DividerColsCtl2");
+    var box = document.getElementById("DividerGridBox");
+    var info = document.getElementById("DividerAlongInfoText");
+    if (info && box && box.parentNode) { box.parentNode.insertBefore(info, box.nextSibling); }
+    var k, el;
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      el = document.getElementById("DividerSpace" + k + "Field");
+      if (el) { g_dgrid.homes[el.id] = el.parentNode; }
+      el = document.getElementById("DividerAlongSpace" + k + "Field");
+      if (el) { g_dgrid.homes[el.id] = el.parentNode; }
+    }
+    dividerGridFromLua();
+  }
+
+  // Rows / Columns from the Direction and counts Lua loaded (startup, Import)
+  function dividerGridFromLua() {
+    var dir = dividerDirection();
+    var rows = (dir !== "Along") ? (dividerSpacingMode() ? 2 : dividerCount() + 1) : 1;
+    var cols = (dir === "Along" || dir === "Both") ? (dividerAlongSpacingMode() ? 2 : dividerAlongCount() + 1) : 1;
+    setFieldText("DividerGridRowsField", String(rows));
+    setFieldText("DividerGridColsField", String(cols));
+  }
+
+  // Rows / Columns (and Spacing mode, which needs its axis on) -> the hidden
+  // counts and the Direction Lua reads. At least one of them is 2 or more.
+  function syncDividerDirection() {
+    var rows = gridCount("DividerGridRowsField"), cols = gridCount("DividerGridColsField");
+    if (dividerSpacingMode() && rows < 2) { rows = 2; }
+    if (dividerAlongSpacingMode() && cols < 2) { cols = 2; }
+    if (rows < 2 && cols < 2) { rows = 2; }
+    setFieldText("DividerGridRowsField", String(rows));
+    setFieldText("DividerGridColsField", String(cols));
+    if (rows >= 2) { setFieldText("DividerCountField", String(rows - 1)); }
+    if (cols >= 2) { setFieldText("DividerAlongCountField", String(cols - 1)); }
+    setSelectValue("DividerDirectionSelect", (rows >= 2 && cols >= 2) ? "Both" : (cols >= 2 ? "Along" : "Across"));
+  }
+
+  // Rows or Columns typed: a whole number 1..51, then spaced evenly (like
+  // changing a divider count did).
+  function onDividerGridCountChanged(which) {
+    var rowsId = "DividerGridRowsField", colsId = "DividerGridColsField";
+    var id = (which === "cols") ? colsId : rowsId;
+    var other = (which === "cols") ? rowsId : colsId;
+    var n = gridCount(id);
+    if (n < 2 && gridCount(other) < 2) { n = 2; }   // something has to divide the box
+    setFieldText(id, String(n));
+    updateDividerSection();   // -> syncDividerDirection, shown fields, grid
+    if (which === "cols") {
+      if (n >= 2) { dividerAlongSpaceEvenly(); } else { onGeometryFieldChanged(); }
+    } else {
+      if (n >= 2) { dividerSpaceEvenly(); } else { onGeometryFieldChanged(); }
+    }
+  }
+
+  // n + 1 sizes for one axis: the n gaps, then what is left after the last divider
+  function dividerGridSizes(L, n) {
+    var out = [], used = 0, k, g;
+    for (k = 1; k <= n; k++) {
+      g = L.gaps[k];
+      if (!isFinite(g)) { g = 0; }
+      out.push(g);
+      used += g + L.dt.td;
+    }
+    out.push(L.dt.inside - used);
+    return out;
+  }
+
+  function dividerGridFmt(v) {
+    return isFinite(v) ? calcFormat(Math.round(v * 1000) / 1000) : "?";
+  }
+
+  // (Re)draws the grid when anything it shows changed. The Space boxes are moved
+  // back to their homes first, so rebuilding never destroys them; the focused one
+  // keeps the keyboard (captureFocus / restoreFocus).
+  function renderDividerGrid() {
+    var box = document.getElementById("DividerGridBox");
+    var cb = document.getElementById("MakeDividers");
+    if (!box || !(cb && cb.checked)) { return; }
+    var lay = dividerLayout(), alay = dividerAlongLayout();
+    if (!lay || !alay) { return; }
+    var n = dividerAcrossOn() ? lay.n : 0, m = dividerAlongOn() ? alay.n : 0;
+    var rowsS = dividerGridSizes(lay, n), colsS = dividerGridSizes(alay, m);
+    var D = Math.max(lay.dt.inside, 1e-6), W = Math.max(alay.dt.inside, 1e-6);
+    // about 440 x 300 px at most; a column is never narrower than its box (58 px),
+    // so only then is the drawing off scale
+    var s = Math.min(440 / W, 300 / D);
+    var sig = n + "/" + m + "/" + lay.spacing + "/" + alay.spacing + "/" + rowsS.join(",") + "/" + colsS.join(",") + "/" + lay.dt.td + "/" + lay.dt.t;
+    if (sig === g_dgrid.sig) { return; }
+    g_dgrid.sig = sig;
+
+    var keep = captureFocus();
+    var id;
+    for (id in g_dgrid.homes) {
+      if (g_dgrid.homes.hasOwnProperty(id)) {
+        var inp = document.getElementById(id);
+        if (inp && inp.parentNode !== g_dgrid.homes[id]) { g_dgrid.homes[id].appendChild(inp); }
+      }
+    }
+    while (box.firstChild) { box.removeChild(box.firstChild); }
+
+    var px = function (v, min) { var p = Math.round(v * s); return Math.max(min, isFinite(p) ? p : min); };
+    var divPx = Math.max(2, Math.round(lay.dt.td * s)), wallPx = Math.max(3, Math.round(lay.dt.t * s));
+    var table = document.createElement("table");
+    table.className = "dgrid";
+    table.cellPadding = "0";
+    table.cellSpacing = "0";
+    var body = document.createElement("tbody");
+    table.appendChild(body);
+    var td = function (tr, cls, wpx, hpx) {
+      var c = document.createElement("td");
+      c.className = cls;
+      if (wpx) { c.style.width = wpx + "px"; }
+      if (hpx) { c.style.height = hpx + "px"; }
+      if (cls !== "dgrid-lab") { c.innerHTML = "&nbsp;"; }
+      tr.appendChild(c);
+      return c;
+    };
+    // a label cell: the Space box `fieldId` (Count mode), or the size as text
+    var lab = function (tr, fieldId, value, rest, wpx) {
+      var c = td(tr, "dgrid-lab" + (rest ? " dgrid-rest" : ""), wpx, 0);
+      var f = fieldId ? document.getElementById(fieldId) : null;
+      if (f) { c.appendChild(f); }
+      else { c.appendChild(document.createTextNode(dividerGridFmt(value))); }
+      return c;
+    };
+    var colW = [], c, r, tr;
+    for (c = 0; c <= m; c++) { colW.push(px(colsS[c], 58)); }
+    // the line across a whole row: wall / divider strip (cls), or the cells
+    var strip = function (cls, hpx) {
+      tr = document.createElement("tr");
+      body.appendChild(tr);
+      td(tr, "dgrid-lab", 0, 0);
+      td(tr, "dgrid-wall", wallPx, hpx);
+      for (c = 0; c <= m; c++) {
+        td(tr, cls, colW[c], hpx);
+        if (c < m) { td(tr, cls === "dgrid-wall" ? "dgrid-wall" : "dgrid-div", divPx, hpx); }
+      }
+      td(tr, "dgrid-wall", wallPx, hpx);
+    };
+
+    // header: each column's width (Left to Right)
+    tr = document.createElement("tr");
+    body.appendChild(tr);
+    td(tr, "dgrid-lab", 0, 0);
+    td(tr, "dgrid-lab", 0, 0);
+    for (c = 0; c <= m; c++) {
+      lab(tr, (c < m && !alay.spacing) ? "DividerAlongSpace" + (c + 1) + "Field" : null, colsS[c], c === m || alay.spacing, colW[c]);
+      if (c < m) { td(tr, "dgrid-lab", 0, 0); }
+    }
+    td(tr, "dgrid-lab", 0, 0);
+
+    strip("dgrid-wall", wallPx);   // Back
+    for (r = n; r >= 0; r--) {     // Back row first, Front row last
+      tr = document.createElement("tr");
+      body.appendChild(tr);
+      lab(tr, (r < n && !lay.spacing) ? "DividerSpace" + (r + 1) + "Field" : null, rowsS[r], r === n || lay.spacing, 0);
+      var hpx = px(rowsS[r], 24);
+      td(tr, "dgrid-wall", wallPx, hpx);
+      for (c = 0; c <= m; c++) {
+        td(tr, "dgrid-cell", colW[c], hpx);
+        if (c < m) { td(tr, "dgrid-div", divPx, hpx); }
+      }
+      td(tr, "dgrid-wall", wallPx, hpx);
+      if (r > 0) { strip("dgrid-div", divPx); }   // the across divider in front of it
+    }
+    strip("dgrid-wall", wallPx);   // Front
+    box.appendChild(table);
+    restoreFocus(keep);
+  }
+
+  function onDividerDirectionChanged() {
+    updateDividerSection();
+    onGeometryFieldChanged();
+  }
+
+  function onDividerAlongModeChanged() {
+    updateDividerSection();
+    onGeometryFieldChanged();
+  }
+
+  function fillDividerAlongSpacesFromList() {
+    var src = document.getElementById("DividerAlongSpacesList");
+    if (!src || !src.value) { return; }
+    var parts = src.value.split(","), k, el;
+    for (k = 1; k <= MAX_DIVIDERS && k <= parts.length; k++) {
+      el = document.getElementById("DividerAlongSpace" + k + "Field");
+      if (el && el.value !== parts[k - 1]) { el.value = parts[k - 1]; }
+    }
+  }
+
+  function syncDividerAlongSpacesList() {
+    var dst = document.getElementById("DividerAlongSpacesList");
+    if (!dst) { return; }
+    var parts = [], k, el;
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      el = document.getElementById("DividerAlongSpace" + k + "Field");
+      parts.push(el ? calcTrim(el.value) : "");
+    }
+    var text = parts.join(",");
+    if (dst.value !== text) { dst.value = text; }
+  }
+
+  // InvalidDividerAlongSpaces ("k:message|...") onto the along Space boxes
+  var g_dividerAlongSpaceFlagsLast = null;
+  function updateDividerAlongSpaceFlags() {
+    var src = document.getElementById("InvalidDividerAlongSpaces");
+    var value = src ? src.value : "";
+    if (value === g_dividerAlongSpaceFlagsLast) { return; }
+    g_dividerAlongSpaceFlagsLast = value;
+    var msgs = {}, parts = value ? value.split("|") : [], i, k, el, cls, at;
+    for (i = 0; i < parts.length; i++) {
+      at = parts[i].indexOf(":");
+      if (at > 0) { msgs[parseInt(parts[i].substring(0, at), 10)] = parts[i].substring(at + 1); }
+    }
+    for (k = 1; k <= MAX_DIVIDERS; k++) {
+      el = document.getElementById("DividerAlongSpace" + k + "Field");
+      if (!el) { continue; }
+      cls = el.className.replace(" invalid", "").replace("invalid", "");
+      if (msgs[k]) {
+        if (el.className !== cls + " invalid") { el.className = cls + " invalid"; }
+        if (el.title !== msgs[k]) { el.title = msgs[k]; }
+      } else {
+        if (el.className !== cls) { el.className = cls; }
+        if (el.title) { el.removeAttribute("title"); }
+      }
+    }
+  }
+
+  // The reading under the along Space boxes: what is left before Right, or in
+  // Spacing mode how many fit and the gap. (InvalidDividers, the general message,
+  // shows under the across boxes - or here when only along dividers are made.)
+  function updateDividerAlongInfo() {
+    var out = document.getElementById("DividerAlongInfoText");
+    if (!out) { return; }
+    updateDividerAlongSpaceFlags();
+    var text = "", bad = false;
+    var errEl = document.getElementById("InvalidDividers");
+    var err = errEl ? errEl.value : "";
+    var lay = dividerAlongLayout();
+    if (err && !dividerAcrossOn()) {
+      text = err;
+      bad = true;
+    } else if (lay && lay.spacing) {
+      bad = lay.n < 1;
+      text = bad ? "No along divider fits at that gap - make it smaller."
+                 : (lay.n + " along divider" + (lay.n === 1 ? "" : "s") + ", gaps of " + calcFormat(Math.round(lay.even * 1000) / 1000) +
+                    (lay.n >= MAX_DIVIDERS ? " (at most " + MAX_DIVIDERS + ")" : ""));
+    } else if (lay) {
+      var used = 0, k;
+      for (k = 1; k <= lay.n; k++) {
+        if (!isFinite(lay.gaps[k])) { used = NaN; break; }
+        used += lay.gaps[k] + lay.dt.td;
+      }
+      if (isFinite(used)) {
+        var last = lay.dt.inside - used;
+        bad = last <= 0.0001;
+        text = "Space after along divider " + lay.n + " (to Right's inside face): " + calcFormat(Math.round(last * 1000) / 1000);
+        if (bad) { text += " - they don't fit, make the spaces smaller."; }
+      }
+    }
+    if (out.innerHTML !== text) { out.innerHTML = text; }
+    var cls = bad ? "divider-info divider-info-error" : "divider-info";
+    if (out.className !== cls) { out.className = cls; }
+  }
+
+  function dividerAlongSpaceEvenly() {
+    var dt = dividerWidthAndThickness();
+    if (!dt) { return; }
+    var n = dividerAlongCount();
+    var even = (dt.inside - n * dt.td) / (n + 1);
+    if (even < 0) { even = 0; }
+    var text = calcFormat(Math.floor(even * 1000) / 1000);
+    for (var k = 1; k <= MAX_DIVIDERS; k++) {
+      var el = document.getElementById("DividerAlongSpace" + k + "Field");
+      if (el && el.value !== text) { el.value = text; }
+    }
+    syncDividerAlongSpacesList();
+    updateDividerInfo();
+    onGeometryFieldChanged();
+  }
+
+  function onDividerAlongCountChanged() {
+    var el = document.getElementById("DividerAlongCountField");
+    if (el) {
+      var n = String(dividerAlongCount());
+      if (el.value !== n) { el.value = n; }
+    }
+    updateDividerSection();
+    dividerAlongSpaceEvenly();
+  }
 
   // Width/Depth/Height/joint widths/dovetail angle/allowance are plain number
   // fields with no LuaButton class, so edits don't reach Lua on their own.
@@ -1507,6 +2034,7 @@
       pollInvalidFieldFlags();
       updateLidTabLabels();
       updateDividerInfo();   // depth / spaces changed -- by Claude 11/26/2026
+      renderDividerGrid();   // the grid follows the sizes -- by Claude 11/28/2026 (hardi)
       restoreFocus(keepFocus);
     }, 50);
   }
@@ -1909,7 +2437,9 @@
     "InvalidDividerInset":      "DividerInsetField",    // dividers -- by Claude 11/26/2026
     "InvalidDividerCount":      "DividerCountField",    // the Space fields: InvalidDividerSpaces, see updateDividerSpaceFlags -- by Claude 11/27/2026
     "InvalidDividerThickness":  "DividerThicknessField",
-    "InvalidDividerMinGap":     "DividerMinGapField"    // Spacing mode -- by Claude 11/27/2026
+    "InvalidDividerMinGap":     "DividerMinGapField",   // Spacing mode -- by Claude 11/27/2026
+    "InvalidDividerAlongCount":  "DividerAlongCountField",   // along dividers -- by Claude 11/27/2026 (hardi)
+    "InvalidDividerAlongMinGap": "DividerAlongMinGapField"
   };
 
   // Each field's own tooltip before any invalid-message override, so it can
@@ -2334,7 +2864,7 @@
   //                                                           -- by Claude 11/26/2026
   function isoDividerSettings(t) {
     var cb = document.getElementById("MakeDividers");
-    var D = { ys: [], key: "off", inset: 0, groove: false, td: t };
+    var D = { ys: [], xs: [], key: "off", inset: 0, groove: false, td: t };   // xs: along -- by Claude 11/27/2026 (hardi)
     if (!(cb && cb.checked) || !(t > 0)) { return D; }
     var tdEl = document.getElementById("DividerThicknessField");   // the dividers' own thickness -- by Claude 11/27/2026
     var tdv = tdEl ? parseFloat(tdEl.value) : NaN;
@@ -2346,7 +2876,7 @@
     // where they go: the same layout the readout uses - Count + Space fields, or in
     // Spacing mode as many as fit at the minimum gap         -- by Claude 11/27/2026
     var lay = dividerLayout(), y = t, k, s;
-    var n = lay ? lay.n : 0;
+    var n = (lay && dividerAcrossOn()) ? lay.n : 0;   // Direction Along: none across -- by Claude 11/27/2026 (hardi)
     for (k = 1; k <= n; k++) {
       s = lay.gaps[k];
       if (!isFinite(s) || s < 0) { s = 0; }
@@ -2354,7 +2884,20 @@
       D.ys.push(y);
       y += D.td;
     }
-    D.key = D.ys.join(",") + "/" + D.inset + "/" + D.groove + "/" + D.td;
+    // along dividers: xs = each one's face towards Left, from Left's outer face
+    // (the view has Left at x = w, so it is drawn at w - x - td .. w - x)
+    //                                                    -- by Claude 11/27/2026 (hardi)
+    D.xs = [];
+    var alay = dividerAlongOn() ? dividerAlongLayout() : null, x = t;
+    var na = alay ? alay.n : 0;
+    for (k = 1; k <= na; k++) {
+      s = alay.gaps[k];
+      if (!isFinite(s) || s < 0) { s = 0; }
+      x += s;
+      D.xs.push(x);
+      x += D.td;
+    }
+    D.key = D.ys.join(",") + "/" + D.xs.join(",") + "/" + D.inset + "/" + D.groove + "/" + D.td;
     return D;
   }
 
@@ -3479,7 +4022,7 @@
     // back divider first, so each one stands in front of the one behind it. The
     // lids come later anyway (LIDS layer).                     -- by Claude 11/26/2026
     var dvs = isoDividerSettings(t);
-    if (open && dvs.ys.length) {
+    if (open && (dvs.ys.length || dvs.xs.length)) {   // along too -- by Claude 11/27/2026 (hardi)
       var dz0, dz1, dJB, dJL;
       if (bType === "Fingers" || bType === "Flat" || bType === "Inset") { dz0 = t; dJB = fc.bottom || fc.tabs; }
       else if (bType === "Grooved") { dz0 = t; dJB = false; }     // stands on the slide-in panel (drawn at t)
@@ -3490,12 +4033,26 @@
       else { dz1 = h; dJL = false; }
       // Top inset: that much lower, and no longer reaching the lid -- by Claude 11/26/2026
       if (dvs.inset > 1e-9) { dz1 -= dvs.inset; dJL = false; }
-      if (dz1 - dz0 <= 1e-9) { dvs.ys = []; }   // nothing left of them - the dialog flags it
+      if (dz1 - dz0 <= 1e-9) { dvs.ys = []; dvs.xs = []; }   // nothing left of them - the dialog flags it
       var dJLeft = fc.left || fc.tabs, dJRight = fc.right || fc.tabs;   // Left is the x = w wall
 
       var dvSide = isoDividerSpans(dz1 - dz0, isoNum("SideTabWidthField"), dz0);
       var dvBot = dJB ? isoDividerSpans(w - 2 * t, isoJointWidth("bottom"), t) : [];
       var dvLid = dJL ? isoDividerSpans(w - 2 * t, isoJointWidth("lid"), t) : [];
+      // where along dividers cross, the across ones have no lid fingers within one
+      // divider thickness (AddDividerSlotsToFaces)     -- by Claude 11/28/2026 (hardi)
+      if (dvLid.length && dvs.xs.length) {
+        var dvLidKept = [], lq, lx, near;
+        for (lq = 0; lq < dvLid.length; lq++) {
+          near = false;
+          for (lx = 0; lx < dvs.xs.length; lx++) {
+            var cx0 = w - dvs.xs[lx] - dvs.td, cx1 = w - dvs.xs[lx];
+            if (dvLid[lq][1] > cx0 - dvs.td && dvLid[lq][0] < cx1 + dvs.td) { near = true; break; }
+          }
+          if (!near) { dvLidKept.push(dvLid[lq]); }
+        }
+        dvLid = dvLidKept;
+      }
       // Dividers: Groove - no fingers at all; the tongues sit in the grooves. What
       // shows of the grooves is drawn per divider below.          -- by Claude 11/26/2026
       var dvGroove = dvs.groove;
@@ -3516,10 +4073,38 @@
       var dPin = function () { dStep++; return dBase + DETAIL + dStep * 1e-7; };
       var segsOf = function (spans) { var r = [], q; for (q = 0; q < spans.length; q++) { r.push([spans[q][0], spans[q][1]]); } return r; };
 
+      // Along dividers (parallel to Left / Right): drawn as plain slabs, piece by
+      // piece between the across dividers, in the same back-to-front run as those
+      // (each piece pinned with dPin, so emission order is paint order): the
+      // pieces behind an across divider before it, its crossings' tops after it -
+      // where they cross, the along divider is the top half (the across one is
+      // notched from the top), so its top runs on over the across divider. Their
+      // joints into Front / Back are not drawn.          -- by Claude 11/27/2026 (hardi)
+      var alongX = function (ai) { return [w - dvs.xs[ai] - dvs.td, w - dvs.xs[ai]]; };
+      var alongPieces = function (ya, yb, frontEnd) {
+        if (!(yb - ya > EPSB)) { return; }
+        for (var ai = dvs.xs.length - 1; ai >= 0; ai--) {   // farthest (nearest Right) first
+          var ax = alongX(ai);
+          if (ax[0] < t - 1e-9) { continue; }   // doesn't fit - the dialog flags it
+          if (frontEnd) { F([[ax[0],ya,dz0],[ax[1],ya,dz0],[ax[1],ya,dz1],[ax[0],ya,dz1]], front, dPin()); }
+          F([[ax[1],ya,dz0],[ax[1],yb,dz0],[ax[1],yb,dz1],[ax[1],ya,dz1]], side, dPin());
+          F([[ax[0],ya,dz1],[ax[1],ya,dz1],[ax[1],yb,dz1],[ax[0],yb,dz1]], top, dPin());
+        }
+      };
+      var alongCells = function (ya, yb) {
+        for (var ai = dvs.xs.length - 1; ai >= 0; ai--) {
+          var ax = alongX(ai);
+          if (ax[0] < t - 1e-9) { continue; }
+          F([[ax[0],ya,dz1],[ax[1],ya,dz1],[ax[1],yb,dz1],[ax[0],yb,dz1]], top, dPin());
+        }
+      };
+      var aFront = d - t;   // front end of the next along pieces to draw (going forwards)
+
       var dk, dy0, dy1, q, sp;
       for (dk = dvs.ys.length - 1; dk >= 0; dk--) {
         dy0 = dvs.ys[dk]; dy1 = dy0 + dvs.td;   // the dividers' own thickness -- by Claude 11/27/2026
         if (dy1 > d - t + 1e-9) { continue; }   // doesn't fit - the dialog flags it
+        alongPieces(dy1, aFront, false);   // the along pieces behind this divider -- by Claude 11/27/2026 (hardi)
         // Grooved: how far the divider reaches into each groove (groove depth less
         // the allowance, like MakeGroovedDividerFace) - into Right / Left, and up
         // into the lid's groove when it joints into the lid (Fingers / Flat / Inset,
@@ -3632,6 +4217,61 @@
               lidClosed ? top : holeCol, lidClosed ? LATEST + DETAIL : depthAt(w / 2, d / 2, lzTop));
           }
           layer = 0;
+        }
+        // along dividers: their tops over this divider, then on to the next one
+        //                                                -- by Claude 11/27/2026 (hardi)
+        alongCells(dy0, dy1);
+        aFront = dy0;
+      }
+      // the along pieces in front of the first across divider (or the whole
+      // length when there are none), their front end showing if Front isn't there
+      alongPieces(t, aFront, !fc.front);
+
+      // Along dividers' joints into Front / Back (and the lid), as far as they can
+      // be seen - the same rules as the across ones into Right / Left above:
+      // Fingers: their end grain on Front's outer face and on a closed Fingers lid
+      // (or the empty slots in a lifted Flat / Inset lid). Grooved: the groove above
+      // the divider in Back's inside face (it faces the camera), and the notches a
+      // groove leaves in the rims of Front and Back where it reaches the top.
+      //                                                  -- by Claude 11/28/2026 (hardi)
+      if (dvs.xs.length) {
+        var aJF = fc.front || fc.tabs, aJBk = fc.back || fc.tabs;
+        var aSide = dvGroove ? [] : isoDividerSpans(dz1 - dz0, isoNum("SideTabWidthField"), dz0);
+        var aLid = (dJL && !dvGroove) ? isoDividerSpans(d - 2 * t, isoJointWidth("lid"), t) : [];
+        var aThrough = dvGroove && (lid.type === "None" || lid.type === "OpenChamfer") && !(dvs.inset > 1e-9);
+        var aTopZ = aThrough ? zT : dz1 + isoNum("AllowanceField") + isoNum("ToolDiameterInfo") / 2;
+        var aOverRims = (lid.type === "Grooved") ? OUTER - 1 : LIDS - 2000;
+        var aGd = t / 2, ai2, ax2, q2;
+        for (ai2 = dvs.xs.length - 1; ai2 >= 0; ai2--) {
+          ax2 = alongX(ai2);
+          if (ax2[0] < t - 1e-9) { continue; }
+          if (dvGroove) {
+            if (fc.back && aJBk && lid.type !== "OpenChamfer") {
+              var aStrip = Math.min(aTopZ, lid.type === "Grooved" ? lidZ0 : zT);
+              if (aStrip - dz1 > EPSB) { F([[ax2[0],d-t,dz1],[ax2[1],d-t,dz1],[ax2[1],d-t,aStrip],[ax2[0],d-t,aStrip]], holeCol, dPin()); }
+            }
+            if (aTopZ >= zT - 1e-9 && lid.type !== "OpenChamfer") {
+              if (fc.front && aJF) { F([[ax2[0],t-aGd,zT],[ax2[1],t-aGd,zT],[ax2[1],t,zT],[ax2[0],t,zT]], holeCol, aOverRims); }
+              if (fc.back && aJBk) { F([[ax2[0],d-t,zT],[ax2[1],d-t,zT],[ax2[1],d-t+aGd,zT],[ax2[0],d-t+aGd,zT]], holeCol, aOverRims); }
+            }
+          } else {
+            // through Front: end grain on its outer face (outer plane, after the wall)
+            if (aJF && fc.front) {
+              for (q2 = 0; q2 < aSide.length; q2++) {
+                F([[ax2[0],0,aSide[q2][0]],[ax2[1],0,aSide[q2][0]],[ax2[1],0,aSide[q2][1]],[ax2[0],0,aSide[q2][1]]], front);
+              }
+            }
+            // through the lid, like the across dividers' lid fingers
+            if (dJL && fc.lid) {
+              layer = LIDS;
+              var aLz = lidClosed ? h : zT + Math.max(h * 0.3, 2 * t) + t;   // same lift as the lid
+              for (q2 = 0; q2 < aLid.length; q2++) {
+                F([[ax2[0],aLid[q2][0],aLz],[ax2[1],aLid[q2][0],aLz],[ax2[1],aLid[q2][1],aLz],[ax2[0],aLid[q2][1],aLz]],
+                  lidClosed ? top : holeCol, lidClosed ? LATEST + DETAIL : depthAt(w / 2, d / 2, aLz));
+              }
+              layer = 0;
+            }
+          }
         }
       }
     }
@@ -4092,6 +4732,7 @@
     updateBottomRabbetInfo();
     updateLidRabbetInfo();
     fillDividerSpacesFromList();   // Lua put the imported spaces into the list -- by Claude 11/27/2026
+    if (g_dgrid.inited) { dividerGridFromLua(); }   // Rows / Columns from the imported counts -- by Claude 11/28/2026 (hardi)
     updateDividerSection();   // keep the imported spaces, don't re-space -- by Claude 11/26/2026
     if (zoomSelect) { onZoomLevelChanged(zoomSelect); }
     if (darkMode) { onDarkModeChanged(darkMode); }
@@ -4157,6 +4798,8 @@
       // Count as a whole number (a host without integer fields fills it as "3.000") -- by Claude 11/27/2026
       var countField = document.getElementById("DividerCountField");
       if (countField && countField.value !== String(dividerCount())) { countField.value = String(dividerCount()); }
+      var alongCountField = document.getElementById("DividerAlongCountField");   // the same for the along count -- by Claude 11/27/2026 (hardi)
+      if (alongCountField && alongCountField.value !== String(dividerAlongCount())) { alongCountField.value = String(dividerAlongCount()); }
       fillDividerSpacesFromList();   // the Space boxes from the one list Lua filled -- by Claude 11/27/2026
       updateDividerSection();   // Divider Options open if Dividers is ticked -- by Claude 11/26/2026
       isoInit(true);            // view box in place of the picture, drawn in phase 2

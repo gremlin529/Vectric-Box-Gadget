@@ -161,7 +161,9 @@ function main(script_path)
     ZoomLevel = { Auto = 1, ["100%"] = 2, ["125%"] = 3, ["150%"] = 4,
       ["175%"] = 5, ["200%"] = 6, ["225%"] = 7, ["250%"] = 8 },
     dividerJoint = DividerJointCodes,  -- Dividers.xlua -- by Claude 11/26/2026
-    dividerMode = DividerModeCodes     -- Count / Spacing -- by Claude 11/27/2026
+    dividerMode = DividerModeCodes,    -- Count / Spacing -- by Claude 11/27/2026
+    dividerDirection = DividerDirectionCodes,   -- Across / Along / Both -- by Claude 11/27/2026 (hardi)
+    dividerAlongMode = DividerModeCodes
   }
 
   local job = VectricJob()
