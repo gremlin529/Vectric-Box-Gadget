@@ -1338,6 +1338,8 @@ function DisplayDialog(script_path, options, sideDoveTail, bottomDoveTail, lidDo
   dialog:AddCheckBox("LabelFaces", options.label_faces)
 
   dialog:AddDropDownList("ZoomLevel", options.ZoomLevel)
+  -- which dialog sections are folded away ("TITLE|TITLE", kept by the page) -- by Claude 11/28/2026 (hardi)
+  dialog:AddTextField("CollapsedSections", options.collapsedSections or "")
 
   dialog:AddCheckBox("MakeLid", options.facesToMake.lid)
   dialog:AddCheckBox("MakeBottom", options.facesToMake.bottom)
@@ -1701,6 +1703,7 @@ function ReadOptionsFromDialog(dialog, options, sideDoveTail, bottomDoveTail, li
   options.dark_mode     = dialog:GetCheckBox("DarkMode")
   options.label_faces   = dialog:GetCheckBox("LabelFaces")
   options.ZoomLevel = dialog:GetDropDownListValue("ZoomLevel")
+  options.collapsedSections = dialog:GetTextField("CollapsedSections") or ""   -- by Claude 11/28/2026 (hardi)
 
   options.no_toolpath  = dialog:GetCheckBox("NoToolpath")
   options.create_dogbones  = dialog:GetCheckBox("CreateDogbones")
@@ -1901,6 +1904,7 @@ function SaveDefaultsToRegistry(options, justwindowinfo)
   registry:SetBool("DarkMode", options.dark_mode)
   registry:SetBool("LabelFaces", options.label_faces)
   registry:SetString("ZoomLevel", options.ZoomLevel)
+  registry:SetString("CollapsedSections", options.collapsedSections or "")   -- by Claude 11/28/2026 (hardi)
 
   if justwindowinfo then
     return
@@ -2081,6 +2085,7 @@ function LoadDefaultsFromRegistry(options, sideDoveTail, bottomDoveTail, lidDove
   options.dark_mode     = registry:GetBool("DarkMode", true)     -- default ON
   options.label_faces   = registry:GetBool("LabelFaces", true)    -- default ON
   options.ZoomLevel = registry:GetString("ZoomLevel", options.ZoomLevel) -- default Auto
+  options.collapsedSections = registry:GetString("CollapsedSections", "")   -- folded dialog sections -- by Claude 11/28/2026 (hardi)
   options.no_toolpath = registry:GetBool("NoToolpath", options.no_toolpath)
   options.create_dogbones = registry:GetBool("CreateDogbones", options.create_dogbones)
   options.useSingleSheet = registry:GetBool("SingleSheetBestEffort", options.useSingleSheet)

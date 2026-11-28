@@ -70,6 +70,13 @@
     .divider-info-error { color: #cc3333; font-weight: bold; }
     body.dark-mode .field-row input.divider-even-button { background-color: #1a3a6b; color: #90bcf0; border-color: #3a6ab0; }
     body.dark-mode .divider-info-error { color: #ff7b7b; }
+    /* Foldable sections: a click on a blue section title folds its card away; the
+       arrow shows which way, the title turns red while a folded card holds an
+       invalid field.                                   -- by Claude 11/28/2026 (hardi) */
+    .section-header.section-foldable { cursor: pointer; }
+    .section-arrow { font-size: 11px; margin-right: 6px; }
+    .section-header.section-header-invalid { background-color: #b03030; }
+    body.dark-mode .section-header.section-header-invalid { background-color: #8a2a2a; }
     /* Divider grid: top view of the compartments, a table (IE7-safe, normal flow).
        Column widths over the top, row depths down the left, the dividers as dark
        strips. Built by renderDividerGrid.              -- by Claude 11/28/2026 (hardi) */
@@ -82,6 +89,7 @@
     .dgrid-rowctl-item { margin: 3px 0; text-align: center; }
     .dgrid-rowctl-item select.divider-mode-select { margin-left: 0; }
     .dgrid-rowctl-item input.divider-even-button { margin-left: 0; }
+    .dgrid-rowctl-item input.divider-small-field { width: 58px; }   /* the minimum gap box (Spacing), as in the Columns row -- by Claude 11/28/2026 (hardi) */
     label.dgrid-rowlabel { font-weight: bold; }
     .dgrid-caption { font-size: 12px; opacity: 0.8; margin: 2px 0; }
     table.dgrid { border-collapse: collapse; margin: 2px 0 4px 0; }
@@ -861,6 +869,8 @@
     <input type="text" id="InvalidDividerMinGap" value=""/><!-- Spacing mode -- by Claude 11/27/2026 -->
     <!-- along dividers: the same as the across ones above -- by Claude 11/27/2026 (hardi) -->
     <input type="text" id="DividerAlongSpacesList" value=""/>
+    <!-- folded dialog sections, "TITLE|TITLE" (initFoldableSections) -- by Claude 11/28/2026 (hardi) -->
+    <input type="text" id="CollapsedSections" value=""/>
     <input type="text" id="InvalidDividerAlongSpaces" value=""/>
     <input type="text" id="InvalidDividerAlongCount" value=""/>
     <input type="text" id="InvalidDividerAlongMinGap" value=""/>
@@ -936,7 +946,119 @@
     var body = document.getElementById(bodyId);
     var display = visible ? "block" : "none";
     if (header) { header.style.display = display; }
-    if (body) { body.style.display = display; }
+    // a folded section shows only its title -- by Claude 11/28/2026 (hardi)
+    if (body) { body.style.display = (visible && isSectionFolded(header)) ? "none" : display; }
+  }
+
+  // ── Foldable sections ─────────────────────────────────────────────────
+  // Every blue section title that has a card under it (Geometry Options, Faces To
+  // Machine, Tools, Divider Options, the Open Chamfer / Grooved Lid / Grooved
+  // Bottom options) folds its card away when clicked, with an arrow in front of
+  // it. Which ones are folded travels to Lua as the hidden CollapsedSections
+  // ("TITLE|TITLE", by their titles) and is kept in the registry, so the dialog
+  // opens the way it was left. A section shown / hidden by setSectionVisible
+  // stays folded when it comes back. While a folded card holds an invalid field
+  // its title turns red (updateFoldedSectionFlags, from onIdleTick).
+  // ES3, IE7.                                          -- by Claude 11/28/2026 (hardi)
+  var g_sections = [];      // { header, body, key, arrow }
+  var g_folded = {};        // key -> true
+
+  function nextElementOf(el) {
+    var n = el ? el.nextSibling : null;
+    while (n && n.nodeType !== 1) { n = n.nextSibling; }
+    return n;
+  }
+
+  function sectionOfHeader(header) {
+    for (var i = 0; i < g_sections.length; i++) {
+      if (g_sections[i].header === header) { return g_sections[i]; }
+    }
+    return null;
+  }
+
+  function isSectionFolded(header) {
+    var s = header ? sectionOfHeader(header) : null;
+    return !!(s && g_folded[s.key]);
+  }
+
+  function applySectionFold(s) {
+    var folded = !!g_folded[s.key];
+    var arrow = folded ? "&#9658;" : "&#9660;";
+    if (s.arrow.innerHTML !== arrow) { s.arrow.innerHTML = arrow; }
+    if (s.header.style.display === "none") { return; }   // hidden as a whole - setSectionVisible decides
+    var want = folded ? "none" : (s.body.id ? "block" : "");
+    if (s.body.style.display !== want) { s.body.style.display = want; }
+  }
+
+  function saveFoldedSections() {
+    var keys = [], i;
+    for (i = 0; i < g_sections.length; i++) {
+      if (g_folded[g_sections[i].key]) { keys.push(g_sections[i].key); }
+    }
+    var field = document.getElementById("CollapsedSections");
+    var text = keys.join("|");
+    if (field && field.value !== text) { field.value = text; }
+  }
+
+  function toggleSection(index) {
+    var s = g_sections[index];
+    if (!s) { return; }
+    g_folded[s.key] = !g_folded[s.key];
+    applySectionFold(s);
+    saveFoldedSections();
+    updateFoldedSectionFlags();
+  }
+
+  function initFoldableSections() {
+    if (g_sections.length) { return; }
+    var divs = document.getElementsByTagName("div"), list = [], i;
+    for (i = 0; i < divs.length; i++) {
+      if ((" " + divs[i].className + " ").indexOf(" section-header ") >= 0) { list.push(divs[i]); }
+    }
+    for (i = 0; i < list.length; i++) {
+      var h = list[i], b = nextElementOf(h);
+      if (!b || (" " + b.className + " ").indexOf(" card ") < 0) { continue; }
+      var key = h.innerHTML.replace(/<[^>]*>/g, "").replace(/^\s+|\s+$/g, "").toUpperCase();
+      var arrow = document.createElement("span");
+      arrow.className = "section-arrow";
+      h.insertBefore(arrow, h.firstChild);
+      h.className += " section-foldable";
+      h.title = "Click to fold or unfold this section";
+      h.onclick = (function (index) { return function () { toggleSection(index); }; })(g_sections.length);
+      g_sections.push({ header: h, body: b, key: key, arrow: arrow });
+    }
+    var field = document.getElementById("CollapsedSections");
+    var saved = field && field.value ? field.value.split("|") : [];
+    for (i = 0; i < saved.length; i++) { if (saved[i]) { g_folded[saved[i]] = true; } }
+    for (i = 0; i < g_sections.length; i++) { applySectionFold(g_sections[i]); }
+  }
+
+  // Would `el` show once its folded card `root` is unfolded? Not when it, or
+  // anything between it and the card, is hidden itself (e.g. the divider count
+  // boxes behind the grid).
+  function shownWithin(el, root) {
+    for (var n = el; n && n !== root; n = n.parentNode) {
+      if (n.style && n.style.display === "none") { return false; }
+      if (n.type === "hidden") { return false; }
+    }
+    return true;
+  }
+
+  // red title on a folded section whose card holds an invalid field the user
+  // would see on unfolding it
+  function updateFoldedSectionFlags() {
+    for (var i = 0; i < g_sections.length; i++) {
+      var s = g_sections[i], bad = false;
+      if (g_folded[s.key]) {
+        var inputs = s.body.getElementsByTagName("input");
+        for (var k = 0; k < inputs.length && !bad; k++) {
+          if ((" " + inputs[k].className + " ").indexOf(" invalid ") >= 0 && shownWithin(inputs[k], s.body)) { bad = true; }
+        }
+      }
+      var cls = s.header.className.replace(" section-header-invalid", "");
+      if (bad) { cls += " section-header-invalid"; }
+      if (s.header.className !== cls) { s.header.className = cls; }
+    }
   }
 
   // Lid Type dropdown option indexes (see LidTypeSelect). Only Open Chamfer
@@ -4749,6 +4871,7 @@
     pollToolNameChanged();
     pollInvalidFieldFlags();
     updateLidTabLabels();
+    updateFoldedSectionFlags();   // red title on a folded section with an invalid field -- by Claude 11/28/2026 (hardi)
     updateDividerInfo();
     updateMaterialInfo();   // material size by the ISO view -- by Claude 11/27/2026
     // (no preview poll: every change that alters the picture redraws it through
@@ -4776,6 +4899,7 @@
     if (darkMode) {
       onDarkModeChanged(darkMode);
     }
+    initFoldableSections();   // fold the sections left folded last time -- by Claude 11/28/2026 (hardi)
 
     g_initDeferLua = true;   // the handlers below would each call Lua - once, in phase 2
     try {
