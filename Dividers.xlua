@@ -22,6 +22,48 @@ G_dividerLayerName = "Divider Panel"         -- dividers on sheets of their own:
 G_dividerCutoutLayerName = "CutOut Dividers" -- ... and their cutout vectors
 DividerJointCodes = { Finger = 1, Groove = 2 }   -- options.dividerJoint as a number (document variables, Export)
 DividerModeCodes = { Count = 1, Spacing = 2 }    -- options.dividerMode as a number (document variables, Export) -- by Claude 11/27/2026
+-- options.dividerDirection: Across (the original dividers, parallel to Front/Back),
+-- Along (parallel to Left/Right, jointed into Front/Back) or Both (a grid, half
+-- lapped where they cross).                                -- by Claude 11/27/2026 (hardi)
+DividerDirectionCodes = { Across = 1, Along = 2, Both = 3 }
+
+--[[  -------------- Divider axes --------------------------------------------------
+|
+|  "across": dividers parallel to Front / Back, spaced along the depth (y, from
+|  Front's outer face), jointed into Left / Right. "along": dividers parallel to
+|  Left / Right, spaced along the width (x, from Left's outer face), jointed into
+|  Front / Back. Each axis has its own count, Count / Spacing mode, minimum gap
+|  and spaces; joint, thickness and Top inset are shared.
+|                                                            -- by Claude 11/27/2026 (hardi)
+]]
+local DividerAxisKeys = {
+  across = { space = "dividerSpace", count = "dividerCount", mode = "dividerMode",
+             minGap = "dividerMinGap", entered = "dividerCountEntered" },
+  along  = { space = "dividerAlongSpace", count = "dividerAlongCount", mode = "dividerAlongMode",
+             minGap = "dividerAlongMinGap", entered = "dividerAlongCountEntered" }
+}
+
+local function AxisKeys(axis)
+  return DividerAxisKeys[axis or "across"] or DividerAxisKeys.across
+end
+
+-- Is this axis switched on by the Direction dropdown?
+function DividerAxisOn(options, axis)
+  local dir = options.dividerDirection or "Across"
+  if (axis or "across") == "along" then
+    return dir == "Along" or dir == "Both"
+  end
+  return dir ~= "Along"
+end
+
+-- Clear inside length the dividers of this axis are spaced along: the inside
+-- depth for across, the inside width for along.
+function DividerInside(options, axis)
+  if (axis or "across") == "along" then
+    return options.width - 2*options.thickness
+  end
+  return options.depth - 2*options.thickness
+end
 
 -- LineTo that skips a (near) zero length span.
 local function LineToIfNeeded(contour, pt)
@@ -51,6 +93,19 @@ function InitDividerOptions(options)
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = 0
   end
+  -- along dividers (parallel to Left / Right) and the Direction -- by Claude 11/27/2026 (hardi)
+  options.dividerDirection = "Across"
+  options.dividerAlongCount = 1
+  options.dividerAlongMode = "Count"
+  options.dividerAlongMinGap = 0
+  for k = 1, G_maxDividers do
+    options["dividerAlongSpace" .. k] = 0
+  end
+end
+
+-- Number of dividers of both axes being made.          -- by Claude 11/27/2026 (hardi)
+function DividerTotalCount(options)
+  return DividerCount(options, "across") + DividerCount(options, "along")
 end
 
 -- The dividers' own thickness: the Thickness field, or the material thickness.
@@ -72,23 +127,30 @@ end
 -- the material thickness they are laid out with the box parts. (The "Dividers on
 -- separate sheet" checkbox this replaced was dropped 11/27/2026.)  -- by Claude 11/27/2026
 function DividersOnSeparateSheets(options)
-  return DividerCount(options) > 0 and DividerThicknessDiffers(options)
+  return DividerTotalCount(options) > 0 and DividerThicknessDiffers(options)   -- both axes -- by Claude 11/27/2026 (hardi)
 end
 
 -- Every numeric divider option (document variables, Export).
 function DividerDocumentFieldNames()
-  local names = { "makeDividers", "dividerCount", "dividerInset", "dividerThickness", "dividerMinGap" }
+  local names = { "makeDividers", "dividerCount", "dividerInset", "dividerThickness", "dividerMinGap",
+                  "dividerAlongCount", "dividerAlongMinGap" }   -- along: by Claude 11/27/2026 (hardi)
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
+  end
+  for k = 1, G_maxDividers do
+    names[#names + 1] = "dividerAlongSpace" .. k
   end
   return names
 end
 
 -- The divider options that are lengths (rescaled between inches and mm).
 function DividerLengthFieldNames()
-  local names = { "dividerInset", "dividerThickness", "dividerMinGap" }
+  local names = { "dividerInset", "dividerThickness", "dividerMinGap", "dividerAlongMinGap" }
   for k = 1, G_maxDividers do
     names[#names + 1] = "dividerSpace" .. k
+  end
+  for k = 1, G_maxDividers do
+    names[#names + 1] = "dividerAlongSpace" .. k
   end
   return names
 end
@@ -108,24 +170,32 @@ function ResolveDividerSpacing(options)
   if not options.makeDividers or (tonumber(options.dividerThickness) or 0) <= 0.0001 then
     options.dividerThickness = options.thickness
   end
-  local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
-  options.dividerCount = n
+  if options.dividerDirection ~= "Along" and options.dividerDirection ~= "Both" then
+    options.dividerDirection = "Across"
+  end
+  -- the same for each axis: across (along the depth) and along (along the width)
+  --                                                       -- by Claude 11/27/2026 (hardi)
   local td = DividerThickness(options)
-  local spacing_ok = true
-  local used = options.thickness
-  for k = 1, n do
-    local space = options["dividerSpace" .. k] or 0
-    if space <= 0 then spacing_ok = false end
-    used = used + space + td
-  end
-  if not spacing_ok or used >= options.depth - options.thickness then
-    SetEvenDividerSpaces(options)
-  end
-  -- Spacing mode's minimum gap: start from the (even) first space when nothing
-  -- usable is saved.                                       -- by Claude 11/27/2026
-  if options.dividerMode ~= "Spacing" then options.dividerMode = "Count" end
-  if (tonumber(options.dividerMinGap) or 0) <= 0.0001 then
-    options.dividerMinGap = options.dividerSpace1 or 0
+  for _, axis in ipairs({ "across", "along" }) do
+    local K = AxisKeys(axis)
+    local n = math.max(1, math.min(math.floor((tonumber(options[K.count]) or 1) + 0.5), G_maxDividers))
+    options[K.count] = n
+    local spacing_ok = true
+    local used = 0
+    for k = 1, n do
+      local space = options[K.space .. k] or 0
+      if space <= 0 then spacing_ok = false end
+      used = used + space + td
+    end
+    if not spacing_ok or used >= DividerInside(options, axis) then
+      SetEvenDividerSpaces(options, axis)
+    end
+    -- Spacing mode's minimum gap: start from the (even) first space when nothing
+    -- usable is saved.                                       -- by Claude 11/27/2026
+    if options[K.mode] ~= "Spacing" then options[K.mode] = "Count" end
+    if (tonumber(options[K.minGap]) or 0) <= 0.0001 then
+      options[K.minGap] = options[K.space .. 1] or 0
+    end
   end
 end
 
@@ -203,6 +273,26 @@ function AddDividerDialogFields(dialog, options)
   dialog:AddDropDownList("DividerModeSelect", options.dividerMode == "Spacing" and "Spacing" or "Count")
   dialog:AddDoubleField("DividerMinGapField", options.dividerMinGap or 0)
   dialog:AddTextField("InvalidDividerMinGap", "")
+  -- Direction and the along dividers' own count / mode / gap / spaces, the same
+  -- way as the across ones above                          -- by Claude 11/27/2026 (hardi)
+  dialog:AddDropDownList("DividerDirectionSelect", options.dividerDirection or "Across")
+  dialog:AddDropDownList("DividerAlongModeSelect", options.dividerAlongMode == "Spacing" and "Spacing" or "Count")
+  AddCountField(dialog, "DividerAlongCountField", ClampDividerCount(options.dividerAlongCount))
+  dialog:AddDoubleField("DividerAlongMinGapField", options.dividerAlongMinGap or 0)
+  dialog:AddTextField("DividerAlongSpacesList", DividerSpacesText(function(k) return options["dividerAlongSpace" .. k] end))
+  dialog:AddTextField("InvalidDividerAlongSpaces", "")
+  dialog:AddTextField("InvalidDividerAlongCount", "")
+  dialog:AddTextField("InvalidDividerAlongMinGap", "")
+end
+
+-- "s1,s2,..." from a spaces list field into options[prefix .. k]
+local function ReadSpacesList(dialog, field, options, prefix)
+  local k = 0
+  for item in string.gmatch((dialog:GetTextField(field) or "") .. ",", "([^,]*),") do
+    k = k + 1
+    if k > G_maxDividers then break end
+    options[prefix .. k] = tonumber(item) or 0
+  end
 end
 
 function ReadDividerOptionsFromDialog(dialog, options)
@@ -217,12 +307,15 @@ function ReadDividerOptionsFromDialog(dialog, options)
   options.dividerJoint = (joint == "Grooved" or joint == "Groove") and "Groove" or "Finger"
   -- every space in one read: "s1,s2,...". A missing or unreadable entry counts as
   -- 0 (not filled in), which ValidateDividers flags for the spaces in use.
-  local k = 0
-  for item in string.gmatch((dialog:GetTextField("DividerSpacesList") or "") .. ",", "([^,]*),") do
-    k = k + 1
-    if k > G_maxDividers then break end
-    options["dividerSpace" .. k] = tonumber(item) or 0
-  end
+  ReadSpacesList(dialog, "DividerSpacesList", options, "dividerSpace")
+  -- Direction and the along dividers                      -- by Claude 11/27/2026 (hardi)
+  local dir = dialog:GetDropDownListValue("DividerDirectionSelect")
+  options.dividerDirection = (dir == "Along" or dir == "Both") and dir or "Across"
+  options.dividerAlongMode = (dialog:GetDropDownListValue("DividerAlongModeSelect") == "Spacing") and "Spacing" or "Count"
+  options.dividerAlongCountEntered = GetCountField(dialog, "DividerAlongCountField")
+  options.dividerAlongCount = ClampDividerCount(options.dividerAlongCountEntered)
+  options.dividerAlongMinGap = dialog:GetDoubleField("DividerAlongMinGapField") or 0
+  ReadSpacesList(dialog, "DividerAlongSpacesList", options, "dividerAlongSpace")
 end
 
 function SaveDividerRegistry(registry, options)
@@ -236,6 +329,14 @@ function SaveDividerRegistry(registry, options)
   for k = 1, G_maxDividers do
     registry:SetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
   end
+  -- Direction and the along dividers                      -- by Claude 11/27/2026 (hardi)
+  registry:SetString("DividerDirection", options.dividerDirection or "Across")
+  registry:SetDouble("DividerAlongCount", options.dividerAlongCount or 1)
+  registry:SetString("DividerAlongMode", options.dividerAlongMode == "Spacing" and "Spacing" or "Count")
+  registry:SetDouble("DividerAlongMinGap", options.dividerAlongMinGap or 0)
+  for k = 1, G_maxDividers do
+    registry:SetDouble("DividerAlongSpace" .. k, options["dividerAlongSpace" .. k] or 0)
+  end
 end
 
 function LoadDividerRegistry(registry, options)
@@ -248,6 +349,15 @@ function LoadDividerRegistry(registry, options)
   options.dividerMinGap = registry:GetDouble("DividerMinGap", options.dividerMinGap or 0)
   for k = 1, G_maxDividers do
     options["dividerSpace" .. k] = registry:GetDouble("DividerSpace" .. k, options["dividerSpace" .. k] or 0)
+  end
+  -- Direction and the along dividers                      -- by Claude 11/27/2026 (hardi)
+  local dir = registry:GetString("DividerDirection", options.dividerDirection or "Across")
+  options.dividerDirection = (dir == "Along" or dir == "Both") and dir or "Across"
+  options.dividerAlongCount = registry:GetDouble("DividerAlongCount", options.dividerAlongCount or 1)
+  options.dividerAlongMode = (registry:GetString("DividerAlongMode", options.dividerAlongMode or "Count") == "Spacing") and "Spacing" or "Count"
+  options.dividerAlongMinGap = registry:GetDouble("DividerAlongMinGap", options.dividerAlongMinGap or 0)
+  for k = 1, G_maxDividers do
+    options["dividerAlongSpace" .. k] = registry:GetDouble("DividerAlongSpace" .. k, options["dividerAlongSpace" .. k] or 0)
   end
 end
 
@@ -279,6 +389,28 @@ function ImportDividerSettings(dialog, values, options)
   if values.dividerJoint ~= nil then
     dialog:UpdateDropDownListValue("DividerJointSelect", values.dividerJoint == DividerJointCodes.Groove and "Grooved" or "Fingers")
   end
+  -- Direction and the along dividers (the page copies DividerAlongSpacesList into
+  -- the along Space boxes like the across ones)           -- by Claude 11/27/2026 (hardi)
+  dialog:UpdateTextField("DividerAlongSpacesList", DividerSpacesText(function(k)
+    local v = values["dividerAlongSpace" .. k]
+    if v == nil and options then v = options["dividerAlongSpace" .. k] end
+    return v
+  end))
+  if values.dividerDirection ~= nil then
+    local dir = "Across"
+    if values.dividerDirection == DividerDirectionCodes.Along then dir = "Along"
+    elseif values.dividerDirection == DividerDirectionCodes.Both then dir = "Both" end
+    dialog:UpdateDropDownListValue("DividerDirectionSelect", dir)
+  end
+  if values.dividerAlongMode ~= nil then
+    dialog:UpdateDropDownListValue("DividerAlongModeSelect", values.dividerAlongMode == DividerModeCodes.Spacing and "Spacing" or "Count")
+  end
+  if values.dividerAlongMinGap ~= nil and values.dividerAlongMinGap > 0 then
+    dialog:UpdateDoubleField("DividerAlongMinGapField", values.dividerAlongMinGap)
+  end
+  if values.dividerAlongCount ~= nil then
+    UpdateCountField(dialog, "DividerAlongCountField", ClampDividerCount(values.dividerAlongCount))
+  end
 end
 
 --[[  -------------- ValidateDividers --------------------------------------------------
@@ -297,34 +429,73 @@ end
 |  set_text writes a hidden field (DisplayDialog's cached SetDialogText), decimals
 |  is the number of places in the messages.                 -- updated by Claude 11/27/2026
 |
+|  Along dividers (Direction Along / Both) are checked the same way against the
+|  inside width; their messages go to InvalidDividerAlongSpaces / ...AlongCount /
+|  ...AlongMinGap. With Both, the half-lap notches where they cross need a tool
+|  that fits them (one divider thickness wide).     -- by Claude 11/27/2026 (hardi)
+|
 ]]
-function ValidateDividers(dialog, options, report_as_dialog, effective_diameter, set_text, decimals)
-  local messages = {}
-  local general = ""
-  local inset_message = ""
-  local count_message = ""
-  local thickness_message = ""
-  local min_gap_message = ""   -- Spacing mode -- by Claude 11/27/2026
-  local spacing = DividerUsesSpacing(options)
-  local n = DividerCount(options)
-  local fmt = "%." .. (decimals or 3) .. "f"
 
-  if options.makeDividers then
-    if spacing then
-      -- Spacing mode: a minimum gap that leaves room for at least one divider
-      local g = tonumber(options.dividerMinGap) or 0
-      if g <= 0.0001 then
-        min_gap_message = "The minimum gap between dividers must be greater than 0."
-      elseif n < 1 then
-        min_gap_message = string.format("Not even one divider fits with gaps of at least " .. fmt .. " - the inside depth is only " .. fmt .. ". Use a smaller gap.",
-          g, options.depth - 2*options.thickness)
-      end
-    else
-      local entered = tonumber(options.dividerCountEntered or options.dividerCount)
-      if entered == nil or entered < 1 or entered > G_maxDividers or math.abs(entered - math.floor(entered + 0.5)) > 0.0001 then
-        count_message = string.format("The number of dividers must be a whole number from 1 to %d.", G_maxDividers)
+-- Count / spacing / fit checks for one axis. Returns the per-space messages, the
+-- count message, the minimum gap message and a "don't fit" message.
+local function ValidateDividerAxis(options, axis, fmt)
+  local K = AxisKeys(axis)
+  local messages, count_message, min_gap_message, fit_message = {}, "", "", ""
+  if not (options.makeDividers and DividerAxisOn(options, axis)) then
+    return messages, count_message, min_gap_message, fit_message
+  end
+  local spacing = DividerUsesSpacing(options, axis)
+  local n = DividerCount(options, axis)
+  local inside = DividerInside(options, axis)
+  local word = (axis == "along") and "width" or "depth"
+  local what = (axis == "along") and "along dividers" or "dividers"
+  if spacing then
+    -- Spacing mode: a minimum gap that leaves room for at least one divider
+    local g = tonumber(options[K.minGap]) or 0
+    if g <= 0.0001 then
+      min_gap_message = "The minimum gap between " .. what .. " must be greater than 0."
+    elseif n < 1 then
+      min_gap_message = string.format("Not even one divider fits with gaps of at least " .. fmt .. " - the inside " .. word .. " is only " .. fmt .. ". Use a smaller gap.",
+        g, inside)
+    end
+  else
+    local entered = tonumber(options[K.entered] or options[K.count])
+    if entered == nil or entered < 1 or entered > G_maxDividers or math.abs(entered - math.floor(entered + 0.5)) > 0.0001 then
+      count_message = string.format("The number of " .. what .. " must be a whole number from 1 to %d.", G_maxDividers)
+    end
+  end
+  if n > 0 then
+    for k = 1, n do
+      if spacing then break end   -- no Space fields in Spacing mode -- by Claude 11/27/2026
+      local space = options[K.space .. k]
+      if not space or space <= 0.0001 then
+        messages[k] = string.format("Space %d must be greater than 0.", k)
       end
     end
+    local last = DividerLastSpace(options, axis)
+    if last <= 0.0001 then
+      local used = inside - last
+      messages[n] = messages[n] or string.format("The " .. what .. " don't fit: the spaces plus %d divider(s) of " .. fmt .. " come to " .. fmt .. ", but the inside " .. word .. " is only " .. fmt .. ".",
+        n, DividerThickness(options), used, inside)
+      fit_message = messages[n]
+    end
+  end
+  return messages, count_message, min_gap_message, fit_message
+end
+
+function ValidateDividers(dialog, options, report_as_dialog, effective_diameter, set_text, decimals)
+  local general = ""
+  local inset_message = ""
+  local thickness_message = ""
+  local fmt = "%." .. (decimals or 3) .. "f"
+  local n = DividerTotalCount(options)   -- both axes -- by Claude 11/27/2026 (hardi)
+
+  -- per axis: spaces, count, Spacing mode's minimum gap, and whether they fit
+  local messages, count_message, min_gap_message, fit_across = ValidateDividerAxis(options, "across", fmt)
+  local along_messages, along_count_message, along_min_gap_message, fit_along = ValidateDividerAxis(options, "along", fmt)
+  if fit_across ~= "" then general = fit_across elseif fit_along ~= "" then general = fit_along end
+
+  if options.makeDividers then
     if (tonumber(options.dividerThickness) or 0) <= 0.0001 then
       thickness_message = "The divider thickness must be greater than 0."
     end
@@ -347,21 +518,6 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
       end
     end
 
-    for k = 1, n do
-      if spacing then break end   -- no Space fields in Spacing mode -- by Claude 11/27/2026
-      local space = options["dividerSpace" .. k]
-      if not space or space <= 0.0001 then
-        messages[k] = string.format("Space %d must be greater than 0.", k)
-      end
-    end
-    local last = DividerLastSpace(options)
-    if last <= 0.0001 then
-      local inside = options.depth - 2*options.thickness
-      local used = inside - last
-      messages[n] = messages[n] or string.format("The dividers don't fit: the spaces plus %d divider(s) of " .. fmt .. " come to " .. fmt .. ", but the inside depth is only " .. fmt .. ".", n, td, used, inside)
-      general = messages[n]
-    end
-
     local j = DividerJoints(options, options.facesToMake)
     local fw = DividerFingerWidths(options)
     local divider_height = j.z_top - j.z_bot
@@ -376,25 +532,38 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
         general = string.format("The divider grooves are only " .. fmt .. " wide (divider thickness + allowance), the tool (" .. fmt .. ") does not fit in them. Use a smaller tool.", gw, raw_dia)
       end
     end
-    if not grooves and general == "" and inset_message == "" and (j.side1 or j.side2) and divider_height <= (fw.side or 0) + 0.0001 then
+    local side_joints = ((DividerCount(options, "across") > 0) and (j.side1 or j.side2))
+                     or ((DividerCount(options, "along") > 0) and (j.end1 or j.end2))
+    if not grooves and general == "" and inset_message == "" and side_joints and divider_height <= (fw.side or 0) + 0.0001 then
       general = string.format("The dividers are only " .. fmt .. " tall inside the box - too short for a side joint of " .. fmt .. ". Use a smaller side joint width or a taller box.", divider_height, fw.side or 0)
     end
     if not grooves and general == "" and not options.no_toolpath and effective_diameter
         and effective_diameter > 0 and td <= effective_diameter + 0.0001 then
       general = string.format("The divider slots are only " .. fmt .. " wide (the divider thickness), the tool does not fit in them (" .. fmt .. "). Use a smaller tool.", td, effective_diameter)
     end
+    -- Both: the half-lap notches are one divider thickness wide -- by Claude 11/27/2026 (hardi)
+    if DividerCrosses(options) and general == "" and not options.no_toolpath and effective_diameter
+        and effective_diameter > 0 and td <= effective_diameter + 0.0001 then
+      general = string.format("The notches where the dividers cross are only " .. fmt .. " wide (the divider thickness), the tool does not fit in them (" .. fmt .. "). Use a smaller tool.", td, effective_diameter)
+    end
   end
 
   if report_as_dialog then
-    for _, m in ipairs({ count_message, min_gap_message, thickness_message }) do
+    for _, m in ipairs({ count_message, min_gap_message, along_count_message, along_min_gap_message, thickness_message }) do
       if m ~= "" then
         DisplayMessageBox(m)
         return false
       end
     end
-    for k = 1, n do
+    for k = 1, G_maxDividers do
       if messages[k] then
         DisplayMessageBox(messages[k])
+        return false
+      end
+    end
+    for k = 1, G_maxDividers do
+      if along_messages[k] then
+        DisplayMessageBox("Along dividers: " .. along_messages[k])
         return false
       end
     end
@@ -409,19 +578,27 @@ function ValidateDividers(dialog, options, report_as_dialog, effective_diameter,
     return true
   end
 
-  local list = {}
-  for k = 1, n do
-    if messages[k] then
-      list[#list + 1] = k .. ":" .. string.gsub(messages[k], "[|]", "/")
+  local function SpaceList(msgs)
+    local list = {}
+    for k = 1, G_maxDividers do
+      if msgs[k] then
+        list[#list + 1] = k .. ":" .. (string.gsub(msgs[k], "[|]", "/"))
+      end
     end
+    return table.concat(list, "|")
   end
-  set_text(dialog, "InvalidDividerSpaces", table.concat(list, "|"))
+  set_text(dialog, "InvalidDividerSpaces", SpaceList(messages))
   set_text(dialog, "InvalidDividers", general)
   set_text(dialog, "InvalidDividerInset", inset_message)
   set_text(dialog, "InvalidDividerCount", count_message)
   set_text(dialog, "InvalidDividerThickness", thickness_message)
   set_text(dialog, "InvalidDividerMinGap", min_gap_message)   -- by Claude 11/27/2026
-  return general == "" and inset_message == "" and count_message == "" and min_gap_message == "" and thickness_message == "" and next(messages) == nil
+  set_text(dialog, "InvalidDividerAlongSpaces", SpaceList(along_messages))   -- by Claude 11/27/2026 (hardi)
+  set_text(dialog, "InvalidDividerAlongCount", along_count_message)
+  set_text(dialog, "InvalidDividerAlongMinGap", along_min_gap_message)
+  return general == "" and inset_message == "" and count_message == "" and min_gap_message == ""
+     and along_count_message == "" and along_min_gap_message == "" and thickness_message == ""
+     and next(messages) == nil and next(along_messages) == nil
 end
 
 --[[  -------------- Building the box --------------------------------------------------
@@ -434,13 +611,16 @@ end
 
 -- CreateBoxFaces: slots / grooves in the walls, bottom and lid, then the dividers.
 function AddDividersToFaces(faces, options, facesToMake)
-  local n = DividerCount(options)
-  if n == 0 then
+  if DividerTotalCount(options) == 0 then   -- both axes -- by Claude 11/27/2026 (hardi)
     return
   end
   AddDividerSlotsToFaces(faces, options, facesToMake)
-  for k = 1, n do
+  for k = 1, DividerCount(options, "across") do
     faces[#faces + 1] = MakeDividerFace(options, facesToMake, k)
+  end
+  -- along dividers: "DividerL1", "DividerL2", ... numbered from Left -- by Claude 11/27/2026 (hardi)
+  for k = 1, DividerCount(options, "along") do
+    faces[#faces + 1] = MakeDividerFace(options, facesToMake, k, "along")
   end
 end
 
@@ -568,15 +748,22 @@ end
 ]]
 
 -- Number of dividers actually being made (0 when the Dividers box is unticked).
-function DividerCount(options)
-  if not options.makeDividers then
+-- axis: "across" (default) or "along"; 0 when the Direction leaves that axis out.
+--                                                       -- axis: by Claude 11/27/2026 (hardi)
+function DividerCount(options, axis)
+  if not options.makeDividers or not DividerAxisOn(options, axis) then
     return 0
   end
-  if DividerUsesSpacing(options) then
-    return DividerSpacingCount(options)   -- as many as fit at the minimum gap -- by Claude 11/27/2026
+  if DividerUsesSpacing(options, axis) then
+    return DividerSpacingCount(options, axis)   -- as many as fit at the minimum gap -- by Claude 11/27/2026
   end
-  local n = math.floor((tonumber(options.dividerCount) or 0) + 0.5)
+  local n = math.floor((tonumber(options[AxisKeys(axis).count]) or 0) + 0.5)
   return math.max(0, math.min(n, G_maxDividers))
+end
+
+-- Both axes in use: the dividers cross and are half lapped. -- by Claude 11/27/2026 (hardi)
+function DividerCrosses(options)
+  return DividerCount(options, "across") > 0 and DividerCount(options, "along") > 0
 end
 
 --[[  -------------- Spacing mode --------------------------------------------------
@@ -589,66 +776,71 @@ end
 |  used in this mode.                                         -- by Claude 11/27/2026
 |
 ]]
-function DividerUsesSpacing(options)
-  return options.dividerMode == "Spacing"
+-- All of these take an optional axis ("across" when left out, "along" for the
+-- dividers parallel to Left / Right, measured along the width from Left's outer
+-- face).                                                   -- by Claude 11/27/2026 (hardi)
+function DividerUsesSpacing(options, axis)
+  return options[AxisKeys(axis).mode] == "Spacing"
 end
 
-function DividerSpacingCount(options)
-  local g = tonumber(options.dividerMinGap) or 0
+function DividerSpacingCount(options, axis)
+  local g = tonumber(options[AxisKeys(axis).minGap]) or 0
   if g <= 0.0001 then
     return 0
   end
-  local inside = options.depth - 2*options.thickness
+  local inside = DividerInside(options, axis)
   local n = math.floor((inside - g) / (g + DividerThickness(options)) + 0.000001)
   return math.max(0, math.min(n, G_maxDividers))
 end
 
 -- The gap in front of divider k: the Space field, or in Spacing mode the even gap.
-function DividerSpace(options, k)
-  if DividerUsesSpacing(options) then
-    local n = DividerSpacingCount(options)
-    local inside = options.depth - 2*options.thickness
+function DividerSpace(options, k, axis)
+  if DividerUsesSpacing(options, axis) then
+    local n = DividerSpacingCount(options, axis)
+    local inside = DividerInside(options, axis)
     return (inside - n*DividerThickness(options)) / (n + 1)
   end
-  return options["dividerSpace" .. k] or 0
+  return options[AxisKeys(axis).space .. k] or 0
 end
 
--- y_box of each divider's front face. The walls are the material thickness (t),
--- each divider its own thickness (td).                -- td: by Claude 11/27/2026
-function DividerPositions(options)
+-- y_box of each divider's front face (along: x_box of its face towards Left).
+-- The walls are the material thickness (t), each divider its own thickness (td).
+--                                                        -- td: by Claude 11/27/2026
+function DividerPositions(options, axis)
   local t = options.thickness
   local td = DividerThickness(options)
   local positions = {}
   local y = t
-  for k = 1, DividerCount(options) do
-    y = y + DividerSpace(options, k)   -- Space field, or the even gap in Spacing mode -- by Claude 11/27/2026
+  for k = 1, DividerCount(options, axis) do
+    y = y + DividerSpace(options, k, axis)   -- Space field, or the even gap in Spacing mode -- by Claude 11/27/2026
     positions[k] = y
     y = y + td
   end
   return positions
 end
 
--- Clear space behind the last divider, up to Back's inside face.
-function DividerLastSpace(options)
+-- Clear space behind the last divider, up to Back's inside face (along: up to
+-- Right's inside face).
+function DividerLastSpace(options, axis)
   local t = options.thickness
-  local n = DividerCount(options)
+  local n = DividerCount(options, axis)
   local behind = t
   if n > 0 then
-    behind = DividerPositions(options)[n] + DividerThickness(options)
+    behind = DividerPositions(options, axis)[n] + DividerThickness(options)
   end
-  return (options.depth - t) - behind
+  return (t + DividerInside(options, axis)) - behind
 end
 
 -- Fill every divider space with an even spacing for the current count. Used
 -- when nothing usable has been saved yet.
-function SetEvenDividerSpaces(options)
-  local t = options.thickness
+function SetEvenDividerSpaces(options, axis)
+  local K = AxisKeys(axis)
   local td = DividerThickness(options)
-  local n = math.max(1, math.min(math.floor((tonumber(options.dividerCount) or 1) + 0.5), G_maxDividers))
-  local even = ((options.depth - 2*t) - n*td) / (n + 1)
+  local n = math.max(1, math.min(math.floor((tonumber(options[K.count]) or 1) + 0.5), G_maxDividers))
+  local even = (DividerInside(options, axis) - n*td) / (n + 1)
   even = math.max(0, Truncate(even, 3))
   for k = 1, G_maxDividers do
-    options["dividerSpace" .. k] = even
+    options[K.space .. k] = even
   end
 end
 
@@ -716,6 +908,9 @@ function DividerJoints(options, facesToMake)
 
   j.side1 = (facesToMake.side1 or tabsForMissing) and true or false
   j.side2 = (facesToMake.side2 or tabsForMissing) and true or false
+  -- along dividers joint into Front (end1) / Back (end2)  -- by Claude 11/27/2026 (hardi)
+  j.end1 = (facesToMake.end1 or tabsForMissing) and true or false
+  j.end2 = (facesToMake.end2 or tabsForMissing) and true or false
   return j
 end
 
@@ -828,35 +1023,187 @@ local function DividerGrooveRunOn(options)
   return r
 end
 
+--[[  -------------- Crossing dividers (half lap) --------------------------------------------------
+|
+|  Direction "Both": across and along dividers cross. Where they do, each gets a
+|  notch one divider thickness wide: the across divider from the TOP down, the
+|  along divider from the BOTTOM up, each just past half the divider's height
+|  (half the tool radius more), so the round inside corners the bit leaves in one
+|  notch stay clear of the other divider. Pushed together they sit flush top and
+|  bottom.
+|
+|  A divider never has fingers on its notched edge near a crossing: those would
+|  run into the notch, and their slots in the bottom / lid into the other
+|  divider's. Within one divider thickness either side of a crossing they are
+|  left out (the other divider's fingers there are kept: it is whole at that edge).
+|
+|  Part coordinates: an across divider is drawn with x = box x from Left's outer
+|  face, an along divider with x = box y from Front's outer face - so the other
+|  axis's positions (DividerPositions) are its notch positions as they are.
+|                                                           -- by Claude 11/27/2026 (hardi)
+]]
+
+local function OtherAxis(axis)
+  return ((axis or "across") == "along") and "across" or "along"
+end
+
+-- Where this axis's dividers are crossed: { {from, to}, ... } in part x (box
+-- coordinates along the divider), empty unless both axes are in use.
+local function DividerCrossings(options, axis)
+  local list = {}
+  if not DividerCrosses(options) then
+    return list
+  end
+  local td = DividerThickness(options)
+  for _, p in ipairs(DividerPositions(options, OtherAxis(axis))) do
+    list[#list + 1] = { p, p + td }
+  end
+  return list
+end
+
+-- Leave out the finger spans (relative to the inside corner at box coordinate
+-- `t`) that come within `margin` of a crossing.
+local function DropSpansNearCrossings(spans, crossings, t, margin)
+  if #crossings == 0 then
+    return spans
+  end
+  local kept = {}
+  for _, s in ipairs(spans) do
+    local a, b = t + s[1], t + s[2]
+    local clear = true
+    for _, c in ipairs(crossings) do
+      if b > c[1] - margin and a < c[2] + margin then
+        clear = false
+        break
+      end
+    end
+    if clear then kept[#kept + 1] = s end
+  end
+  return kept
+end
+
+-- Draws one straight edge of a divider from `start` along `along` (the contour
+-- must already end at `start`). `feats` = { {a, b, depth, finger}, ... } sorted by
+-- a, measured from `start`: a finger sticks out by depth towards `out`, a notch
+-- (negative depth) goes in. Tab points on the plain stretches, finger sides into
+-- fingerSides (for the roundover) like DrawDividerEdge.
+local function DrawDividerEdgeFeatures(contour, start, along, out, length, feats, tablist, fingerSides)
+  local function at(d)
+    return start + d*along
+  end
+  local prev = 0
+  for k = 1, #feats do
+    local a, b, depth = feats[k][1], feats[k][2], feats[k][3]
+    if (a - prev > 0.000001) then
+      contour:LineTo(at(a))
+      tablist[#tablist + 1] = at(0.5*(prev + a))
+    end
+    local a_out = at(a) + depth*out
+    local b_out = at(b) + depth*out
+    if fingerSides and feats[k][4] then
+      fingerSides:AddTail(MakeLine(at(a), a_out))
+      fingerSides:AddTail(MakeLine(b_out, at(b)))
+    end
+    contour:LineTo(a_out)
+    contour:LineTo(b_out)
+    contour:LineTo(at(b))
+    prev = b
+  end
+  if (length - prev > 0.000001) then
+    contour:LineTo(at(length))
+    tablist[#tablist + 1] = at(0.5*(prev + length))
+  end
+end
+
+-- Edge features from box-coordinate intervals: `x_start` is the box coordinate the
+-- edge starts at, `dir` +1 / -1 the way it runs. Sorted along the edge.
+local function EdgeFeats(intervals, x_start, dir)
+  local feats = {}
+  for _, iv in ipairs(intervals) do
+    local a = dir*(iv[1] - x_start)
+    local b = dir*(iv[2] - x_start)
+    if a > b then a, b = b, a end
+    feats[#feats + 1] = { a, b, iv[3], iv[4] }
+  end
+  table.sort(feats, function(u, v) return u[1] < v[1] end)
+  return feats
+end
+
+-- The divider part's frame: its length (box width or depth), which neighbours
+-- its two ends joint into (lo = the x = 0 end: Left for across, Front for
+-- along), its name, and the crossings and which edge they notch.
+local function DividerPartFrame(options, j, index, axis)
+  local f = {}
+  if (axis or "across") == "along" then
+    f.length = options.depth
+    f.lo, f.hi = j.end1, j.end2
+    f.name = "DividerL" .. index
+    f.notch_bottom = true
+  else
+    f.length = options.width
+    f.lo, f.hi = j.side1, j.side2
+    f.name = "Divider" .. index
+    f.notch_top = true
+  end
+  f.crossings = DividerCrossings(options, axis)
+  return f
+end
+
 -- The divider part for grooves: drawn like the finger one (Left at x = 0, y = z),
 -- body inside width x z_bot..z_top, plus a tongue along each grooved edge.
-function MakeGroovedDividerFace(options, facesToMake, index)
+-- Along dividers: Front at x = 0, tongues into Front / Back; crossings notched.
+--                                                   -- axis, notches: by Claude 11/27/2026 (hardi)
+function MakeGroovedDividerFace(options, facesToMake, index, axis)
   local t = options.thickness
   local sp = options.start_point
   local j = DividerJoints(options, facesToMake)
+  local f = DividerPartFrame(options, j, index, axis)
   local g = DividerTongue(options)
-  local gL = j.side1 and g or 0      -- into Left (x = 0 side of the part)
-  local gR = j.side2 and g or 0      -- into Right
+  local gL = f.lo and g or 0         -- into Left / Front (x = 0 side of the part)
+  local gR = f.hi and g or 0         -- into Right / Back
   local gB = j.bottom and g or 0
   local gT = j.lid and g or 0
   local xl = sp.x + t
-  local xr = sp.x + options.width - t
+  local xr = sp.x + f.length - t
   local yb = sp.y + j.z_bot
   local yt = sp.y + j.z_top
+  local run = DividerGrooveRunOn(options)
+  local ymid = 0.5*(yb + yt)
+
+  -- notches: down from the top edge (across) to just below the middle, or up
+  -- from the bottom edge (along) to just above it
+  local bottom_ivs, top_ivs = {}, {}
+  for _, c in ipairs(f.crossings) do
+    if f.notch_bottom then
+      bottom_ivs[#bottom_ivs + 1] = { c[1], c[2], -((ymid + 0.5*run) - (yb - gB)), false }
+    else
+      top_ivs[#top_ivs + 1] = { c[1], c[2], -((yt + gT) - (ymid - 0.5*run)), false }
+    end
+  end
 
   local tablist = {}
   local contour = Contour(0.0)
   contour:AppendPoint(Point2D(xl, yb - gB))
-  LineToIfNeeded(contour, Point2D(xr, yb - gB))
-  AddMiddleOfLastSpanToList(contour, tablist)
+  if #bottom_ivs > 0 then
+    DrawDividerEdgeFeatures(contour, Point2D(xl, yb - gB), unit_x, -unit_y, xr - xl,
+      EdgeFeats(bottom_ivs, t, 1), tablist, nil)
+  else
+    LineToIfNeeded(contour, Point2D(xr, yb - gB))
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
   LineToIfNeeded(contour, Point2D(xr, yb))
   LineToIfNeeded(contour, Point2D(xr + gR, yb))
   LineToIfNeeded(contour, Point2D(xr + gR, yt))
   AddMiddleOfLastSpanToList(contour, tablist)
   LineToIfNeeded(contour, Point2D(xr, yt))
   LineToIfNeeded(contour, Point2D(xr, yt + gT))
-  LineToIfNeeded(contour, Point2D(xl, yt + gT))
-  AddMiddleOfLastSpanToList(contour, tablist)
+  if #top_ivs > 0 then
+    DrawDividerEdgeFeatures(contour, Point2D(xr, yt + gT), -unit_x, unit_y, xr - xl,
+      EdgeFeats(top_ivs, f.length - t, -1), tablist, nil)
+  else
+    LineToIfNeeded(contour, Point2D(xl, yt + gT))
+    AddMiddleOfLastSpanToList(contour, tablist)
+  end
   LineToIfNeeded(contour, Point2D(xl, yt))
   LineToIfNeeded(contour, Point2D(xl - gL, yt))
   LineToIfNeeded(contour, Point2D(xl - gL, yb))
@@ -864,7 +1211,7 @@ function MakeGroovedDividerFace(options, facesToMake, index)
   LineToIfNeeded(contour, Point2D(xl, yb))
   LineToIfNeeded(contour, Point2D(xl, yb - gB))
 
-  return Face(contour, nil, {}, tablist, "Divider" .. index, FaceType.Divider, FaceJointType.Fingers, {}, nil)
+  return Face(contour, nil, {}, tablist, f.name, FaceType.Divider, FaceJointType.Fingers, {}, nil)
 end
 
 --[[  -------------- MakeDividerFace --------------------------------------------------
@@ -874,42 +1221,64 @@ end
 |  Drawn anti-clockwise, Left at x = 0, y = z.
 |
 ]]
-function MakeDividerFace(options, facesToMake, index)
+function MakeDividerFace(options, facesToMake, index, axis)
   if DividerUsesGrooves(options) then
-    return MakeGroovedDividerFace(options, facesToMake, index)   -- by Claude 11/26/2026
+    return MakeGroovedDividerFace(options, facesToMake, index, axis)   -- by Claude 11/26/2026
   end
   local t = options.thickness
   local sp = options.start_point
   local j = DividerJoints(options, facesToMake)
   local fw = DividerFingerWidths(options)
+  -- across: Left at x = 0, ends into Left / Right; along: Front at x = 0, ends
+  -- into Front / Back. Crossings notched, fingers kept clear of them.
+  --                                                   -- axis, notches: by Claude 11/27/2026 (hardi)
+  local f = DividerPartFrame(options, j, index, axis)
 
   local x0 = sp.x + t
-  local x1 = sp.x + options.width - t
+  local x1 = sp.x + f.length - t
   local y0 = sp.y + j.z_bot
   local y1 = sp.y + j.z_top
   local inner_w = x1 - x0
   local inner_h = y1 - y0
   local side_spans = DividerFingerSpans(inner_h, fw.side)
   local none = {}
+  local td = DividerThickness(options)
+  local notch_depth = 0.5*inner_h + 0.5*DividerGrooveRunOn(options)
+
+  -- bottom / top edges as box-coordinate intervals: fingers (depth t) and notches
+  local bottom_ivs, top_ivs = {}, {}
+  local bottom_spans = j.bottom and DividerFingerSpans(inner_w, fw.bottom) or none
+  local lid_spans = j.lid and DividerFingerSpans(inner_w, fw.lid) or none
+  if f.notch_bottom then bottom_spans = DropSpansNearCrossings(bottom_spans, f.crossings, t, td) end
+  if f.notch_top then lid_spans = DropSpansNearCrossings(lid_spans, f.crossings, t, td) end
+  for _, s in ipairs(bottom_spans) do bottom_ivs[#bottom_ivs + 1] = { t + s[1], t + s[2], t, true } end
+  for _, s in ipairs(lid_spans) do top_ivs[#top_ivs + 1] = { t + s[1], t + s[2], t, true } end
+  for _, c in ipairs(f.crossings) do
+    if f.notch_bottom then
+      bottom_ivs[#bottom_ivs + 1] = { c[1], c[2], -notch_depth, false }
+    else
+      top_ivs[#top_ivs + 1] = { c[1], c[2], -notch_depth, false }
+    end
+  end
 
   local tablist = {}
   local fingerSides = ContourGroup(true)
   local contour = Contour(0.0)
   contour:AppendPoint(Point2D(x0, y0))
   -- bottom edge, left to right: fingers down through the bottom panel
-  DrawDividerEdge(contour, Point2D(x0, y0), unit_x, -unit_y, inner_w,
-    j.bottom and DividerFingerSpans(inner_w, fw.bottom) or none, t, tablist, fingerSides)
-  -- right edge, upwards: fingers through Right (Side 2)
+  DrawDividerEdgeFeatures(contour, Point2D(x0, y0), unit_x, -unit_y, inner_w,
+    EdgeFeats(bottom_ivs, t, 1), tablist, fingerSides)
+  -- right edge, upwards: fingers through Right (Side 2) / Back
   DrawDividerEdge(contour, Point2D(x1, y0), unit_y, unit_x, inner_h,
-    j.side2 and side_spans or none, t, tablist, fingerSides)
+    f.hi and side_spans or none, t, tablist, fingerSides)
   -- top edge, right to left: fingers up through the lid
-  DrawDividerEdge(contour, Point2D(x1, y1), -unit_x, unit_y, inner_w,
-    j.lid and DividerFingerSpans(inner_w, fw.lid) or none, t, tablist, fingerSides)
-  -- left edge, downwards: fingers through Left (Side 1)
+  DrawDividerEdgeFeatures(contour, Point2D(x1, y1), -unit_x, unit_y, inner_w,
+    EdgeFeats(top_ivs, f.length - t, -1), tablist, fingerSides)
+  -- left edge, downwards: fingers through Left (Side 1) / Front
   DrawDividerEdge(contour, Point2D(x0, y1), -unit_y, -unit_x, inner_h,
-    j.side1 and side_spans or none, t, tablist, fingerSides)
+    f.lo and side_spans or none, t, tablist, fingerSides)
 
-  return Face(contour, nil, {}, tablist, "Divider" .. index, FaceType.Divider, FaceJointType.Fingers, {}, fingerSides)
+  return Face(contour, nil, {}, tablist, f.name, FaceType.Divider, FaceJointType.Fingers, {}, fingerSides)
 end
 
 -- Height in the side wall's own drawing that matches box height z: the wall's
@@ -939,21 +1308,48 @@ end
 |
 ]]
 function AddDividerSlotsToFaces(faces, options, facesToMake)
-  local n = DividerCount(options)
-  if n == 0 then
+  local n = DividerCount(options, "across")
+  local n_along = DividerCount(options, "along")   -- by Claude 11/27/2026 (hardi)
+  if n + n_along == 0 then
     return
   end
   local t = options.thickness            -- the walls / bottom / lid
   local td = DividerThickness(options)   -- the dividers: slot / groove width across the depth -- by Claude 11/27/2026
   local sp = options.start_point
-  local positions = DividerPositions(options)
+  local positions = DividerPositions(options, "across")
+  local along_positions = DividerPositions(options, "along")
   local j = DividerJoints(options, facesToMake)
   local fw = DividerFingerWidths(options)
   local inner_w = options.width - 2*t
+  local inner_d = options.depth - 2*t
   local side_spans = DividerFingerSpans(j.z_top - j.z_bot, fw.side)
+  -- across dividers: lid fingers kept clear of the crossings (they are notched
+  -- from the top); along dividers: bottom fingers (notched from the bottom)
+  --                                                       -- by Claude 11/27/2026 (hardi)
   local bottom_spans = DividerFingerSpans(inner_w, fw.bottom)
-  local lid_spans = DividerFingerSpans(inner_w, fw.lid)
+  local lid_spans = DropSpansNearCrossings(DividerFingerSpans(inner_w, fw.lid), DividerCrossings(options, "across"), t, td)
+  local along_bottom_spans = DropSpansNearCrossings(DividerFingerSpans(inner_d, fw.bottom), DividerCrossings(options, "along"), t, td)
+  local along_lid_spans = DividerFingerSpans(inner_d, fw.lid)
   local wall_bottom = SideWallBottomZ(options)
+
+  -- Front / Back: their drawing has y = z, and Front's x runs from Left (x = 0),
+  -- Back's from Right (see MakeEndFace).                -- by Claude 11/27/2026 (hardi)
+  local function EndX(face_is_end1, x_box)
+    if face_is_end1 then return sp.x + x_box end
+    return sp.x + options.width - x_box - td
+  end
+  local function EndHeight(is_end1)
+    local h = is_end1 and options.end1Height or options.end2Height
+    return h or options.height
+  end
+  -- lowest z of an end's own drawing (Back is cut short above a sliding bottom)
+  local function EndBottomZ(is_end1)
+    local bt = options.bottomType
+    if bt == FaceJointType.Grooved then
+      return is_end1 and 0 or (options.bottomGrooveOffset or 0)
+    end
+    return 0
+  end
 
   -- Dividers set to Groove: grooves (pocketed half deep) instead of through slots,
   -- same faces and the same coordinates as the slots below.  -- by Claude 11/26/2026
@@ -984,7 +1380,8 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
     if j.z_bot < 0.0001 then z0 = -run end   -- no bottom: open at the bottom edge too
     local inset = tonumber(options.dividerInset) or 0
     local z1 = j.z_top + math.max(0, options.allowance or 0) + run
-    if DividerGroovesOpenTop(options) and inset <= 0.0001 then z1 = options.height + run end
+    local open_top = DividerGroovesOpenTop(options) and inset <= 0.0001
+    if open_top then z1 = options.height + run end
     for i = 1, #faces do
       local face = faces[i]
       if (face.facetype == FaceType.Side) then
@@ -1000,15 +1397,40 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
             AddGroove(face, xa, ya, xa + gw, yb)
           end
         end
+      elseif (face.facetype == FaceType.End and (face.name == "EndFace1" or face.name == "EndFace2")) then
+        -- along dividers: the same grooves in Front / Back -- by Claude 11/27/2026 (hardi)
+        local is_end1 = (face.name == "EndFace1")
+        if n_along > 0 and ((is_end1 and j.end1) or ((not is_end1) and j.end2)) then
+          local ez0 = math.max(z0, EndBottomZ(is_end1))
+          if j.z_bot < 0.0001 then ez0 = -run end
+          local ez1 = open_top and (EndHeight(is_end1) + run) or z1
+          -- Back under a sliding lid ends at the lid's underside: the groove runs
+          -- out there rather than past the part's edge
+          if (not is_end1) and options.lidType == FaceJointType.Grooved then
+            ez1 = math.min(ez1, EndHeight(false) - (options.lidGrooveOffset or 0))
+          end
+          for k = 1, n_along do
+            local xa = EndX(is_end1, along_positions[k]) - half_play
+            AddGroove(face, xa, sp.y + ez0, xa + gw, sp.y + ez1)
+          end
+        end
       elseif (face.facetype == FaceType.Bottom and j.bottom) then
         for k = 1, n do
           local ya = sp.y + positions[k] - half_play
           AddGroove(face, sp.x + t - run, ya, sp.x + options.width - t + run, ya + gw)
         end
+        for k = 1, n_along do   -- by Claude 11/27/2026 (hardi)
+          local xa = sp.x + along_positions[k] - half_play
+          AddGroove(face, xa, sp.y + t - run, xa + gw, sp.y + options.depth - t + run)
+        end
       elseif (face.facetype == FaceType.Lid and j.lid) then
         for k = 1, n do
           local ya = sp.y + options.depth - positions[k] - td - half_play
           AddGroove(face, sp.x + t - run, ya, sp.x + options.width - t + run, ya + gw)
+        end
+        for k = 1, n_along do   -- by Claude 11/27/2026 (hardi)
+          local xa = sp.x + along_positions[k] - half_play
+          AddGroove(face, xa, sp.y + t - run, xa + gw, sp.y + options.depth - t + run)
         end
       end
     end
@@ -1045,6 +1467,17 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
           end
         end
       end
+    elseif (face.facetype == FaceType.End and (face.name == "EndFace1" or face.name == "EndFace2")) then
+      -- along dividers: through slots in Front / Back -- by Claude 11/27/2026 (hardi)
+      local is_end1 = (face.name == "EndFace1")
+      if (is_end1 and j.end1) or ((not is_end1) and j.end2) then
+        for k = 1, n_along do
+          local xa = EndX(is_end1, along_positions[k])
+          for s = 1, #side_spans do
+            AddSlot(face, xa, sp.y + j.z_bot + side_spans[s][1], xa + td, sp.y + j.z_bot + side_spans[s][2])
+          end
+        end
+      end
     elseif (face.facetype == FaceType.Bottom and j.bottom) then
       for k = 1, n do
         local ya = sp.y + positions[k]
@@ -1052,11 +1485,25 @@ function AddDividerSlotsToFaces(faces, options, facesToMake)
           AddSlot(face, sp.x + t + bottom_spans[s][1], ya, sp.x + t + bottom_spans[s][2], ya + td)
         end
       end
+      for k = 1, n_along do   -- Front at y = 0 -- by Claude 11/27/2026 (hardi)
+        local xa = sp.x + along_positions[k]
+        for s = 1, #along_bottom_spans do
+          AddSlot(face, xa, sp.y + t + along_bottom_spans[s][1], xa + td, sp.y + t + along_bottom_spans[s][2])
+        end
+      end
     elseif (face.facetype == FaceType.Lid and j.lid) then
       for k = 1, n do
         local ya = sp.y + options.depth - positions[k] - td
+        -- x as on the bottom (Left at x = 0), only Front / Back are flipped on
+        -- the lid; the spans can be uneven now (crossings) -- by Claude 11/27/2026 (hardi)
         for s = 1, #lid_spans do
           AddSlot(face, sp.x + t + lid_spans[s][1], ya, sp.x + t + lid_spans[s][2], ya + td)
+        end
+      end
+      for k = 1, n_along do   -- Front at y = depth on the lid -- by Claude 11/27/2026 (hardi)
+        local xa = sp.x + along_positions[k]
+        for s = 1, #along_lid_spans do
+          AddSlot(face, xa, sp.y + options.depth - t - along_lid_spans[s][2], xa + td, sp.y + options.depth - t - along_lid_spans[s][1])
         end
       end
     end

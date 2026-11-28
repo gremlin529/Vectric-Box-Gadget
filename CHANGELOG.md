@@ -2,6 +2,25 @@
 
 Changes made to the Simple Box Creator gadget on the `users/hardiagithub/...` branches, newest first. Commit hashes are given where available.
 
+### 2026-11-28
+
+Branch `users/hardiagithub/dividers-test`, based on `users/gremlin/Dividers` (`c5f2366`).
+
+- **Dividers in both directions: along dividers and crossing grids**
+  Next to the dividers across the width (parallel to Front / Back) there are now dividers along the depth (parallel to Left / Right), jointed into Front and Back with the same joint (Fingers or Grooved), thickness and Top inset. In `Dividers.xlua` every spacing function takes an axis (`"across"` / `"along"`); the along dividers have their own count, Count / Spacing mode, minimum gap and spaces (`dividerAlong...` options, saved in the registry, document variables and Export / Import), and `options.dividerDirection` is Across, Along or Both. The parts are named `DividerL1`, `DividerL2`, ... (label "DIVIDER L1").
+
+- **Half-lap notches where dividers cross**
+  With both directions, the across dividers are notched from the top and the along dividers from the bottom, one divider thickness wide. Each notch goes half a tool radius past the middle, so the round inside corners left by the bit stay clear of the other divider; both still stand flush top and bottom. Fingers on a notched edge are left out within one divider thickness of a crossing, and so are their slots in the bottom / lid. A tool that does not fit the notches is reported in the dialog.
+
+- **Slots and grooves in Front / Back, bottom and lid for the along dividers**
+  `AddDividerSlotsToFaces` adds the through slots (Fingers) or grooves (Grooved) to Front and Back and the along slots / grooves to the bottom and lid. A groove in Back under a sliding lid stops at the lid's underside.
+
+- **Dialog: divider grid instead of the Space lists**
+  Rows (compartments front to back) and Columns (left to right) replace the two divider counts; they set the hidden counts and the Direction. Below them a top view of the compartments, roughly to scale, with each column's width over it and each row's depth beside it; the last row and column show what is left. Columns sits over the drawing, Rows beside it. Built from a table and the existing Space boxes (`renderDividerGrid`), normal flow only (IE7).
+
+- **Isometric view: along dividers**
+  Drawn piece by piece between the across dividers in the same back-to-front order; where they cross, the along divider's top runs on over the across one. Their finger ends show on Front's outer face and in the lid, their grooves in Back's inside face and as notches in the rims.
+
 ### 2026-10-29
 
 - **Groove deeper than half the material thickness is a warning, not an error** (`56b317f`)
